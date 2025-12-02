@@ -1,0 +1,10 @@
+venv_flet/
+venv_django/
+frontend/venv_flet/
+backend/venv_django/
+__pycache__/
+*.pyc
+frontend/build/
+.env
+db.sqlite3
+.DS_Store
