@@ -48,26 +48,37 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Apps de Terceiros
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
+    'corsheaders', # Se estiver usando cors
+    
+    # Allauth (Autenticação Social)
     'django.contrib.sites',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
-    'api'
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
+    
+    # Seus Apps
+    'api',
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware', # Recomendado estar no topo
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'allauth.account.middleware.AccountMiddleware'
+    
+    # ADICIONE ESTA LINHA SE NÃO TIVER (Obrigatória na versão nova):
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'projeto_principal.urls'
@@ -162,30 +173,26 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
 
-# Redirecionamento após login/logout
-LOGIN_REDIRECT_URL = '/api/google-callback/'  # Tenta ir para a raiz do site (pode dar 404 no Django, mas o Flet intercepta o cookie/token se configurado, ou a gente pega o token de outra forma)
-LOGOUT_REDIRECT_URL = '/'
-
-# MANTENHA O ADAPTER (Ele é essencial para pular a tela de cadastro)
-SOCIALACCOUNT_ADAPTER = 'api.adapters.CustomSocialAccountAdapter'
-
-# CONFIGURAÇÕES CLÁSSICAS (Compatíveis com dj-rest-auth e Allauth 0.60)
+# Configurações do Allauth (Nova Sintaxe)
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_UNIQUE_EMAIL = True
-ACCOUNT_USERNAME_REQUIRED = False  # <--- Isso evita pedir username
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None # <--- Diz ao Allauth que não usamos username no login
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None # Diz que não usamos username
 
-# Pular verificações de email
+# Evitar bloqueios de verificação
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
 
-# Login automático
+# Fluxo
 SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
 ACCOUNT_LOGOUT_ON_GET = True
 
-# Provider Google (Mantenha igual)
+# Adapter (Mantenha o seu arquivo customizado, ele ainda funciona)
+SOCIALACCOUNT_ADAPTER = 'api.adapters.CustomSocialAccountAdapter'
+
+# Provider Google
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'SCOPE': ['profile', 'email'],
@@ -193,6 +200,11 @@ SOCIALACCOUNT_PROVIDERS = {
         'VERIFIED_EMAIL': True,
     }
 }
+
+# JWT
+REST_USE_JWT = True
+JWT_AUTH_COOKIE = 'my-app-auth'
+JWT_AUTH_REFRESH_COOKIE = 'my-refresh-token'
 
 LOGIN_REDIRECT_URL = '/api/google-callback/'
 
