@@ -1,5 +1,3 @@
-# frontend/main.py
-
 import flet as ft
 import requests
 import time
@@ -7,6 +5,7 @@ import certifi
 import urllib3
 import charset_normalizer
 import config  # Importa as configurações globais (Ícones, URL)
+import urllib.parse
 from home_view import create_main_view  # Importa a sua tela Home com abas
 
 # Atalhos vindos do config.py
@@ -229,31 +228,40 @@ def create_register_view(page: ft.Page):
     )
 
 # ===============================================
-# ROTEAMENTO CENTRAL (O Maestro)
+# ROTEAMENTO INTELIGENTE (COM DEEP LINK)
 # ===============================================
 def route_change(e: ft.RouteChangeEvent, page: ft.Page):
+    print(f"Rota: {page.route}") 
+
+    # --- LÓGICA MÁGICA (DEEP LINK) ---
+    if page.route.startswith("/login-callback"):
+        try:
+            # Pega o token escondido na URL
+            parsed = urllib.parse.urlparse(page.route)
+            token = urllib.parse.parse_qs(parsed.query).get('access', [None])[0]
+            
+            if token:
+                page.client_storage.set("token", token)
+                print("Token pego automaticamente!")
+                page.go("/") # Manda direto para a Home
+                return
+        except Exception as ex:
+            print(f"Erro Deep Link: {ex}")
+
+    # --- LÓGICA PADRÃO ---
     page.views.clear()
-    
-    # Verifica se existe token salvo
     token = page.client_storage.get("token")
 
-    # Lógica de decisão de telas
     if page.route == "/login":
         page.views.append(create_login_view(page))
-        
     elif page.route == "/register":
         page.views.append(create_register_view(page))
-        
-    elif page.route == "/":
+    elif page.route == "/" or page.route == "":
         if token:
-            # AQUI: Chama a função importada do home_view.py
             page.views.append(create_main_view(page)) 
         else:
-            # Sem token? Manda pro login
             page.go("/login")
-            
     else:
-        # Rota desconhecida? Manda pro login
         page.go("/login")
     
     page.update()
@@ -278,4 +286,4 @@ def main(page: ft.Page):
     # Inicia na rota /
     page.go(page.route)
 
-ft.app(target=main, assets_dir="assets")
+ft.app(target=main, assets_dir="assets", deep_link_url_scheme="vigiaa")

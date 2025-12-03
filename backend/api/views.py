@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.http import HttpResponse
+from django.http import HttpResponseRedirect
 
 # Importações para o Login Social (Google)
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
@@ -22,24 +23,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from allauth.socialaccount.models import SocialToken, SocialAccount
 from django.contrib.auth.decorators import login_required
 
-@login_required
+
 @login_required
 def google_callback_token(request):
     user = request.user
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     
-    # HTML simples para copiar o token
-    return HttpResponse(f"""
-        <div style="background-color:black; color:#00ff00; padding:20px; font-family:monospace; word-break:break-all;">
-            <h1>LOGIN SUCESSO!</h1>
-            <p>Copie o token abaixo:</p>
-            <br>
-            <p>{access_token}</p>
-        </div>
-    """)
+    # ISSO É O QUE FAZ O APP ABRIR SOZINHO:
+    # Ele redireciona para "vigiaa://" com o token
+    return HttpResponseRedirect(f"vigiaa://login-callback?access={access_token}")
 
-# Não esqueça de importar HttpResponse: from django.http import HttpResponse
 
 
 # -----------------------------------
