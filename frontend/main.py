@@ -286,4 +286,9 @@ def main(page: ft.Page):
     # Inicia na rota /
     page.go(page.route)
 
-ft.app(target=main, assets_dir="assets", deep_link_url_scheme="vigiaa")
+try:
+    ft.app(target=main, assets_dir="assets", deep_link_url_scheme="vigiaa")
+# Se der erro de versão, roda sem Deep Link (Modo de Segurança)
+except TypeError:
+    print("AVISO: Versão antiga do Flet detectada. Deep Link desativado.")
+    ft.app(target=main, assets_dir="assets")
