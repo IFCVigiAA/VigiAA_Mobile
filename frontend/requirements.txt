@@ -1,4 +1,4 @@
-flet
+flet>=0.28.0
 requests
 certifi
 urllib3
