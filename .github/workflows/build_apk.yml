@@ -22,30 +22,28 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Install Flet 0.28.3 (CLEAN INSTALL)
+    - name: Build APK in VENV (ISOLAMENTO TOTAL)
       run: |
-        python -m pip install --upgrade pip
-        # Remove qualquer versão velha que o GitHub possa ter
-        pip uninstall flet -y || true
-        # Instala a versão correta
-        pip install flet==0.28.3
-        # Mostra a versão no log para termos certeza
-        echo "VERSAO INSTALADA:"
-        flet --version
-
-    - name: Flet Build APK (NUCLEAR)
-      run: |
+        # 1. Cria uma bolha isolada (Virtual Environment)
+        python -m venv venv
+        
+        # 2. Instala o Flet 0.28.3 DENTRO da bolha
+        ./venv/bin/pip install --upgrade pip
+        ./venv/bin/pip install flet==0.28.3
+        
+        # 3. Prova que a versão da bolha é a certa (vai aparecer no log)
+        echo "Versão dentro do VENV:"
+        ./venv/bin/flet --version
+        
+        # 4. Prepara o frontend
         cd frontend
         
-        # 1. Apaga requirements antigos
-        rm -f requirements.txt
-        
-        # 2. Cria o arquivo de requisitos travado na versão certa
+        # 5. Cria o requirements.txt travado na versão certa
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        # 3. Roda o comando padrão (AGORA VAI FUNCIONAR)
-        # O parametro --deep-link-scheme força o registro do link vigiaa://
-        flet build apk --deep-link-scheme vigiaa --verbose
+        # 6. O GRANDE FINAL: Roda o build usando o executável da bolha
+        # Usamos ../ porque o venv está na pasta anterior
+        ../venv/bin/flet build apk --deep-link-scheme vigiaa --verbose
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
