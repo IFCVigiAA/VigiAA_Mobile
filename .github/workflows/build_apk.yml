@@ -22,23 +22,30 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Install Dependencies & Build
+    - name: Install Flet 0.28.3 (CLEAN INSTALL)
       run: |
-        # 1. Atualiza pip e instala Flet novo
         python -m pip install --upgrade pip
+        # Remove qualquer versão velha que o GitHub possa ter
+        pip uninstall flet -y || true
+        # Instala a versão correta
         pip install flet==0.28.3
-        
-        # 2. Entra na pasta
+        # Mostra a versão no log para termos certeza
+        echo "VERSAO INSTALADA:"
+        flet --version
+
+    - name: Flet Build APK (NUCLEAR)
+      run: |
         cd frontend
         
-        # 3. Cria o requirements.txt na força bruta
-        # Garante que o pacote Python dentro do APK tenha o Flet novo e o Certifi
+        # 1. Apaga requirements antigos
+        rm -f requirements.txt
+        
+        # 2. Cria o arquivo de requisitos travado na versão certa
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        # 4. O COMANDO BLINDADO
-        # Usamos 'python -m flet' para garantir que estamos usando a versão 0.28.3
-        # Adicionamos o deep-link-scheme aqui para garantir o registro no Android
-        python -m flet build apk --deep-link-scheme vigiaa --verbose
+        # 3. Roda o comando padrão (AGORA VAI FUNCIONAR)
+        # O parametro --deep-link-scheme força o registro do link vigiaa://
+        flet build apk --deep-link-scheme vigiaa --verbose
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
