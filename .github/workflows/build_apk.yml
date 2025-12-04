@@ -22,28 +22,24 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK in VENV (ISOLAMENTO TOTAL)
+    - name: Build APK (VERSAO FINAL SEM FLAG)
       run: |
-        # 1. Cria uma bolha isolada (Virtual Environment)
+        # 1. Cria a bolha isolada
         python -m venv venv
         
-        # 2. Instala o Flet 0.28.3 DENTRO da bolha
+        # 2. Instala o Flet 0.28.3
         ./venv/bin/pip install --upgrade pip
         ./venv/bin/pip install flet==0.28.3
         
-        # 3. Prova que a versão da bolha é a certa (vai aparecer no log)
-        echo "Versão dentro do VENV:"
-        ./venv/bin/flet --version
-        
-        # 4. Prepara o frontend
+        # 3. Prepara o frontend
         cd frontend
         
-        # 5. Cria o requirements.txt travado na versão certa
+        # 4. Cria o requirements travado
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        # 6. O GRANDE FINAL: Roda o build usando o executável da bolha
-        # Usamos ../ porque o venv está na pasta anterior
-        ../venv/bin/flet build apk --deep-link-scheme vigiaa --verbose
+        # 5. RODA O BUILD (SEM A FLAG --deep-link-scheme)
+        # O Flet vai ler o seu main.py e configurar o link sozinho
+        ../venv/bin/flet build apk --verbose
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
