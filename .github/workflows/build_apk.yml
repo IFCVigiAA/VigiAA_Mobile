@@ -36,11 +36,15 @@ jobs:
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         cat requirements.txt
 
-    - name: Flet Build APK
+    - name: Flet Build APK (COMANDO FORCADO)
       run: |
         cd frontend
-        # Roda o build com verbose
-        flet build apk --verbose
+        # Recria o arquivo de requisitos para garantir a versão
+        printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
+        
+        # AQUI ESTÁ A MÁGICA: Adicionamos --deep-link-scheme vigiaa
+        # Isso força o Android a registrar o link, independente do main.py
+        flet build apk --deep-link-scheme vigiaa --verbose
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
