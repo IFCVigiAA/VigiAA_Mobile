@@ -286,10 +286,4 @@ def main(page: ft.Page):
     # Inicia na rota /
     page.go(page.route)
 
-try:
-    # Tenta ativar o Deep Link (Se o Flet for novo)
-    ft.app(target=main, assets_dir="assets", deep_link_url_scheme="vigiaa")
-except TypeError:
-    # Se o Flet for velho, roda sem Deep Link (pelo menos o app abre)
-    print("ERRO CRITICO: Flet desatualizado no APK!")
-    ft.app(target=main, assets_dir="assets")
+ft.app(target=main, assets_dir="assets", deep_link_url_scheme="vigiaa")
