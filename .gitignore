@@ -8,3 +8,6 @@ frontend/build/
 .env
 db.sqlite3
 .DS_Store
+frontend/app.zip
+frontend/build/
+*.zip
