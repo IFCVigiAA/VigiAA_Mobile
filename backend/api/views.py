@@ -34,9 +34,48 @@ def google_callback_token(request):
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     
-    # Agora usamos a nossa classe MobileRedirect em vez da padrão
-    return MobileRedirect(f"vigiaa://login-callback?access={access_token}")
-
+    # Montamos o link do aplicativo
+    deep_link = f"vigiaa://login-callback?access={access_token}"
+    
+    # HTML com JavaScript para tentar abrir sozinho, 
+    # MAS com um botão gigante caso falhe (que é o seu caso da tela branca)
+    html = f"""
+    <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Voltando...</title>
+            <style>
+                body {{ font-family: sans-serif; text-align: center; padding: 40px; background-color: #f0f0f0; }}
+                .btn {{
+                    display: block;
+                    width: 100%;
+                    padding: 20px;
+                    background-color: #007bff;
+                    color: white;
+                    text-decoration: none;
+                    font-size: 18px;
+                    border-radius: 8px;
+                    margin-top: 20px;
+                    font-weight: bold;
+                }}
+            </style>
+        </head>
+        <body>
+            <h2>Login Concluído!</h2>
+            <p>Se o aplicativo não abrir, clique abaixo:</p>
+            
+            <a href="{deep_link}" class="btn">ABRIR APLICATIVO</a>
+            
+            <script>
+                // Tenta abrir automaticamente após 1 segundo
+                setTimeout(function() {{
+                    window.location.href = "{deep_link}";
+                }}, 1000);
+            </script>
+        </body>
+    </html>
+    """
+    return HttpResponse(html)
 
 
 # -----------------------------------
