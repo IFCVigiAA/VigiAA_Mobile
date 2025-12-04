@@ -17,34 +17,28 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Force Install Flet 0.28.3
-      run: |
-        python -m pip install --upgrade pip
-        # Instala Flet Globalmente
-        pip install flet==0.28.3
-        flet --version
-
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.24.0'
 
-    - name: Create Requirements on the Fly
+    - name: Install Dependencies & Build
       run: |
+        # 1. Atualiza pip e instala Flet novo
+        python -m pip install --upgrade pip
+        pip install flet==0.28.3
+        
+        # 2. Entra na pasta
         cd frontend
-        # Cria o arquivo requirements.txt DO ZERO
-        printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
-        cat requirements.txt
-
-    - name: Flet Build APK (COMANDO FORCADO)
-      run: |
-        cd frontend
-        # Recria o arquivo de requisitos para garantir a versão
+        
+        # 3. Cria o requirements.txt na força bruta
+        # Garante que o pacote Python dentro do APK tenha o Flet novo e o Certifi
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        # AQUI ESTÁ A MÁGICA: Adicionamos --deep-link-scheme vigiaa
-        # Isso força o Android a registrar o link, independente do main.py
-        flet build apk --deep-link-scheme vigiaa --verbose
+        # 4. O COMANDO BLINDADO
+        # Usamos 'python -m flet' para garantir que estamos usando a versão 0.28.3
+        # Adicionamos o deep-link-scheme aqui para garantir o registro no Android
+        python -m flet build apk --deep-link-scheme vigiaa --verbose
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
