@@ -17,34 +17,33 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install dependencies
+    - name: Install dependencies (FORCE UPDATE)
       run: |
         python -m pip install --upgrade pip
-        # Instala o Flet no sistema do robô para poder rodar o comando de build
+        # Limpa o cache para não pegar versão velha
+        pip cache purge
+        # Instala explicitamente
         pip install flet==0.28.3
+        
+        cd frontend
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.24.0'
 
-    - name: Flet Build APK (NUCLEAR OPTION)
+    - name: Flet Build APK
       run: |
         cd frontend
+        # Força a criação do requirements limpo lá no servidor também
+        echo "flet==0.28.3" > requirements.txt
+        echo "requests" >> requirements.txt
+        echo "certifi" >> requirements.txt
+        echo "urllib3" >> requirements.txt
+        echo "charset-normalizer" >> requirements.txt
+        echo "idna" >> requirements.txt
         
-        # 1. Apaga qualquer requirements.txt que tenha vindo do seu PC
-        rm -f requirements.txt
-        
-        # 2. Cria um novo do zero, travando a versão exata
-        # O \n garante a quebra de linha correta no Linux
-        printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
-        
-        # 3. Imprime o conteúdo na tela do log para provar que está certo
-        echo "--- CONTEUDO DO ARQUIVO CRIADO ---"
-        cat requirements.txt
-        echo "----------------------------------"
-        
-        # 4. Roda o build
         flet build apk --verbose
 
     - name: Upload APK Artifact

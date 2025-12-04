@@ -24,15 +24,18 @@ from allauth.socialaccount.models import SocialToken, SocialAccount
 from django.contrib.auth.decorators import login_required
 
 
+# --- CLASSE MÁGICA PARA PERMITIR VIGIAA:// ---
+class MobileRedirect(HttpResponseRedirect):
+    allowed_schemes = ['vigiaa', 'http', 'https', 'ftp']
+
 @login_required
 def google_callback_token(request):
     user = request.user
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     
-    # ISSO É O QUE FAZ O APP ABRIR SOZINHO:
-    # Ele redireciona para "vigiaa://" com o token
-    return HttpResponseRedirect(f"vigiaa://login-callback?access={access_token}")
+    # Agora usamos a nossa classe MobileRedirect em vez da padrão
+    return MobileRedirect(f"vigiaa://login-callback?access={access_token}")
 
 
 
