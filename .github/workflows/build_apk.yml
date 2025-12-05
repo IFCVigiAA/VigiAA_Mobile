@@ -22,23 +22,24 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (VERSAO FINAL SEM FLAG)
+    - name: Build APK (ISOLAMENTO TOTAL)
       run: |
-        # 1. Cria a bolha isolada
+        # 1. Cria uma "Bolha" limpa (Virtual Environment)
         python -m venv venv
         
-        # 2. Instala o Flet 0.28.3
+        # 2. Instala o Flet 0.28.3 DENTRO da bolha (Ninguém mexe aqui)
         ./venv/bin/pip install --upgrade pip
         ./venv/bin/pip install flet==0.28.3
         
         # 3. Prepara o frontend
         cd frontend
         
-        # 4. Cria o requirements travado
+        # 4. Cria o requirements travado na versão certa
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        # 5. RODA O BUILD (SEM A FLAG --deep-link-scheme)
-        # O Flet vai ler o seu main.py e configurar o link sozinho
+        # 5. O GRANDE SEGREDO:
+        # Rodamos o build usando o Flet da bolha (que é novo e esperto)
+        # E NÃO passamos flag nenhuma. Ele vai ler o seu main.py sozinho.
         ../venv/bin/flet build apk --verbose
 
     - name: Upload APK Artifact
