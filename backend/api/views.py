@@ -22,60 +22,65 @@ from django.shortcuts import render
 from rest_framework_simplejwt.tokens import RefreshToken
 from allauth.socialaccount.models import SocialToken, SocialAccount
 from django.contrib.auth.decorators import login_required
-
+from django.http import HttpResponse, JsonResponse
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth.decorators import login_required
+from django.core.cache import cache # Vamos usar o cache para guardar o token temporariamente
 
 # --- CLASSE MÁGICA PARA PERMITIR VIGIAA:// ---
 class MobileRedirect(HttpResponseRedirect):
     allowed_schemes = ['vigiaa', 'http', 'https', 'ftp']
 
+# --- 1. VIEW DE CALLBACK (O que o Google chama) ---
 @login_required
 def google_callback_token(request):
     user = request.user
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     
-    # Montamos o link do aplicativo
-    deep_link = f"vigiaa://login-callback?access={access_token}"
+    # Tenta pegar o código identificador que mandamos na URL (state)
+    # O allauth geralmente passa o 'state' na query string
+    login_id = request.GET.get('state') 
+
+    if login_id:
+        # SALVA O TOKEN NO CACHE POR 300 SEGUNDOS (5 min)
+        # A chave será o login_id e o valor será o token
+        cache.set(f"login_token_{login_id}", access_token, timeout=300)
     
-    # HTML com JavaScript para tentar abrir sozinho, 
-    # MAS com um botão gigante caso falhe (que é o seu caso da tela branca)
-    html = f"""
+    # Mostra uma tela bonita e limpa
+    html = """
     <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Voltando...</title>
-            <style>
-                body {{ font-family: sans-serif; text-align: center; padding: 40px; background-color: #f0f0f0; }}
-                .btn {{
-                    display: block;
-                    width: 100%;
-                    padding: 20px;
-                    background-color: #007bff;
-                    color: white;
-                    text-decoration: none;
-                    font-size: 18px;
-                    border-radius: 8px;
-                    margin-top: 20px;
-                    font-weight: bold;
-                }}
-            </style>
-        </head>
-        <body>
-            <h2>Login Concluído!</h2>
-            <p>Se o aplicativo não abrir, clique abaixo:</p>
-            
-            <a href="{deep_link}" class="btn">ABRIR APLICATIVO</a>
-            
+        <body style="background-color:#121212; color:white; text-align:center; font-family:sans-serif; padding-top:50px;">
+            <div style="font-size:50px;">✅</div>
+            <h1>Login Confirmado!</h1>
+            <p>Você pode fechar esta janela e voltar para o aplicativo VigiAA.</p>
             <script>
-                // Tenta abrir automaticamente após 1 segundo
-                setTimeout(function() {{
-                    window.location.href = "{deep_link}";
-                }}, 1000);
+                // Tenta fechar a janela automaticamente (funciona em alguns browsers)
+                window.close();
             </script>
         </body>
     </html>
     """
     return HttpResponse(html)
+
+# --- 2. NOVA VIEW: O App chama essa para pegar o token ---
+def check_login_status(request):
+    # O app manda o ID que ele gerou: /api/check-login/?login_id=XYZ
+    login_id = request.GET.get('login_id')
+    
+    if not login_id:
+        return JsonResponse({'status': 'waiting'}, status=400)
+
+    # Verifica se existe um token salvo para esse ID
+    token = cache.get(f"login_token_{login_id}")
+    
+    if token:
+        # Se achou, limpa o cache (segurança) e devolve o token
+        cache.delete(f"login_token_{login_id}")
+        return JsonResponse({'status': 'success', 'access_token': token})
+    else:
+        # Se não achou ainda
+        return JsonResponse({'status': 'waiting'})
 
 
 # -----------------------------------

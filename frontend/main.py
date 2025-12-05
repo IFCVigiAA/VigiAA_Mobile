@@ -7,6 +7,7 @@ import charset_normalizer
 import config  # Importa as configurações globais (Ícones, URL)
 import urllib.parse
 from home_view import create_main_view  # Importa a sua tela Home com abas
+import uuid
 
 # Atalhos vindos do config.py
 ICONS = config.ICONS
@@ -34,20 +35,51 @@ def create_login_view(page: ft.Page):
     
     error_text = ft.Text(color="red")
 
-    # --- Função que valida o Token e Redireciona ---
-    def finalize_login_with_token(token):
-        # Validação simples
-        if not token or len(token) < 10:
-            return
+    # --- LÓGICA DO LOGIN PROFISSIONAL (POLLING) ---
+    def google_login_clicked(e):
+        # 1. Gerar um ID único para essa tentativa de login
+        login_id = str(uuid.uuid4())
         
-        # 1. Salva o token no celular/PC
-        page.client_storage.set("token", token)
+        # 2. Montar a URL mandando esse ID como 'state'
+        # O Django vai receber esse state e saber que é você
+        base_url = "https://froglike-cataleya-quirkily.ngrok-free.dev" # SEU NGROK AQUI
+        google_url = f"{base_url}/accounts/google/login/?state={login_id}"
         
-        print(f"Token salvo: {token[:15]}...")
+        # 3. Abrir navegador
+        page.launch_url(google_url)
         
-        # 2. Feedback visual
-        error_text.value = "Login validado! Carregando..."
-        error_text.color = "green"
+        # 4. Mudar a interface para avisar que estamos esperando
+        e.control.text = "Aguardando confirmação..."
+        e.control.disabled = True
+        page.update()
+        
+        # 5. Loop de Verificação (Pergunta pro servidor a cada 2s)
+        attempts = 0
+        while attempts < 30: # Tenta por 60 segundos (30x2)
+            try:
+                time.sleep(2)
+                print(f"Verificando login... {login_id}")
+                
+                # Pergunta ao Django: "O login_id tal já tem token?"
+                res = requests.get(f"{API_URL}/check-login/?login_id={login_id}")
+                
+                if res.status_code == 200:
+                    data = res.json()
+                    if data.get('status') == 'success':
+                        # SUCESSO! Pegamos o token sem deep link
+                        token = data.get('access_token')
+                        page.client_storage.set("token", token)
+                        page.go("/") # Vai pra Home
+                        return
+            except Exception as ex:
+                print(f"Erro no polling: {ex}")
+            
+            attempts += 1
+        
+        # Se passar 60s e nada:
+        error_text.value = "Tempo esgotado. Tente novamente."
+        e.control.disabled = False
+        e.control.text = "Entrar com Google"
         page.update()
         
         # 3. Aguarda um pouco e manda para a Home
@@ -286,4 +318,4 @@ def main(page: ft.Page):
     # Inicia na rota /
     page.go(page.route)
 
-ft.app(target=main, assets_dir="assets", deep_link_url_scheme="vigiaa")
+ft.app(target=main, assets_dir="assets")

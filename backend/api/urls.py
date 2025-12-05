@@ -3,6 +3,7 @@ from django.urls import path
 from .views import MyTokenObtainPairView, UserRegistrationView, UserDeleteView
 
 from .views import google_callback_token
+from .views import google_callback_token, check_login_status
 
 urlpatterns = [
     # Login
@@ -15,4 +16,6 @@ urlpatterns = [
     path('delete-account/', UserDeleteView.as_view(), name='user_delete'),
 
     path('google-callback/', google_callback_token, name='google_callback'),
+
+    path('check-login/', check_login_status, name='check_login'),
 ]
