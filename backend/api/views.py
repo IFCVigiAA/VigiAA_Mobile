@@ -38,26 +38,24 @@ def google_callback_token(request):
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     
-    # Tenta pegar o código identificador que mandamos na URL (state)
-    # O allauth geralmente passa o 'state' na query string
     login_id = request.GET.get('state') 
-
     if login_id:
-        # SALVA O TOKEN NO CACHE POR 300 SEGUNDOS (5 min)
-        # A chave será o login_id e o valor será o token
         cache.set(f"login_token_{login_id}", access_token, timeout=300)
     
-    # Mostra uma tela bonita e limpa
+    # HTML Limpo (Sem script de fechar)
     html = """
     <html>
-        <body style="background-color:#121212; color:white; text-align:center; font-family:sans-serif; padding-top:50px;">
-            <div style="font-size:50px;">✅</div>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { background-color:#121212; color:white; text-align:center; font-family:sans-serif; padding-top:50px; }
+                .success { color: #00ff00; font-size: 60px; }
+            </style>
+        </head>
+        <body>
+            <div class="success">✅</div>
             <h1>Login Confirmado!</h1>
-            <p>Você pode fechar esta janela e voltar para o aplicativo VigiAA.</p>
-            <script>
-                // Tenta fechar a janela automaticamente (funciona em alguns browsers)
-                window.close();
-            </script>
+            <p>Pode fechar esta janela e voltar para o VigiAA.</p>
         </body>
     </html>
     """

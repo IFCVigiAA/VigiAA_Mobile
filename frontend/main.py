@@ -8,6 +8,7 @@ import config  # Importa as configurações globais (Ícones, URL)
 import urllib.parse
 from home_view import create_main_view  # Importa a sua tela Home com abas
 import uuid
+import threading
 
 # Atalhos vindos do config.py
 ICONS = config.ICONS
@@ -35,56 +36,68 @@ def create_login_view(page: ft.Page):
     
     error_text = ft.Text(color="red")
 
-    # --- LÓGICA DO LOGIN PROFISSIONAL (POLLING) ---
+    # --- LÓGICA DO LOGIN (COM THREAD PARA NÃO TRAVAR) ---
     def google_login_clicked(e):
-        # 1. Gerar um ID único para essa tentativa de login
+        # 1. Gera ID e Link
         login_id = str(uuid.uuid4())
-        
-        # 2. Montar a URL mandando esse ID como 'state'
-        # O Django vai receber esse state e saber que é você
-        base_url = "https://froglike-cataleya-quirkily.ngrok-free.dev" # SEU NGROK AQUI
+        # LINK DO NGROK (Confira se está atualizado!)
+        base_url = "https://froglike-cataleya-quirkily.ngrok-free.dev" 
         google_url = f"{base_url}/accounts/google/login/?state={login_id}"
         
-        # 3. Abrir navegador
+        # 2. Abre o navegador
         page.launch_url(google_url)
         
-        # 4. Mudar a interface para avisar que estamos esperando
-        e.control.text = "Aguardando confirmação..."
+        # 3. Prepara a UI
         e.control.disabled = True
+        e.control.text = "Aguardando você logar..."
+        error_text.value = "Conectando ao servidor..."
+        error_text.color = "blue"
         page.update()
-        
-        # 5. Loop de Verificação (Pergunta pro servidor a cada 2s)
-        attempts = 0
-        while attempts < 30: # Tenta por 60 segundos (30x2)
-            try:
-                time.sleep(2)
-                print(f"Verificando login... {login_id}")
+
+        # 4. Função que roda em SEGUNDO PLANO (A Mágica)
+        def poll_job():
+            attempts = 0
+            while attempts < 60: # 2 minutos tentando
+                try:
+                    time.sleep(2)
+                    
+                    # Atualiza a tela para você saber que ele está vivo
+                    error_text.value = f"Verificando login... ({attempts})"
+                    page.update()
+                    
+                    # Pergunta pro servidor
+                    res = requests.get(f"{API_URL}/check-login/?login_id={login_id}", timeout=5)
+                    
+                    if res.status_code == 200:
+                        data = res.json()
+                        if data.get('status') == 'success':
+                            token = data.get('access_token')
+                            
+                            # SUCESSO!
+                            page.client_storage.set("token", token)
+                            error_text.value = "Login confirmado! Entrando..."
+                            error_text.color = "green"
+                            page.update()
+                            time.sleep(1)
+                            page.go("/") 
+                            return
+                            
+                except Exception as ex:
+                    # Mostra o erro real na tela (ajuda a descobrir o problema)
+                    error_text.value = f"Erro na conexão: {ex}"
+                    page.update()
                 
-                # Pergunta ao Django: "O login_id tal já tem token?"
-                res = requests.get(f"{API_URL}/check-login/?login_id={login_id}")
-                
-                if res.status_code == 200:
-                    data = res.json()
-                    if data.get('status') == 'success':
-                        # SUCESSO! Pegamos o token sem deep link
-                        token = data.get('access_token')
-                        page.client_storage.set("token", token)
-                        page.go("/") # Vai pra Home
-                        return
-            except Exception as ex:
-                print(f"Erro no polling: {ex}")
+                attempts += 1
             
-            attempts += 1
-        
-        # Se passar 60s e nada:
-        error_text.value = "Tempo esgotado. Tente novamente."
-        e.control.disabled = False
-        e.control.text = "Entrar com Google"
-        page.update()
-        
-        # 3. Aguarda um pouco e manda para a Home
-        time.sleep(1)
-        page.go("/") 
+            # Se saiu do loop, falhou
+            error_text.value = "Tempo esgotado. Tente novamente."
+            error_text.color = "red"
+            e.control.disabled = False
+            e.control.text = "Entrar com Google"
+            page.update()
+
+        # 5. Inicia a thread (Solta o processo para rodar livre)
+        threading.Thread(target=poll_job, daemon=True).start() 
 
     # Monitora o campo de colar token
     def on_token_change(e):
