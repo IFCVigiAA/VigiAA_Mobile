@@ -1,22 +1,17 @@
 import flet as ft
 import requests
 import time
-import certifi
-import urllib3
-import charset_normalizer
-import config  # Importa as configurações globais (Ícones, URL)
-import urllib.parse
-from home_view import create_main_view  # Importa a sua tela Home com abas
+import config  
+from home_view import create_main_view
 import uuid
 import threading
 
-# Atalhos vindos do config.py
 ICONS = config.ICONS
 API_URL = config.API_URL
 
-# ===============================================
-# TELA DE LOGIN (COM GOOGLE + TOKEN MANUAL + POLLING)
-# ===============================================
+# ======================================================
+#  TELA DE LOGIN (COM GOOGLE + TOKEN MANUAL + POLLING)
+# ======================================================
 def create_login_view(page: ft.Page):
     
     # Campos de Login Tradicional
@@ -71,31 +66,24 @@ def create_login_view(page: ft.Page):
         page.update()
         return False
 
-    # --- Ação do Botão Google (Inicia o Processo) ---
     def google_login_clicked(e):
-        # 1. Gera ID único para essa tentativa
         login_id = str(uuid.uuid4())
         
-        # 2. Monta o link do Google com esse ID (state)
-        # Pega a base do Ngrok tirando o /api do final
         base_url = API_URL.split("/api")[0] 
-        google_url = f"{base_url}/accounts/google/login/?state={login_id}"
         
-        # 3. Abre o navegador
+        google_url = f"{base_url}/api/start-login/?login_id={login_id}"
+        
         page.launch_url(google_url)
         
-        # 4. Atualiza a tela
         e.control.disabled = True
         e.control.text = "Aguardando login..."
         status_text.value = "Navegador aberto. Faça login e volte aqui."
         status_text.color = "blue"
         
-        # Habilita botão manual caso o automático falhe
         check_now_button.visible = True
         check_now_button.on_click = lambda _: check_status(login_id)
         page.update()
 
-        # 5. Inicia a verificação em segundo plano (Thread)
         def poll_loop():
             attempts = 0
             # Tenta por 60 vezes (2 segundos cada = 2 minutos)

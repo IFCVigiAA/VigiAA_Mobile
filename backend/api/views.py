@@ -25,59 +25,59 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.decorators import login_required
-from django.core.cache import cache # Vamos usar o cache para guardar o token temporariamente
+from django.core.cache import cache
+from django.shortcuts import redirect
 
-# --- CLASSE MÁGICA PARA PERMITIR VIGIAA:// ---
 class MobileRedirect(HttpResponseRedirect):
     allowed_schemes = ['vigiaa', 'http', 'https', 'ftp']
 
-# --- 1. VIEW DE CALLBACK (O que o Google chama) ---
 @login_required
 def google_callback_token(request):
     user = request.user
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
-    
-    login_id = request.GET.get('state') 
+
+    login_id = request.session.get('mobile_login_id')
+
     if login_id:
         cache.set(f"login_token_{login_id}", access_token, timeout=300)
-    
-    # HTML Limpo (Sem script de fechar)
+        del request.session['mobile_login_id']
+    else:
+        print("AVISO: Login ID não encontrado na sessão!")
+
     html = """
     <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                body { background-color:#121212; color:white; text-align:center; font-family:sans-serif; padding-top:50px; }
-                .success { color: #00ff00; font-size: 60px; }
-            </style>
-        </head>
-        <body>
-            <div class="success">✅</div>
+        <head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+        <body style="background-color:#121212; color:white; text-align:center; font-family:sans-serif; padding-top:50px;">
+            <div style="font-size:60px; color:#00ff00;">✅</div>
             <h1>Login Confirmado!</h1>
-            <p>Pode fechar esta janela e voltar para o VigiAA.</p>
+            <p>Pode fechar esta janela e voltar para o aplicativo.</p>
         </body>
     </html>
     """
     return HttpResponse(html)
 
-# --- 2. NOVA VIEW: O App chama essa para pegar o token ---
+def start_login(request):
+    login_id = request.GET.get('login_id')
+
+    if login_id:
+        request.session['mobile_login_id'] = login_id
+        request.session.modified = True
+
+    return redirect('/accounts/google/login/')
+
 def check_login_status(request):
-    # O app manda o ID que ele gerou: /api/check-login/?login_id=XYZ
     login_id = request.GET.get('login_id')
     
     if not login_id:
         return JsonResponse({'status': 'waiting'}, status=400)
 
-    # Verifica se existe um token salvo para esse ID
     token = cache.get(f"login_token_{login_id}")
     
     if token:
-        # Se achou, limpa o cache (segurança) e devolve o token
         cache.delete(f"login_token_{login_id}")
         return JsonResponse({'status': 'success', 'access_token': token})
     else:
-        # Se não achou ainda
         return JsonResponse({'status': 'waiting'})
 
 
