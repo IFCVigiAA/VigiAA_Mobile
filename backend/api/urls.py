@@ -5,6 +5,7 @@ from .views import MyTokenObtainPairView, UserRegistrationView, UserDeleteView
 from .views import google_callback_token
 from .views import google_callback_token, check_login_status
 from .views import google_callback_token, check_login_status, start_login
+from . import views
 
 urlpatterns = [
     # Login
@@ -21,4 +22,6 @@ urlpatterns = [
     path('check-login/', check_login_status, name='check_login'),
 
     path('start-login/', start_login, name='start_login'),
+
+    path('api/google-callback/', views.google_callback_token, name='google_callback_token'),
 ]

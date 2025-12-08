@@ -31,21 +31,65 @@ from django.shortcuts import redirect
 class MobileRedirect(HttpResponseRedirect):
     allowed_schemes = ['vigiaa', 'http', 'https', 'ftp']
 
+def start_login(request):
+    login_id = request.GET.get('login_id')
+    
+    # HTML que redireciona automaticamente
+    html = """
+    <html>
+        <body>
+            <h3>Redirecionando para o Google...</h3>
+            <script>
+                window.location.href = '/accounts/google/login/';
+            </script>
+        </body>
+    </html>
+    """
+    
+    response = HttpResponse(html)
+    
+    # --- A MUDANÇA ESTÁ AQUI ---
+    if login_id:
+        # Salvamos num Cookie separado (não na sessão)
+        # samesite='None' e secure=True são OBRIGATÓRIOS para funcionar no Ngrok/Https
+        response.set_cookie(
+            key='mobile_login_id', 
+            value=login_id, 
+            max_age=300, # 5 minutos de vida
+            samesite='None', 
+            secure=True,
+            httponly=True
+        )
+        print(f"DEBUG: Cookie 'mobile_login_id' gravado com: {login_id}")
+    # ---------------------------
+    
+    return response
+
 @login_required
 def google_callback_token(request):
     user = request.user
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
 
-    login_id = request.session.get('mobile_login_id')
+    # --- A MUDANÇA ESTÁ AQUI ---
+    # Agora lemos do Cookie, não da Session
+    login_id = request.COOKIES.get('mobile_login_id')
+    # ---------------------------
 
     if login_id:
+        print(f"DEBUG: Cookie encontrado! ID: {login_id}")
         cache.set(f"login_token_{login_id}", access_token, timeout=300)
-        del request.session['mobile_login_id']
+        # Opcional: deletar o cookie depois de usar
+        response = HttpResponse(get_success_html())
+        response.delete_cookie('mobile_login_id')
+        return response
     else:
-        print("AVISO: Login ID não encontrado na sessão!")
+        print("AVISO: Cookie 'mobile_login_id' sumiu ou não foi enviado!")
+        # Retorna sucesso mesmo assim para não assustar o usuário, mas o App não vai logar
+        return HttpResponse(get_success_html())
 
-    html = """
+def get_success_html():
+    return """
     <html>
         <head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
         <body style="background-color:#121212; color:white; text-align:center; font-family:sans-serif; padding-top:50px;">
@@ -55,31 +99,6 @@ def google_callback_token(request):
         </body>
     </html>
     """
-    return HttpResponse(html)
-
-def start_login(request):
-    # 1. Pega o ID
-    login_id = request.GET.get('login_id')
-    
-    if login_id:
-        # 2. Salva na memória
-        request.session['mobile_login_id'] = login_id
-        request.session.modified = True
-        request.session.save()
-        print(f"DEBUG: Salvando ID na sessão: {login_id}")
-
-    html = """
-    <html>
-        <body>
-            <h3 style="font-family:sans-serif;">Redirecionando para o Google...</h3>
-            <script>
-                // Redireciona via JS para garantir que o cookie grudou
-                window.location.href = '/accounts/google/login/';
-            </script>
-        </body>
-    </html>
-    """
-    return HttpResponse(html)
 
 def check_login_status(request):
     login_id = request.GET.get('login_id')
@@ -166,5 +185,5 @@ class UserDeleteView(APIView):
 class GoogleLogin(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
     # URL de callback configurada no Google Cloud
-    callback_url = "http://localhost:8000/accounts/google/login/callback/"
+    callback_url = "https://froglike-cataleya-quirkily.ngrok-free.dev/accounts/google/login/callback/"
     client_class = OAuth2Client
