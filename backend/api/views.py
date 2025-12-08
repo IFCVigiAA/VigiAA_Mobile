@@ -58,13 +58,28 @@ def google_callback_token(request):
     return HttpResponse(html)
 
 def start_login(request):
+    # 1. Pega o ID
     login_id = request.GET.get('login_id')
-
+    
     if login_id:
+        # 2. Salva na memória
         request.session['mobile_login_id'] = login_id
         request.session.modified = True
+        request.session.save()
+        print(f"DEBUG: Salvando ID na sessão: {login_id}")
 
-    return redirect('/accounts/google/login/')
+    html = """
+    <html>
+        <body>
+            <h3 style="font-family:sans-serif;">Redirecionando para o Google...</h3>
+            <script>
+                // Redireciona via JS para garantir que o cookie grudou
+                window.location.href = '/accounts/google/login/';
+            </script>
+        </body>
+    </html>
+    """
+    return HttpResponse(html)
 
 def check_login_status(request):
     login_id = request.GET.get('login_id')

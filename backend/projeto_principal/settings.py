@@ -208,3 +208,14 @@ JWT_AUTH_REFRESH_COOKIE = 'my-refresh-token'
 
 LOGIN_REDIRECT_URL = '/api/google-callback/'
 
+# --- CORREÇÃO PARA COOKIES NO NGROK ---
+# Permite que o cookie viaje entre o Ngrok e o Django
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True 
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SECURE = True
+
+CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev'] #para que o ngrok permita a conexão
+
+# Usa o banco de dados para garantir que a sessão persista
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'

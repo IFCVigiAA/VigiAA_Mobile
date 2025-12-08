@@ -14,18 +14,14 @@ API_URL = config.API_URL
 # ======================================================
 def create_login_view(page: ft.Page):
     
-    # Campos de Login Tradicional
     username_field = ft.TextField(label="Usuário", width=300)
     password_field = ft.TextField(label="Senha", password=True, can_reveal_password=True, width=300)
     
-    # Textos de status
     status_text = ft.Text(value="Pronto para iniciar.", color="grey", size=12)
     error_text = ft.Text(color="red")
-    
-    # Botão de verificação manual (aparece se demorar)
+
     check_now_button = ft.ElevatedButton("Já fiz o login (Verificar)", visible=False)
 
-    # --- Função Auxiliar: Salva o Token e Entra ---
     def finalize_login(token):
         if not token: return
         page.client_storage.set("token", token)
@@ -35,33 +31,38 @@ def create_login_view(page: ft.Page):
         time.sleep(1)
         page.go("/")
 
-    # --- Lógica de Verificação no Servidor (Polling) ---
     def check_status(login_id):
         try:
             status_text.value = f"Consultando servidor... ({login_id[:4]})"
-            page.update()
+            status_text.update()
             
-            # Remove barra extra se tiver para montar a URL certa
             clean_api_url = API_URL.rstrip('/')
             check_url = f"{clean_api_url}/check-login/?login_id={login_id}"
             
-            print(f"Consultando: {check_url}")
+            print(f"--- TENTANDO CONECTAR: {check_url} ---") ### DEBUG 1
             res = requests.get(check_url, timeout=5)
             
+            print(f"--- STATUS CODE: {res.status_code} ---") ### DEBUG 2
+            print(f"--- CORPO DA RESPOSTA: {res.text} ---")   ### DEBUG 3 (O MAIS IMPORTANTE)
+
             if res.status_code == 200:
                 data = res.json()
+                # O servidor retorna 'status': 'success' ou 'waiting'
                 if data.get('status') == 'success':
                     token = data.get('access_token')
+                    print(f"--- TOKEN RECEBIDO: {token} ---") ### DEBUG 4
                     finalize_login(token)
-                    return True # Sucesso, para o loop
+                    return True
                 else:
+                    # Se cair aqui, o servidor disse que ainda não logou
+                    print("--- SERVIDOR DISSE: WAITING ---")
                     status_text.value = "Ainda aguardando login..."
             else:
-                status_text.value = f"Servidor respondeu: {res.status_code}"
+                status_text.value = f"Erro no servidor: {res.status_code}"
                 
         except Exception as ex:
             status_text.value = f"Erro de conexão..."
-            print(ex)
+            print(f"--- ERRO FATAL: {ex} ---") ### DEBUG ERRO
         
         page.update()
         return False
@@ -86,15 +87,13 @@ def create_login_view(page: ft.Page):
 
         def poll_loop():
             attempts = 0
-            # Tenta por 60 vezes (2 segundos cada = 2 minutos)
             while attempts < 60: 
                 time.sleep(2)
-                # Se achou o token, para tudo e entra
                 if check_status(login_id): 
                     return
                 attempts += 1
             
-            # Se acabou o tempo
+
             e.control.disabled = False
             e.control.text = "Entrar com Google"
             status_text.value = "Tempo esgotado. Tente novamente."
@@ -102,7 +101,6 @@ def create_login_view(page: ft.Page):
 
         threading.Thread(target=poll_loop, daemon=True).start()
 
-    # --- Ação do Login Tradicional ---
     def login_clicked(e):
         try:
             status_text.value = "Verificando senha..."
