@@ -197,3 +197,14 @@ def main(page: ft.Page):
 
 # SEM O DEEP LINK (Para evitar o erro de versão)
 ft.app(target=main, assets_dir="assets")
+
+
+if __name__ == "__main__":
+    # Removemos o ft.app(target=main) simples e colocamos os parâmetros aqui
+    ft.app(
+        target=main,
+        assets_dir="assets",
+        view=ft.WEB_BROWSER,   # <--- Força abrir no navegador (modo Web)
+        port=8550,             # <--- Define a porta que você queria
+        host="0.0.0.0"         # <--- Libera para acesso externo (celular/ngrok)
+    )

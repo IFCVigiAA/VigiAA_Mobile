@@ -7,24 +7,42 @@ def logout(page: ft.Page):
 
 def create_main_view(page: ft.Page):
     ICONS = config.ICONS
+    # Link do mapa 
     map_url = "http://192.168.70.63:5173/mapa_leaflet/map_src/index.html"
     
+    # --- Conteúdo das Abas ---
+
+    # Aba 0: O Mapa
     view_map = ft.Container(
-        content=ft.WebView(
-            url=map_url, 
-            expand=True,
-            on_page_started=lambda _: print("Carregando mapa..."),
-            on_web_resource_error=lambda e: print(f"Erro no mapa: {e.description}")
+        content=ft.Column(
+            [
+                ft.Icon(ft.Icons.MAP, size=80, color="blue"),
+                ft.Text("Mapa de Monitoramento", size=20, weight="bold"),
+                ft.Text("Clique abaixo para abrir o mapa em tela cheia", color="grey"),
+                ft.Container(height=20),
+                ft.ElevatedButton(
+                    "Abrir Mapa no Navegador",
+                    icon=ft.Icons.OPEN_IN_BROWSER,
+                    style=ft.ButtonStyle(
+                        bgcolor="blue",
+                        color="white",
+                        padding=20
+                    ),
+                    on_click=lambda _: page.launch_url(map_url)
+                )
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            alignment=ft.MainAxisAlignment.CENTER,
         ),
-        expand=True,
-        padding=0
+        alignment=ft.alignment.center,
+        expand=True
     )
 
     # Aba 1: Ajustes
     view_settings = ft.Container(
         content=ft.Column(
             [
-                ft.Icon(ft.icons.SETTINGS, size=50, color="grey"),
+                ft.Icon(ft.Icons.SETTINGS, size=50, color="grey"),
                 ft.Text("Ajustes", size=24),
                 ft.Switch(label="Modo Noturno", value=False),
             ],
@@ -63,32 +81,26 @@ def create_main_view(page: ft.Page):
     # Lista com as 3 telas
     my_tabs = [view_map, view_settings, view_profile]
 
-    # Função para trocar de aba
     def change_tab(e):
-        # O índice da aba clicada define qual container aparece
         index = e.control.selected_index
         body_component.content = my_tabs[index]
         body_component.update()
 
-    # Componente que segura o conteúdo atual (começa com o mapa)
     body_component = ft.Container(content=view_map, expand=True)
 
     return ft.View(
         route="/",
         controls=[
-            ft.AppBar(title=ft.Text("Mapa Web VigiAA"), bgcolor="blue", color="white"),
-            
-            # Corpo Principal (Muda dinamicamente)
+            ft.AppBar(title=ft.Text("VigiAA Mobile"), bgcolor="blue", color="white"),
             body_component,
-
-            # Barra de Navegação no Rodapé
             ft.NavigationBar(
                 selected_index=0,
                 on_change=change_tab,
                 destinations=[
-                    ft.NavigationDestination(icon=ft.icons.MAP, label="Mapa"),
-                    ft.NavigationDestination(icon=ft.icons.SETTINGS, label="Ajustes"),
-                    ft.NavigationDestination(icon=ICONS.PERSON, label="Perfil"),
+                    # --- AQUI ESTAVA O ERRO, TROCAMOS O NOME ---
+                    ft.NavigationBarDestination(icon=ft.Icons.MAP, label="Mapa"),
+                    ft.NavigationBarDestination(icon=ft.Icons.SETTINGS, label="Ajustes"),
+                    ft.NavigationBarDestination(icon=ICONS.PERSON, label="Perfil"),
                 ]
             )
         ],

@@ -4,3 +4,4 @@ certifi
 urllib3
 charset-normalizer
 idna
+flet-webview
