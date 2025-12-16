@@ -32,7 +32,6 @@ CSRF_TRUSTED_ORIGINS = ['https://froglike-cataleya-quirkily.ngrok-free.dev']
 # Configuração para garantir que o Django entenda que é HTTPS
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-SITE_ID = 1
 
 SECURE_SSL_REDIRECT = False
 
@@ -48,26 +47,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Apps de Terceiros
+
+    # Apps de Terceiros (Apenas estes)
     'rest_framework',
-    'rest_framework.authtoken',
     'rest_framework_simplejwt',
-    'corsheaders', # Se estiver usando cors
-    
-    # Allauth (Autenticação Social)
-    'django.contrib.sites',
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.google',
-    'dj_rest_auth',
-    'dj_rest_auth.registration',
-    
+    'corsheaders',
+
     # Seus Apps
     'api',
 ]
-
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', # Recomendado estar no topo
     'django.middleware.security.SecurityMiddleware',
@@ -76,9 +64,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    
-    # ADICIONE ESTA LINHA SE NÃO TIVER (Obrigatória na versão nova):
-    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'projeto_principal.urls'
@@ -192,14 +177,6 @@ ACCOUNT_LOGOUT_ON_GET = True
 # Adapter (Mantenha o seu arquivo customizado, ele ainda funciona)
 SOCIALACCOUNT_ADAPTER = 'api.adapters.CustomSocialAccountAdapter'
 
-# Provider Google
-SOCIALACCOUNT_PROVIDERS = {
-    'google': {
-        'SCOPE': ['profile', 'email'],
-        'AUTH_PARAMS': {'access_type': 'online'},
-        'VERIFIED_EMAIL': True,
-    }
-}
 
 # JWT
 REST_USE_JWT = True
@@ -220,3 +197,11 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = 'None'
+
+# --- Configuração de Envio de Email REAL (Gmail) ---
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'vigiaa.camboriu@ifc.edu.br'  # <--- COLOQUE SEU EMAIL
+EMAIL_HOST_PASSWORD = 'fydz uuni maen xzlf'   # <--- COLOQUE A SENHA DE APP QUE GEROU (sem espaços)
