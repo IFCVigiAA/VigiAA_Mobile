@@ -168,11 +168,9 @@ def create_login_view(page: ft.Page):
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             spacing=15,
             controls=[
-                # --- LOGO LIMPO AQUI ---
-                # Apenas a imagem, sem container em volta
                 ft.Image(
-                    src="logo-sem-fundo.png",       # Certifique-se que o arquivo está na pasta assets
-                    width=120,            # Largura controlada para não estourar
+                    src="logo-sem-fundo.png",
+                    width=120,
                     fit=ft.ImageFit.CONTAIN,
                 ),
                 

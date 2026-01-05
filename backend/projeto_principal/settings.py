@@ -27,7 +27,7 @@ DEBUG = os.getenv('DEBUG') == 'True'
 ALLOWED_HOSTS = ['*', '.ngrok-free.dev'] 
 
 # Autoriza o HTTPS do seu link específico
-CSRF_TRUSTED_ORIGINS = ['https://froglike-cataleya-quirkily.ngrok-free.dev']
+CSRF_TRUSTED_ORIGINS = ['https://unreconciled-unverdant-tess.ngrok-free.dev']
 
 # Configuração para garantir que o Django entenda que é HTTPS
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -198,10 +198,10 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = 'None'
 
-# --- Configuração de Envio de Email REAL (Gmail) ---
+# --- Configuração de Envio de Email (Gmail) ---
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'vigiaa.camboriu@ifc.edu.br'  # <--- COLOQUE SEU EMAIL
-EMAIL_HOST_PASSWORD = 'fydz uuni maen xzlf'   # <--- COLOQUE A SENHA DE APP QUE GEROU (sem espaços)
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')

@@ -21,7 +21,7 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.core.mail import send_mail
-from .serializers import PasswordResetRequestSerializer, SetNewPasswordSerializer
+from .serializers import PasswordResetRequestSerializer, SetNewPasswordSerializer, UserProfileSerializer
 
 # Requests para falar com o Google manualmente
 import requests 
@@ -29,7 +29,8 @@ import urllib.parse
 import os
 
 # Seus Serializers
-from .serializers import MyTokenObtainPairSerializer 
+from .serializers import MyTokenObtainPairSerializer
+from rest_framework.permissions import IsAuthenticated
 
 # ==============================================================================
 # CONFIGURAÇÕES DO GOOGLE (PREENCHA AQUI OU PEGUE DO SETTINGS/ENV)
@@ -37,7 +38,7 @@ from .serializers import MyTokenObtainPairSerializer
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = "https://froglike-cataleya-quirkily.ngrok-free.dev/api/google-callback/"
+GOOGLE_REDIRECT_URI = "https://unreconciled-unverdant-tess.ngrok-free.dev/api/google-callback/"
 
 # ==============================================================================
 # LÓGICA MANUAL DE LOGIN (O QUE O PROFESSOR PEDIU)
@@ -300,7 +301,12 @@ class PasswordTokenCheckAPI(APIView):
             return Response({'message': 'Senha redefinida com sucesso!'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+# No arquivo backend/api/views.py
+
 class PasswordResetWebConfirm(APIView):
+    # CORREÇÃO 1: Liberar acesso para quem não está logado
+    permission_classes = [AllowAny] 
+    
     renderer_classes = [TemplateHTMLRenderer]
     template_name = 'reset_password.html'
 
@@ -311,7 +317,7 @@ class PasswordResetWebConfirm(APIView):
         password = request.data.get('password')
         confirm_password = request.data.get('confirm_password')
 
-        # 1. Conferência de Backend (Segurança)
+        # 1. Conferência manual
         if password != confirm_password:
             return Response({
                 'error': 'As senhas não conferem.',
@@ -319,7 +325,7 @@ class PasswordResetWebConfirm(APIView):
                 'token': token
             })
 
-        # 2. Processa a troca
+        # 2. Prepara o serializer
         serializer = SetNewPasswordSerializer(data={
             'uidb64': uidb64, 
             'token': token, 
@@ -327,7 +333,54 @@ class PasswordResetWebConfirm(APIView):
         })
 
         if serializer.is_valid():
+            # CORREÇÃO 2: SALVAR A SENHA NO BANCO!
+            serializer.save() 
+            
             return Response({'success': True})
         else:
-            error_msg = list(serializer.errors.values())[0][0]
+            # Pega o primeiro erro da lista para mostrar no HTML
+            try:
+                error_msg = list(serializer.errors.values())[0][0]
+            except:
+                error_msg = "Erro desconhecido ou token inválido."
+                
             return Response({'error': error_msg, 'uidb64': uidb64, 'token': token})
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated] # Só quem tem Token entra aqui
+
+    def get(self, request):
+        # O 'request.user' já é o usuário logado (graças ao Token)
+        serializer = UserProfileSerializer(request.user)
+        return Response(serializer.data)
+    
+    def patch(self, request):
+        user = request.user
+        # partial=True significa: "Não preciso de todos os campos, só os que mudaram"
+        serializer = UserProfileSerializer(user, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+from .serializers import ChangePasswordSerializer
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, *args, **kwargs):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        
+        if serializer.is_valid():
+            # Define a nova senha
+            request.user.set_password(serializer.data['new_password'])
+            request.user.save()
+            
+            # Opcional: Atualizar o login para não desconectar o usuário
+            update_last_login(None, request.user)
+            
+            return Response({"message": "Senha atualizada com sucesso!"}, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -1,54 +1,51 @@
 import flet as ft
-from login_view import create_login_view  # <--- Importa a tela que criamos acima
-from home_view import create_main_view    # <--- Supondo que você tenha esse arquivo
-# from register_view import create_register_view # <--- Descomente se tiver esse arquivo
+
+# --- MUDANÇA AQUI: Importando de dentro da pasta 'views' ---
+from views.login_view import create_login_view
+from views.home_view import create_main_view
+from views.register_view import create_register_view
+from views.change_password_view import create_change_password_view
+# -----------------------------------------------------------
 
 def main(page: ft.Page):
     page.title = "VigiAA"
     page.theme_mode = ft.ThemeMode.LIGHT
     
-    # Função que gerencia a navegação (Roteador)
+    # Gerenciador de Rotas
     def route_change(e: ft.RouteChangeEvent):
         page.views.clear()
         
         # Pega o token para saber se já está logado
         token = page.client_storage.get("token")
 
-        # --- ROTA: LOGIN ---
+        # Rota de Login
         if page.route == "/login":
             page.views.append(create_login_view(page))
         
-        # --- ROTA: REGISTRO ---
+        # Rota de Registro
         elif page.route == "/register":
-            # Se você tiver o arquivo register_view.py:
-            # page.views.append(create_register_view(page))
-            
-            # Se não tiver, usa esse provisório:
-            page.views.append(ft.View("/register", [
-                ft.AppBar(title=ft.Text("Registro")),
-                ft.Text("Tela de Registro aqui"),
-                ft.ElevatedButton("Voltar", on_click=lambda _: page.go("/login"))
-            ]))
+            page.views.append(create_register_view(page))
 
-        # --- ROTA: HOME (Raiz) ---
+        # Rota da Home (Protegida)
         elif page.route == "/" or page.route == "":
             if token:
-                # Se tem token, entra no app
+                # Se tem token, carrega a Home (que puxa as abas internamente)
                 page.views.append(create_main_view(page)) 
             else:
-                # Se não tem token, manda pro login
                 page.go("/login")
         
-        # --- QUALQUER OUTRA ROTA ---
+        elif page.route == "/change-password":
+            page.views.append(create_change_password_view(page))
+        
+        # Rota padrão para erros
         else:
             page.go("/login")
         
         page.update()
 
-    # Define a função de mudança de rota
     page.on_route_change = route_change
     
-    # Inicia na rota atual
+    # Inicia a navegação
     page.go(page.route)
 
 if __name__ == "__main__":

@@ -5,7 +5,9 @@ from .views import (
     UserRegistrationView, 
     UserDeleteView, 
     RequestPasswordResetEmail, 
-    PasswordTokenCheckAPI
+    PasswordTokenCheckAPI,
+    UserProfileView,
+    ChangePasswordView
 )
 from .views import PasswordResetWebConfirm
 
@@ -24,4 +26,7 @@ urlpatterns = [
     path('api/password-reset-request/', RequestPasswordResetEmail.as_view(), name='password-reset-request'),
     path('api/password-reset-confirm/', PasswordTokenCheckAPI.as_view(), name='password-reset-confirm'),
     path('api/password-reset-web/<uidb64>/<token>/', PasswordResetWebConfirm.as_view(), name='password-reset-web'),
+    path('api/change-password/', ChangePasswordView.as_view(), name='change-password'),
+
+    path('api/profile/', UserProfileView.as_view(), name='user-profile'),
 ]
