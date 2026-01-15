@@ -5,6 +5,7 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from .models import DengueFocus, FocusImage, Profile
 
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -76,3 +77,41 @@ class ChangePasswordSerializer(serializers.Serializer):
         if attrs['old_password'] == attrs['new_password']:
             raise serializers.ValidationError({"new_password": "A nova senha deve ser diferente da atual."})
         return attrs
+
+class FocusImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FocusImage
+        fields = ['id', 'image', 'uploaded_at']
+
+class DengueFocusSerializer(serializers.ModelSerializer):
+    images = FocusImageSerializer(many=True, read_only=True)
+    
+    # Campo especial para receber VÁRIAS imagens no upload
+    uploaded_images = serializers.ListField(
+        child=serializers.ImageField(max_length=1000000, allow_empty_file=False, use_url=False),
+        write_only=True,
+        required=False
+    )
+
+    class Meta:
+        model = DengueFocus
+        fields = [
+            'id', 'latitude', 'longitude', 'cep', 'city', 'neighborhood', 
+            'street', 'number', 'description', 'images', 'uploaded_images'
+        ]
+
+    def create(self, validated_data):
+        # 1. Separa as imagens dos dados de texto
+        images_data = validated_data.pop('uploaded_images', [])
+        
+        # 2. Pega o usuário logado
+        user = self.context['request'].user
+        
+        # 3. Cria o Foco
+        focus = DengueFocus.objects.create(user=user, **validated_data)
+        
+        # 4. Cria cada imagem vinculada a esse Foco
+        for image in images_data:
+            FocusImage.objects.create(focus=focus, image=image)
+            
+        return focus

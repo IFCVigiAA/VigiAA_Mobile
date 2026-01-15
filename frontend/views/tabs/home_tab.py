@@ -31,38 +31,41 @@ def get_home_tab(page: ft.Page = None):
             border_radius=20,
             data=year,
             on_click=toggle_year,
-            
-            # --- CORREÇÃO AQUI: ft.Animation direto ---
             animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT), 
-            
             shadow=ft.BoxShadow(blur_radius=2, color=ft.Colors.with_opacity(0.1, "black")) if not is_selected else None
         )
         year_buttons_refs.append(btn)
         return btn
 
-    # Linha dos Anos
     year_filter = ft.Row(
         controls=[
             create_year_button("2025", is_selected=True),
             create_year_button("2024"),
             create_year_button("2023"),
         ],
-        spacing=10
+        spacing=10,
+        scroll=ft.ScrollMode.HIDDEN # Permite rolar lateralmente se a tela for MUITO pequena
     )
 
-    # --- Cards de Estatística ---
+    # --- Cards de Estatística (AJUSTADOS PARA MOBILE) ---
     def stat_card(title, value, subtext):
         return ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text(title, size=14, weight="bold", color="black"),
-                    ft.Text(value, size=32, weight="bold", color="black"),
-                    ft.Text(subtext, size=12, color="grey"),
+                    # Fonte reduzida de 14 para 13 e sem negrito excessivo para economizar espaço
+                    ft.Text(title, size=13, weight="w600", color="black"), 
+                    
+                    # Fonte reduzida de 32 para 26
+                    ft.Text(value, size=26, weight="bold", color="black"),
+                    
+                    ft.Text(subtext, size=11, color="grey"),
                 ],
-                spacing=5
+                spacing=2, # Menos espaço entre as linhas
+                alignment=ft.MainAxisAlignment.CENTER
             ),
             bgcolor="white",
-            padding=20,
+            # Padding reduzido de 20 para 15
+            padding=15, 
             border_radius=10,
             expand=True,
             shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.with_opacity(0.05, "black"))
@@ -70,10 +73,10 @@ def get_home_tab(page: ft.Page = None):
 
     stats_row = ft.Row(
         controls=[
-            stat_card("Casos confirmados", "457", "+20 casos no último mês"),
-            stat_card("Suspeitas de dengue", "2,405", "+300 casos no último mês"),
+            stat_card("Casos confirmados", "457", "+20 este mês"), # Encurtei o texto um pouco
+            stat_card("Suspeitas de dengue", "2,405", "+300 este mês"),
         ],
-        spacing=15
+        spacing=10 # Espaçamento entre cards reduzido levemente
     )
 
     # --- Cards de Gráfico ---
@@ -118,7 +121,7 @@ def get_home_tab(page: ft.Page = None):
             scroll=ft.ScrollMode.AUTO,
             spacing=15
         ),
-        padding=20,
+        padding=15, # Reduzi o padding geral da tela também
         alignment=ft.alignment.top_center,
         expand=True
     )

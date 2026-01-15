@@ -7,7 +7,8 @@ from .views import (
     RequestPasswordResetEmail, 
     PasswordTokenCheckAPI,
     UserProfileView,
-    ChangePasswordView
+    ChangePasswordView,
+    DengueFocusCreateView
 )
 from .views import PasswordResetWebConfirm
 
@@ -29,4 +30,6 @@ urlpatterns = [
     path('api/change-password/', ChangePasswordView.as_view(), name='change-password'),
 
     path('api/profile/', UserProfileView.as_view(), name='user-profile'),
+
+    path('api/report-focus/', DengueFocusCreateView.as_view(), name='report-focus'),
 ]

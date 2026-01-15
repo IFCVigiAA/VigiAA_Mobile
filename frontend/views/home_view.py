@@ -1,90 +1,92 @@
 import flet as ft
+# Imports das abas
 from views.tabs.home_tab import get_home_tab
 from views.tabs.new_tab import get_new_tab
 from views.tabs.explore_tab import get_explore_tab
 from views.tabs.profile_tab import get_profile_tab
 
-def create_main_view(page: ft.Page):
+def create_main_view(page: ft.Page, aba_inicial=0):
     
-    saved_tab_index = page.client_storage.get("selected_tab_index")
-    initial_index = saved_tab_index if saved_tab_index is not None else 0
-    page.client_storage.remove("selected_tab_index")
+    # 1. Carrega as abas
+    view_home = get_home_tab(page)
+    view_add = get_new_tab(page)
+    view_explore = get_explore_tab()
+    view_profile = get_profile_tab(page)
 
-    # --- HEADER ATUALIZADO (SEM O NÚMERO 2) ---
-    def get_custom_header():
-        return ft.Container(
-            gradient=ft.LinearGradient(
-                begin=ft.alignment.center_left,
-                end=ft.alignment.center_right,
-                colors=["#39BFEF", "#65F4A6"] 
-            ),
-            padding=ft.padding.only(left=20, right=20, top=40, bottom=20),
-            content=ft.Row(
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                controls=[
-                    ft.Image(
-                        src="logo-sem-fundo.png", 
+    modulos = [view_home, view_add, view_explore, view_profile]
+
+    # 2. Corpo da página
+    body = ft.Container(
+        content=modulos[aba_inicial],
+        expand=True
+    )
+
+    # 3. Função de troca de aba
+    def change_tab(e):
+        index = e.control.selected_index
+        body.content = modulos[index]
+        body.update()
+
+    # 4. Barra de Navegação (Fundo Azul)
+    nav_bar = ft.NavigationBar(
+        destinations=[
+            ft.NavigationBarDestination(icon=ft.Icons.HOME, label="Home"),
+            ft.NavigationBarDestination(icon=ft.Icons.ADD_CIRCLE, label="Novo"),
+            ft.NavigationBarDestination(icon=ft.Icons.EXPLORE, label="Explorar"),
+            ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="Perfil"),
+        ],
+        selected_index=aba_inicial,
+        on_change=change_tab,
+        bgcolor="#39BFEF", 
+    )
+
+    # 5. Cabeçalho Personalizado (VigiAA com Logo e Degradê Claro)
+    header = ft.Container(
+        height=60,
+        padding=ft.padding.symmetric(horizontal=15),
+        # DEGRADÊ AJUSTADO: Azul Ciano -> Verde Claro Luminoso
+        gradient=ft.LinearGradient(
+            begin=ft.alignment.center_left,
+            end=ft.alignment.center_right,
+            colors=["#39BFEF", "#80E27E"] 
+        ),
+        content=ft.Row(
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                # Esquerda: SUA LOGO AQUI!
+                # O src começa com "/" indicando a raiz da pasta assets definida no main.py
+                ft.Container(
+                    content=ft.Image(
+                        src="/logo-sem-fundo.png", 
+                        width=40, 
                         height=40, 
                         fit=ft.ImageFit.CONTAIN
                     ),
-    
-                    ft.Text(
-                        "VigiAA", 
-                        size=22, 
-                        weight="bold", 
-                        color="#1a1a1a",
-                        font_family="Roboto"
-                    ),
-                    
-                    # Apenas o ícone limpo agora
-                    ft.IconButton(
-                        icon=ft.Icons.NOTIFICATIONS_OUTLINED, 
-                        icon_color="black",
-                        icon_size=28,
-                        on_click=lambda _: print("Notificações")
-                    )
-                ]
-            ),
-            shadow=ft.BoxShadow(
-                spread_radius=1,
-                blur_radius=5,
-                color=ft.Colors.with_opacity(0.1, "black"),
-                offset=ft.Offset(0, 2),
-            )
+                    alignment=ft.alignment.center
+                ),
+                
+                # Centro: Título VigiAA
+                ft.Text("VigiAA", size=20, weight="bold", color="black"),
+                
+                # Direita: Sininho (sem o número)
+                ft.IconButton(ft.Icons.NOTIFICATIONS_NONE, icon_color="black")
+            ]
         )
+    )
 
-    view_home = get_home_tab(page)
-    view_add = get_new_tab()
-    view_explore = get_explore_tab()
-    view_profile = get_profile_tab(page) 
-
-    my_tabs = [view_home, view_add, view_explore, view_profile]
-    body_component = ft.Container(content=my_tabs[initial_index], expand=True)
-
-    def change_tab(e):
-        index = e.control.selected_index
-        body_component.content = my_tabs[index]
-        body_component.update()
-
+    # 6. View Final
     return ft.View(
         route="/",
         controls=[
-            get_custom_header(),
-            body_component,
-            
-            ft.NavigationBar(
-                bgcolor="#39BFEF", 
-                indicator_color=ft.Colors.TRANSPARENT,
-                selected_index=initial_index,
-                on_change=change_tab,
-                label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_HIDE,
-                destinations=[
-                    ft.NavigationBarDestination(icon=ft.Icons.HOME_OUTLINED, selected_icon=ft.Icons.HOME, label=""),
-                    ft.NavigationBarDestination(icon=ft.Icons.ADD_BOX_OUTLINED, selected_icon=ft.Icons.ADD_BOX, label=""),
-                    ft.NavigationBarDestination(icon=ft.Icons.EXPLORE_OUTLINED, selected_icon=ft.Icons.EXPLORE, label=""),
-                    ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINE, selected_icon=ft.Icons.PERSON, label=""),
-                ]
+            ft.Column(
+                controls=[
+                    header,  # Topo novo
+                    body,    # Conteúdo
+                    nav_bar  # Baixo azul
+                ],
+                spacing=0,
+                expand=True
             )
         ],
         padding=0,
