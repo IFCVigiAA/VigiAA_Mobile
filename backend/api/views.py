@@ -269,7 +269,7 @@ class RequestPasswordResetEmail(APIView):
         if serializer.is_valid():
             email = serializer.data['email']
             if User.objects.filter(email=email).exists():
-                user = User.objects.get(email=email)
+                user = User.objects.filter(email=email).first()
                 uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
                 token = PasswordResetTokenGenerator().make_token(user)
                 
