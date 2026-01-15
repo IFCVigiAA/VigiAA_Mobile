@@ -4,6 +4,9 @@ import config
 
 def create_login_view(page: ft.Page):
     API_URL = config.API_URL
+    
+    # --- CORREÇÃO 1: CABEÇALHO PARA O NGROK NÃO BLOQUEAR ---
+    HEADERS = {"ngrok-skip-browser-warning": "true"}
 
     email_field = ft.TextField(label="Email", width=300)
     password_field = ft.TextField(label="Senha", password=True, can_reveal_password=True, width=300)
@@ -15,36 +18,40 @@ def create_login_view(page: ft.Page):
             error_text.update()
             return
 
-        error_text.value = ""
+        error_text.value = "Conectando..."
         error_text.update()
 
         try:
-            response = requests.post(f"{API_URL}/api/token/", data={
-                "username": email_field.value, # Django usa 'username', mas seu app manda o email aqui
-                "password": password_field.value
-            })
+            # Adicionamos headers=HEADERS aqui para passar pelo Ngrok
+            response = requests.post(
+                f"{API_URL}/api/token/", 
+                data={
+                    "username": email_field.value, 
+                    "password": password_field.value
+                },
+                headers=HEADERS # <--- O PULO DO GATO
+            )
 
             if response.status_code == 200:
                 data = response.json()
                 token = data.get("access")
                 
                 if token:
-                    # 1. Salva o token
                     page.client_storage.set("token", token)
-                    
-                    # 2. Feedback visual
                     page.snack_bar = ft.SnackBar(ft.Text("Login realizado!"), bgcolor="green")
                     page.snack_bar.open = True
                     page.update()
-
-                    # 3. Força a navegação
                     print("Token salvo. Redirecionando para Home...")
                     page.go("/")
                 else:
-                    error_text.value = "Erro: Token não recebido do servidor."
+                    error_text.value = "Erro: Token vazio."
                     error_text.update()
-            else:
+            
+            elif response.status_code == 401:
                 error_text.value = "Email ou senha incorretos."
+                error_text.update()
+            else:
+                error_text.value = f"Erro no servidor: {response.status_code}"
                 error_text.update()
         
         except Exception as ex:
@@ -54,10 +61,9 @@ def create_login_view(page: ft.Page):
     def go_register(e):
         page.go("/register")
     
-    # URL para login com Google (abre no navegador do celular)
     def login_google(e):
-        # Redireciona para o endpoint do Django que inicia o fluxo do Google
-        page.launch_url(f"{API_URL}/api/start-login/")
+        # Adiciona o parametro na URL pro navegador também tentar pular o aviso
+        page.launch_url(f"{API_URL}/api/start-login/?ngrok-skip-browser-warning=true")
 
     return ft.View(
         route="/login",
@@ -65,7 +71,14 @@ def create_login_view(page: ft.Page):
             ft.Container(
                 content=ft.Column(
                     [
-                        ft.Image(src="logo-sem-fundo.png", width=100, height=100), # Se tiver logo
+                        # --- CORREÇÃO 2: A BARRA "/" E O TRATAMENTO DE ERRO ---
+                        ft.Image(
+                            src="/logo-sem-fundo.png", # <--- OBRIGATÓRIO TER A BARRA
+                            width=100, 
+                            height=100,
+                            # Se a imagem falhar, mostra um ícone e NÃO TRAVA O APP (Tela Branca)
+                            error_content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=50, color="grey")
+                        ), 
                         ft.Text("Bem-vindo ao VigiAA", size=24, weight="bold", color="#39BFEF"),
                         ft.Container(height=20),
                         email_field,

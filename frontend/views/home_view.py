@@ -1,5 +1,4 @@
 import flet as ft
-# Imports das abas
 from views.tabs.home_tab import get_home_tab
 from views.tabs.new_tab import get_new_tab
 from views.tabs.explore_tab import get_explore_tab
@@ -7,27 +6,24 @@ from views.tabs.profile_tab import get_profile_tab
 
 def create_main_view(page: ft.Page, aba_inicial=0):
     
-    # 1. Carrega as abas
     view_home = get_home_tab(page)
-    view_add = get_new_tab(page)
+    view_add = get_new_tab(page) 
     view_explore = get_explore_tab()
     view_profile = get_profile_tab(page)
 
     modulos = [view_home, view_add, view_explore, view_profile]
 
-    # 2. Corpo da página
-    body = ft.Container(
-        content=modulos[aba_inicial],
-        expand=True
-    )
+    body = ft.Container(content=modulos[aba_inicial], expand=True)
 
-    # 3. Função de troca de aba
     def change_tab(e):
         index = e.control.selected_index
+        if index == 1: 
+            page.go("/form-foco")
+            return 
         body.content = modulos[index]
         body.update()
 
-    # 4. Barra de Navegação (Fundo Azul)
+    # --- BARRA DE NAVEGAÇÃO (Compatível com 0.28.3) ---
     nav_bar = ft.NavigationBar(
         destinations=[
             ft.NavigationBarDestination(icon=ft.Icons.HOME, label="Home"),
@@ -37,58 +33,39 @@ def create_main_view(page: ft.Page, aba_inicial=0):
         ],
         selected_index=aba_inicial,
         on_change=change_tab,
-        bgcolor="#39BFEF", 
+        bgcolor="#39BFEF",
     )
 
-    # 5. Cabeçalho Personalizado (VigiAA com Logo e Degradê Claro)
+    # --- CABEÇALHO ---
     header = ft.Container(
         height=60,
         padding=ft.padding.symmetric(horizontal=15),
-        # DEGRADÊ AJUSTADO: Azul Ciano -> Verde Claro Luminoso
         gradient=ft.LinearGradient(
+            colors=["#39BFEF", "#69F0AE"], 
             begin=ft.alignment.center_left,
             end=ft.alignment.center_right,
-            colors=["#39BFEF", "#80E27E"] 
         ),
         content=ft.Row(
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
-                # Esquerda: SUA LOGO AQUI!
-                # O src começa com "/" indicando a raiz da pasta assets definida no main.py
-                ft.Container(
-                    content=ft.Image(
-                        src="/logo-sem-fundo.png", 
-                        width=40, 
-                        height=40, 
-                        fit=ft.ImageFit.CONTAIN
-                    ),
-                    alignment=ft.alignment.center
-                ),
-                
-                # Centro: Título VigiAA
-                ft.Text("VigiAA", size=20, weight="bold", color="black"),
-                
-                # Direita: Sininho (sem o número)
+                # --- A PROTEÇÃO ANTI-TELA BRANCA AQUI ---
+                # Usamos uma barra "/" antes do nome para garantir que o Android ache na raiz dos assets
+                ft.Image(
+                    src="/logo-sem-fundo.png", 
+                    width=40, height=40, 
+                    fit=ft.ImageFit.CONTAIN,
+                    # Se a imagem falhar, mostra um ícone e NÃO TRAVA O APP
+                    error_content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, color="white") 
+                ), 
+                ft.Text("VigiAA", size=22, weight="bold", color="black"),
                 ft.IconButton(ft.Icons.NOTIFICATIONS_NONE, icon_color="black")
             ]
         )
     )
 
-    # 6. View Final
     return ft.View(
         route="/",
-        controls=[
-            ft.Column(
-                controls=[
-                    header,  # Topo novo
-                    body,    # Conteúdo
-                    nav_bar  # Baixo azul
-                ],
-                spacing=0,
-                expand=True
-            )
-        ],
+        controls=[ft.Column([header, body, nav_bar], spacing=0, expand=True)],
         padding=0,
         bgcolor="#F5F5F5"
     )
