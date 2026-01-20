@@ -3,69 +3,69 @@ import flet as ft
 from views.home_view import create_main_view
 from views.login_view import create_login_view
 from views.register_view import create_register_view
-from views.change_password_view import create_change_password_view
 from views.forms.focus_form_view import create_focus_form_view
 
 def main(page: ft.Page):
-    # --- CONFIGURAÇÃO VITAL ---
+    # --- CONFIGURAÇÕES ---
     page.title = "Dengue Focus"
     page.theme_mode = ft.ThemeMode.LIGHT
-    # AQUI: Dizemos ao Flet onde procurar imagens (na pasta 'assets' dentro de frontend)
-    page.assets_dir = "assets" 
+    page.assets_dir = "assets"
     
     def route_change(e):
-        # Limpa as telas anteriores para evitar sobreposições e erros
+        # Limpa as telas da memória
         page.views.clear()
-
+        
+        # Pega a rota atual
         route = page.route
+        print(f"--- Rota Atual: {route} ---") # Debug no terminal
 
-        # --- ROTA RAIZ (HOME PADRÃO - Aba 0) ---
+        # --- ROTA RAIZ (HOME) ---
         if route == "/":
-            if not page.client_storage.contains_key("token"):
-                page.views.append(create_login_view(page))
+            # Verifica se TEM TOKEN
+            token = page.client_storage.get("token")
+            print(f"Token encontrado? {bool(token)}")
+
+            if not token:
+                # SE NÃO TEM TOKEN, REDIRECIONA PARA /login DE VERDADE
+                # Isso evita o bug de estar na rota "/" mostrando login
+                print("Sem token. Indo para /login...")
+                page.go("/login") 
+                return # Para a execução aqui para não carregar mais nada
             else:
+                # SE TEM TOKEN, MOSTRA A HOME
+                print("Token válido. Carregando Home...")
                 page.views.append(create_main_view(page, aba_inicial=0))
 
-        # --- ROTA NOVA (HOME - Aba 1/Novo) ---
-        # Usada quando voltamos do formulário
+        # --- ROTA LOGIN (Agora existe separada) ---
+        elif route == "/login":
+            page.views.append(create_login_view(page))
+
+        # --- ROTA REGISTRO ---
+        elif route == "/register":
+            page.views.append(create_register_view(page))
+
+        # --- ROTA NOVO ---
         elif route == "/novo":
             if not page.client_storage.contains_key("token"):
-                page.views.append(create_login_view(page))
+                page.go("/login")
             else:
                 page.views.append(create_main_view(page, aba_inicial=1))
 
-        # --- ROTAS DE AUTENTICAÇÃO ---
-        elif route == "/login":
-            page.views.append(create_login_view(page))
-        elif route == "/register":
-            page.views.append(create_register_view(page))
-        elif route == "/change-password":
-            # Cria a home por baixo para dar contexto
-            page.views.append(create_main_view(page))
-            page.views.append(create_change_password_view(page))
-
-        # --- ROTA: FORMULÁRIO DE FOCO ---
+        # --- ROTA FORMULÁRIO ---
         elif route == "/form-foco":
-            # Cria a Home por baixo
             page.views.append(create_main_view(page))
-            # Põe o formulário por cima
             page.views.append(create_focus_form_view(page))
 
+        # ATUALIZA A TELA
         page.update()
 
-    # --- CORREÇÃO DO INDEX ERROR ---
     def view_pop(e):
-        # Só tentamos voltar se houver mais de uma tela na pilha
         if len(page.views) > 1:
             page.views.pop()
             top_view = page.views[-1]
             page.go(top_view.route)
         else:
-            # Se for a última tela, não faz nada ou força a ida para home
-            # Isso evita o crash quando não tem para onde voltar
-            print("Não há tela anterior para voltar.")
-            # Opcional: se estiver perdido, força a home
-            if page.route != "/": page.go("/")
+            page.go("/")
 
     page.on_route_change = route_change
     page.on_view_pop = view_pop

@@ -5,13 +5,37 @@ import config
 def create_login_view(page: ft.Page):
     API_URL = config.API_URL
     
-    # --- CORREÇÃO 1: CABEÇALHO PARA O NGROK NÃO BLOQUEAR ---
     HEADERS = {"ngrok-skip-browser-warning": "true"}
 
-    email_field = ft.TextField(label="Email", width=300)
-    password_field = ft.TextField(label="Senha", password=True, can_reveal_password=True, width=300)
-    error_text = ft.Text(color="red", size=14)
+    # --- ELEMENTOS VISUAIS ---
+    error_text = ft.Text(color="red", size=14, weight="bold", text_align=ft.TextAlign.CENTER)
 
+    # Campos de Texto
+    email_field = ft.TextField(
+        hint_text="email@domain.com",
+        bgcolor="white",
+        border_radius=10,
+        border_width=0,       
+        text_size=14,
+        content_padding=15,   
+        color="black",
+        cursor_color="black"
+    )
+
+    password_field = ft.TextField(
+        hint_text="senha",
+        password=True,
+        can_reveal_password=True,
+        bgcolor="white",
+        border_radius=10,
+        border_width=0,
+        text_size=14,
+        content_padding=15,
+        color="black",
+        cursor_color="black"
+    )
+
+    # --- LÓGICA DE LOGIN ---
     def login_click(e):
         if not email_field.value or not password_field.value:
             error_text.value = "Preencha todos os campos"
@@ -22,14 +46,13 @@ def create_login_view(page: ft.Page):
         error_text.update()
 
         try:
-            # Adicionamos headers=HEADERS aqui para passar pelo Ngrok
             response = requests.post(
                 f"{API_URL}/api/token/", 
                 data={
                     "username": email_field.value, 
                     "password": password_field.value
                 },
-                headers=HEADERS # <--- O PULO DO GATO
+                headers=HEADERS
             )
 
             if response.status_code == 200:
@@ -41,7 +64,7 @@ def create_login_view(page: ft.Page):
                     page.snack_bar = ft.SnackBar(ft.Text("Login realizado!"), bgcolor="green")
                     page.snack_bar.open = True
                     page.update()
-                    print("Token salvo. Redirecionando para Home...")
+                    print("Token salvo. Redirecionando...")
                     page.go("/")
                 else:
                     error_text.value = "Erro: Token vazio."
@@ -62,43 +85,140 @@ def create_login_view(page: ft.Page):
         page.go("/register")
     
     def login_google(e):
-        # Adiciona o parametro na URL pro navegador também tentar pular o aviso
         page.launch_url(f"{API_URL}/api/start-login/?ngrok-skip-browser-warning=true")
 
+    # --- LAYOUT FINAL ---
     return ft.View(
         route="/login",
-        controls=[
-            ft.Container(
-                content=ft.Column(
-                    [
-                        # --- CORREÇÃO 2: A BARRA "/" E O TRATAMENTO DE ERRO ---
-                        ft.Image(
-                            src="/logo-sem-fundo.png", # <--- OBRIGATÓRIO TER A BARRA
-                            width=100, 
-                            height=100,
-                            # Se a imagem falhar, mostra um ícone e NÃO TRAVA O APP (Tela Branca)
-                            error_content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, size=50, color="grey")
-                        ), 
-                        ft.Text("Bem-vindo ao VigiAA", size=24, weight="bold", color="#39BFEF"),
-                        ft.Container(height=20),
-                        email_field,
-                        password_field,
-                        error_text,
-                        ft.ElevatedButton("ENTRAR", on_click=login_click, bgcolor="#39BFEF", color="white", width=300),
-                        ft.Container(height=10),
-                        ft.OutlinedButton("Entrar com Google", icon=ft.Icons.g_mobiledata, on_click=login_google, width=300),
-                        ft.Container(height=20),
-                        ft.TextButton("Não tem conta? Cadastre-se", on_click=go_register)
-                    ],
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER
-                ),
-                alignment=ft.alignment.center,
-                expand=True,
-                padding=20,
-                bgcolor="white"
-            )
-        ],
+        padding=0,
         bgcolor="white",
-        padding=0
+        controls=[
+            ft.Column(
+                spacing=0,
+                controls=[
+                    # --- PARTE SUPERIOR COLORIDA ---
+                    ft.Container(
+                        width=float("inf"),
+                        # Aumentei o padding do topo e baixo para caber a logo grande
+                        padding=ft.padding.only(left=30, right=30, top=50, bottom=30),
+                        border_radius=ft.border_radius.only(bottom_left=50, bottom_right=50),
+                        gradient=ft.LinearGradient(
+                            colors=["#4DD0E1", "#69F0AE"], 
+                            begin=ft.alignment.top_center,
+                            end=ft.alignment.bottom_center,
+                        ),
+                        content=ft.Column(
+                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            spacing=15,
+                            controls=[
+                                # --- ALTERAÇÃO 1: LOGO BASTANTE AUMENTADA ---
+                                ft.Image(
+                                    src="/logo-sem-fundo.png", 
+                                    width=160, # Aumentado de 90 para 160
+                                    height=160, 
+                                    error_content=ft.Icon(ft.Icons.BUG_REPORT, size=80, color="#1B5E20")
+                                ),
+                                
+                                ft.Text("VigiAA", size=28, weight="bold", color="black"),
+                                ft.Text("Entre na sua conta", size=16, weight="bold", color="black"),
+                                
+                                ft.Container(height=5),
+                                
+                                ft.Container(content=email_field, width=float("inf")),
+                                ft.Container(content=password_field, width=float("inf")),
+                                
+                                error_text,
+                                
+                                ft.Container(
+                                    width=float("inf"),
+                                    height=50,
+                                    content=ft.ElevatedButton(
+                                        "Continue", 
+                                        on_click=login_click, 
+                                        bgcolor="black", 
+                                        color="white", 
+                                        style=ft.ButtonStyle(
+                                            shape=ft.RoundedRectangleBorder(radius=10)
+                                        )
+                                    )
+                                ),
+                            ]
+                        )
+                    ),
+
+                    # --- PARTE INFERIOR BRANCA (ITENS MAIS PRÓXIMOS) ---
+                    ft.Container(
+                        padding=20,
+                        bgcolor="white",
+                        content=ft.Column(
+                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            spacing=5, # --- ALTERAÇÃO 2: Espaçamento geral reduzido de 10 para 5
+                            controls=[
+                                ft.Container(height=5), # Reduzido de 10 para 5
+                                
+                                ft.TextButton(
+                                    "Esqueci minha senha", 
+                                    style=ft.ButtonStyle(color="#1976D2")
+                                ),
+                                
+                                ft.Text("ou", color="grey", size=12),
+                                
+                                # --- ALTERAÇÃO 3: BOTÃO GOOGLE COM "G" COLORIDO ---
+                                ft.Container(
+                                    width=float("inf"),
+                                    height=50,
+                                    # Botão personalizado para incluir imagem e texto
+                                    content=ft.ElevatedButton(
+                                        on_click=login_google,
+                                        bgcolor="#F5F5F5",
+                                        color="black",
+                                        elevation=0,
+                                        style=ft.ButtonStyle(
+                                            shape=ft.RoundedRectangleBorder(radius=10),
+                                            padding=ft.padding.symmetric(horizontal=10) # Ajuste fino
+                                        ),
+                                        # Conteúdo personalizado: Imagem G + Texto
+                                        content=ft.Row(
+                                            alignment=ft.MainAxisAlignment.CENTER,
+                                            controls=[
+                                                # Usa um link oficial do G do Google (SVG para alta qualidade)
+                                                ft.Image(
+                                                    src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg",
+                                                    width=24,
+                                                    height=24,
+                                                    # Se falhar (sem net), mostra um ícone de fallback
+                                                    error_content=ft.Icon(ft.Icons.G_TRANSLATE, color="grey")
+                                                ),
+                                                ft.Text("Continue com Google")
+                                            ]
+                                        )
+                                    )
+                                ),
+                                
+                                ft.Container(height=10), # Reduzido de 20 para 10
+                                
+                                ft.Text(
+                                    "Ao clicar em Continuar com Google, você aceita nossos\nTermos de Serviço e Política de Privacidade", 
+                                    size=10, 
+                                    color="grey", 
+                                    text_align=ft.TextAlign.CENTER
+                                ),
+                                
+                                ft.Row(
+                                    alignment=ft.MainAxisAlignment.CENTER,
+                                    controls=[
+                                        ft.Text("Não possui uma conta?", color="grey", size=12),
+                                        ft.TextButton(
+                                            "Crie sua conta aqui", 
+                                            on_click=go_register, 
+                                            style=ft.ButtonStyle(color="#1976D2")
+                                        )
+                                    ]
+                                ),
+                            ]
+                        )
+                    )
+                ]
+            )
+        ]
     )
