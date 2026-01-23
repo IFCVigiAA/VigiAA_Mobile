@@ -108,7 +108,7 @@ def create_register_view(page: ft.Page):
                 # Logo MAIOR
                 ft.Image(
                     src="logo-sem-fundo.png",
-                    width=250,
+                    width=170,
                     fit=ft.ImageFit.CONTAIN
                 ),
                 

@@ -158,7 +158,8 @@ def create_login_view(page: ft.Page):
                                 
                                 ft.TextButton(
                                     "Esqueci minha senha", 
-                                    style=ft.ButtonStyle(color="#1976D2")
+                                    style=ft.ButtonStyle(color="#1976D2"),
+                                    on_click=lambda e: page.go("/forgot-password") # <--- O PULO DO GATO ESTÁ AQUI
                                 ),
                                 
                                 ft.Text("ou", color="grey", size=12),

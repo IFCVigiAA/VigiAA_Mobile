@@ -4,162 +4,126 @@ import config
 
 def create_change_password_view(page: ft.Page):
     API_URL = config.API_URL
+    
+    old_pass = ft.TextField(label="Senha Atual", password=True, can_reveal_password=True, width=300, bgcolor="white", color="black", border_radius=10)
+    new_pass = ft.TextField(label="Nova Senha", password=True, can_reveal_password=True, width=300, bgcolor="white", color="black", border_radius=10)
+    status_text = ft.Text(size=14, text_align=ft.TextAlign.CENTER)
 
-    # --- Estilo Minimalista para os Campos ---
-    def create_minimal_field(label):
-        return ft.TextField(
-            label=label,
-            password=True,
-            can_reveal_password=True,
-            
-            # Visual Clean (Só a linha de baixo)
-            border=ft.InputBorder.UNDERLINE,
-            border_color="#E0E0E0",     # Cinza claro quando inativo
-            focused_border_color="#39BFEF", # Azul da marca quando foca
-            cursor_color="#39BFEF",
-            
-            # Tipografia
-            text_style=ft.TextStyle(size=16, color="black"),
-            label_style=ft.TextStyle(size=14, color="grey"),
-            
-            # Remove cor de fundo
-            filled=False,
-            content_padding=ft.padding.symmetric(vertical=15)
-        )
-
-    # Criando os campos
-    tf_old_password = create_minimal_field("Senha Atual")
-    tf_new_password = create_minimal_field("Nova Senha")
-    tf_confirm_password = create_minimal_field("Confirmar Nova Senha")
-
-    # Botão de Ação
-    btn_save = ft.ElevatedButton(
-        text="Salvar Nova Senha",
-        bgcolor="black", # Preto fica mais elegante/minimalista nesse contexto
-        color="white",
-        width=float("inf"),
-        height=50,
-        style=ft.ButtonStyle(
-            shape=ft.RoundedRectangleBorder(radius=8), # Cantos levemente arredondados
-            elevation=0 # Sem sombra para ficar "Flat"
-        )
-    )
-
-    def back_to_profile(e):
-        page.client_storage.set("selected_tab_index", 3)
+    def go_home(e):
         page.go("/")
 
-    def change_password_action(e):
+    def change_click(e):
         token = page.client_storage.get("token")
-        
-        # Validação
-        if not tf_old_password.value or not tf_new_password.value:
-            page.snack_bar = ft.SnackBar(ft.Text("Preencha todos os campos."), bgcolor="red")
-            page.snack_bar.open = True
-            page.update()
+        if not token:
+            page.go("/login")
+            return
+            
+        if not old_pass.value or not new_pass.value:
+            status_text.value = "Preencha os dois campos."
+            status_text.color = "red"
+            status_text.update()
             return
 
-        if tf_new_password.value != tf_confirm_password.value:
-            page.snack_bar = ft.SnackBar(ft.Text("A nova senha não confere."), bgcolor="red")
-            page.snack_bar.open = True
-            page.update()
-            return
-
-        # Feedback
-        btn_save.text = "Processando..."
-        btn_save.disabled = True
-        page.update()
+        status_text.value = "Processando..."
+        status_text.color = "blue"
+        status_text.update()
 
         try:
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "ngrok-skip-browser-warning": "true"
+            }
+            
+            # --- MUDANÇA CRUCIAL AQUI ---
+            # Trocamos requests.post por requests.put
+            # APIs de atualização costumam exigir PUT
             response = requests.put(
-                f"{API_URL}/api/change-password/",
-                json={
-                    "old_password": tf_old_password.value,
-                    "new_password": tf_new_password.value
+                f"{API_URL}/api/change-password/", 
+                data={
+                    "old_password": old_pass.value, 
+                    "new_password": new_pass.value
                 },
-                headers={"Authorization": f"Bearer {token}"}
+                headers=headers
             )
-
-            if response.status_code == 200:
-                page.snack_bar = ft.SnackBar(ft.Text("Senha alterada com sucesso!"), bgcolor="green")
-                # Limpa campos
-                tf_old_password.value = ""
-                tf_new_password.value = ""
-                tf_confirm_password.value = ""
+            
+            # Se der erro 405 de novo com PUT, tente requests.patch (mas PUT é o mais provável)
+            
+            if response.status_code in [200, 204]:
+                status_text.value = "Senha alterada com sucesso!"
+                status_text.color = "green"
+                old_pass.value = ""
+                new_pass.value = ""
+                old_pass.update()
+                new_pass.update()
+            elif response.status_code == 400:
+                msg = response.text
+                if "old_password" in msg:
+                    msg = "Senha atual incorreta."
+                elif "new_password" in msg:
+                    msg = "Senha nova inválida."
+                status_text.value = f"Erro: {msg}"
+                status_text.color = "red"
+            elif response.status_code == 401:
+                page.go("/login")
             else:
-                try:
-                    erro = list(response.json().values())[0]
-                    if isinstance(erro, list): erro = erro[0]
-                except:
-                    erro = "Erro ao alterar senha."
-                page.snack_bar = ft.SnackBar(ft.Text(f"{erro}"), bgcolor="red")
-
+                status_text.value = f"Erro {response.status_code}: {response.text}"
+                status_text.color = "red"
+            
+            status_text.update()
+            
         except Exception as ex:
-            page.snack_bar = ft.SnackBar(ft.Text("Erro de conexão."), bgcolor="red")
-        
-        btn_save.text = "Salvar Nova Senha"
-        btn_save.disabled = False
-        page.snack_bar.open = True
-        page.update()
+            status_text.value = f"Erro de conexão: {ex}"
+            status_text.color = "red"
+            status_text.update()
 
-    btn_save.on_click = change_password_action
-
-    # --- Header (Igual ao das outras telas, sem o sino) ---
+    # --- HEADER MANUAL ---
     header = ft.Container(
-        gradient=ft.LinearGradient(
-            begin=ft.alignment.top_left,
-            end=ft.alignment.bottom_right,
-            colors=["#3AC0ED", "#72FC90"]
-        ),
-        padding=ft.padding.only(left=10, right=20, top=35, bottom=20),
+        height=60,
+        bgcolor="#39BFEF",
+        padding=ft.padding.symmetric(horizontal=10),
         content=ft.Row(
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
-                ft.IconButton(
-                    icon=ft.Icons.ARROW_BACK, 
-                    icon_color="#1a1a1a",
-                    on_click=back_to_profile
-                ),
-                ft.Text(
-                    "Alterar Senha", 
-                    size=20, 
-                    weight="bold", 
-                    color="#1a1a1a"
-                ),
-                # Espaço vazio para manter o título no centro (Compensa o botão de voltar)
-                ft.Container(width=40) 
+                ft.IconButton(ft.Icons.ARROW_BACK, on_click=go_home, icon_color="white"),
+                ft.Text("Alterar Senha", color="white", size=20, weight="bold")
             ]
         )
     )
 
     return ft.View(
         route="/change-password",
-        controls=[
-            header,
-            ft.Container(
-                padding=30, # Bastante respiro nas bordas
-                bgcolor="white",
-                content=ft.Column(
-                    controls=[
-                        # Título interno discreto
-                        ft.Text("Defina sua nova credencial", color="grey", size=14),
-                        ft.Container(height=20),
-                        
-                        tf_old_password,
-                        ft.Container(height=10),
-                        
-                        tf_new_password,
-                        ft.Container(height=10),
-                        
-                        tf_confirm_password,
-                        ft.Container(height=40),
-                        
-                        btn_save
-                    ]
-                )
-            )
-        ],
         bgcolor="white",
-        padding=0
+        padding=0,
+        controls=[
+            ft.Column(
+                controls=[
+                    header,
+                    ft.Container(
+                        padding=20,
+                        content=ft.Column(
+                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            controls=[
+                                ft.Container(height=20),
+                                ft.Text("Segurança", size=20, weight="bold", color="black"),
+                                ft.Text("Defina sua nova senha de acesso.", color="grey"),
+                                ft.Container(height=30),
+                                old_pass,
+                                ft.Container(height=10),
+                                new_pass,
+                                ft.Container(height=20),
+                                ft.ElevatedButton(
+                                    "Salvar Nova Senha", 
+                                    on_click=change_click, 
+                                    bgcolor="#4CAF50", 
+                                    color="white", 
+                                    width=200,
+                                    height=45
+                                ),
+                                ft.Container(height=10),
+                                status_text
+                            ]
+                        )
+                    )
+                ]
+            )
+        ]
     )
