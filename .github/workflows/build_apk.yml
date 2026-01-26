@@ -27,67 +27,108 @@ jobs:
         # 1. Cria e configura o ambiente virtual
         python -m venv venv
         
-        # Ativa o venv explicitamente para os comandos seguintes
+        # Ativa o venv
         source venv/bin/activate
         
         pip install --upgrade pip
         pip install flet==0.28.3
         
-        # --- PASSO NOVO: INJEÇÃO VIA PYTHON (INFALÍVEL) ---
-        echo "🔧 Criando script de correção do Manifest..."
+        # --- CIRURGIA NO TEMPLATE DO FLET (PARA INJETAR GPS) ---
+        echo "🔧 Iniciando injeção de permissões no template compactado..."
         
-        # Cria um arquivo python temporário para fazer o serviço sujo
-        cat <<EOF > patch_manifest.py
+        cat <<EOF > patch_template.py
         import flet
+        import tarfile
+        import shutil
         import sys
+        import io
         from pathlib import Path
 
-        # 1. Localiza onde o Flet foi instalado
-        flet_dir = Path(flet.__file__).parent
-        print(f"📍 Flet encontrado em: {flet_dir}")
+        # 1. Localiza o diretório do Flet instalado
+        flet_path = Path(flet.__file__).parent
+        print(f"📍 Flet instalado em: {flet_path}")
 
-        # 2. Procura recursivamente pelo AndroidManifest.xml principal
-        # O template fica dentro de flet/sdk/...
-        manifests = list(flet_dir.rglob("AndroidManifest.xml"))
+        # 2. Procura pelo arquivo de template (.tar.gz)
+        # O Flet guarda o esqueleto do Android dentro de um arquivo compactado
+        archives = list(flet_path.rglob("*.tar.gz"))
         
-        # Filtra para garantir que é o 'src/main/AndroidManifest.xml'
-        target = next((m for m in manifests if "src/main" in str(m) and "debug" not in str(m)), None)
-
-        if not target:
-            print("❌ ERRO: AndroidManifest.xml não encontrado na instalação do Flet.")
+        if not archives:
+            print("❌ ERRO: Nenhum template .tar.gz encontrado!")
             sys.exit(1)
 
-        print(f"✅ Arquivo alvo: {target}")
-
-        # 3. Lê e Injeta as permissões
-        content = target.read_text(encoding="utf-8")
+        target_archive = archives[0]
+        print(f"📦 Template encontrado: {target_archive}")
         
+        temp_archive = target_archive.with_name("temp_patched.tar.gz")
+        
+        # Permissões que queremos injetar
         permissions = '''
         <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
         <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
         '''
+        
+        modified = False
 
-        if "ACCESS_FINE_LOCATION" in content:
-            print("⚠️ Permissões já existem. Ignorando.")
-        else:
-            # Substitui a tag <application> pelas permissões + a tag <application>
-            new_content = content.replace("<application", f"{permissions}\n    <application")
-            target.write_text(new_content, encoding="utf-8")
-            print("🚀 Permissões de GPS injetadas com SUCESSO!")
+        # 3. Abre o arquivo original e cria um novo
+        try:
+            with tarfile.open(target_archive, "r:gz") as read_tar, \
+                 tarfile.open(temp_archive, "w:gz") as write_tar:
+                
+                for member in read_tar.getmembers():
+                    # Procura o AndroidManifest.xml principal dentro do zip
+                    if "src/main/AndroidManifest.xml" in member.name:
+                        print(f"📝 Editando: {member.name}")
+                        
+                        # Extrai o conteúdo para a memória
+                        f = read_tar.extractfile(member)
+                        content = f.read().decode("utf-8")
+                        
+                        # Injeta as permissões antes da tag <application>
+                        if "ACCESS_FINE_LOCATION" not in content:
+                            new_content = content.replace("<application", f"{permissions}\n    <application")
+                            
+                            # Atualiza o arquivo dentro do tar
+                            encoded_content = new_content.encode("utf-8")
+                            member.size = len(encoded_content)
+                            write_tar.addfile(member, io.BytesIO(encoded_content))
+                            modified = True
+                            print("✅ Permissões injetadas!")
+                        else:
+                            print("⚠️ Permissões já existem.")
+                            write_tar.addfile(member, io.BytesIO(content.encode("utf-8")))
+                    else:
+                        # Copia os outros arquivos sem mexer
+                        if member.isfile():
+                            f = read_tar.extractfile(member)
+                            write_tar.addfile(member, f)
+                        else:
+                            write_tar.addfile(member)
+            
+            # 4. Substitui o arquivo original pelo modificado
+            if modified:
+                shutil.move(str(temp_archive), str(target_archive))
+                print("🎉 Template do Flet atualizado com sucesso!")
+            else:
+                print("ℹ️ Nenhuma alteração foi necessária.")
+                if temp_archive.exists():
+                    os.remove(temp_archive)
+
+        except Exception as e:
+            print(f"❌ Erro durante a patche: {e}")
+            sys.exit(1)
         EOF
         
-        # Roda o script que acabamos de criar
-        python patch_manifest.py
-        # --------------------------------------------------
+        # Executa o script que criamos acima
+        python patch_template.py
+        # -------------------------------------------------------
 
         cd frontend
         
-        # Gera requirements apenas com o essencial
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        # Roda o build (já usando o Flet modificado)
-        flet build apk --verbose
-
+        # Agora roda o build usando o template já "hackeado"
+        ../venv/bin/flet build apk --verbose
+        
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
