@@ -24,22 +24,44 @@ jobs:
 
     - name: Build APK (ISOLAMENTO TOTAL)
       run: |
-        # 1. Cria uma "Bolha" limpa (Virtual Environment)
+        # 1. Cria e configura o ambiente virtual
         python -m venv venv
         
-        # 2. Instala o Flet 0.28.3 DENTRO da bolha (Ninguém mexe aqui)
         ./venv/bin/pip install --upgrade pip
         ./venv/bin/pip install flet==0.28.3
         
-        # 3. Prepara o frontend
+        # --- INICIO DA INJEÇÃO DE PERMISSÕES GPS ---
+        echo "🔍 Procurando AndroidManifest.xml dentro do venv..."
+        
+        # Procura o arquivo dentro do ambiente virtual criado
+        MANIFEST_PATH=$(find ./venv -name AndroidManifest.xml | grep "main/AndroidManifest.xml" | head -n 1)
+        
+        if [ -z "$MANIFEST_PATH" ]; then
+          echo "❌ ERRO CRÍTICO: AndroidManifest.xml não encontrado. O build vai falhar."
+          exit 1
+        fi
+        
+        echo "✅ Arquivo encontrado em: $MANIFEST_PATH"
+        echo "🔧 Injetando permissões de localização..."
+        
+        # Define as permissões necessárias
+        PERMISSIONS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
+        
+        # Insere as permissões antes da tag <application>
+        sed -i "s|<application|$PERMISSIONS\n    <application|g" "$MANIFEST_PATH"
+        
+        # Confirmação visual no log
+        if grep -q "ACCESS_FINE_LOCATION" "$MANIFEST_PATH"; then
+          echo "🎉 Permissões injetadas com SUCESSO!"
+        else
+          echo "⚠️ AVISO: Falha ao injetar permissões."
+        fi
+        # --- FIM DA INJEÇÃO ---
+
         cd frontend
         
-        # 4. Cria o requirements travado na versão certa
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        # 5. O GRANDE SEGREDO:
-        # Rodamos o build usando o Flet da bolha (que é novo e esperto)
-        # E NÃO passamos flag nenhuma. Ele vai ler o seu main.py sozinho.
         ../venv/bin/flet build apk --verbose
 
     - name: Upload APK Artifact

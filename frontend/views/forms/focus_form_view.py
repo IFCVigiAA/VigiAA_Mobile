@@ -3,7 +3,6 @@ import requests
 import config
 from urllib.parse import quote
 import unicodedata
-import time
 
 def create_focus_form_view(page: ft.Page):
     # Limpeza inicial
@@ -20,40 +19,44 @@ def create_focus_form_view(page: ft.Page):
             update_images_display()
             
     file_picker = ft.FilePicker(on_result=on_file_result)
+    # Adiciona o FilePicker no overlay para garantir que funcione sempre
+    page.overlay.append(file_picker)
     
     # --- FUNÇÕES DE NAVEGAÇÃO ---
     def back_click(e):
         page.go("/novo")
 
     # ===============================================================
-    # 1. COMPONENTE GPS (COM DEBUG VISUAL)
+    # 1. COMPONENTE GPS (NOVA ESTRUTURA)
     # ===============================================================
     
     def on_gps_position(e):
         lat = e.latitude
         lon = e.longitude
         accuracy = e.accuracy
-        print(f"✅ GPS Nativo SUCESSO! Lat: {lat}, Lon: {lon}, Acc: {accuracy}")
+        print(f"GPS Nativo SUCESSO! Lat: {lat}, Lon: {lon}, Acc: {accuracy}")
         get_address_from_coords(lat, lon, source="GPS (Preciso)")
 
     def on_gps_error(e):
-        print(f"❌ Erro GPS Nativo: {e.error}")
-        
-        # Mostra o erro na tela para você saber o que houve
+        print(f"Erro GPS Nativo: {e.error}")
+        # Mostra erro visual
         page.snack_bar = ft.SnackBar(
-            ft.Text(f"GPS Nativo falhou: {e.error}. Tentando via Internet..."), 
-            bgcolor="orange",
-            duration=3000
+            content=ft.Text(f"GPS falhou: {e.error}. Verifique se o GPS está ligado!"),
+            bgcolor="red",
+            duration=4000
         )
         page.snack_bar.open = True
         page.update()
         
-        # Só tenta IP se o erro não for de permissão (se for permissão, o IP não resolve a precisão)
+        # Tenta o IP como último recurso
         try_ip_location()
 
     geolocator = ft.Geolocator()
     geolocator.on_position = on_gps_position
     geolocator.on_error = on_gps_error
+    
+    # IMPORTANTE: Adiciona o Geolocator no Overlay (Camada Superior)
+    page.overlay.append(geolocator)
 
     # ===============================================================
     # 2. OVERLAY DE ERRO (ÁREA DE COBERTURA)
@@ -307,13 +310,11 @@ def create_focus_form_view(page: ft.Page):
 
     def get_gps_click(e):
         btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
-        
-        # Tenta GPS Nativo com alta precisão
         try:
-            geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.HIGH)
+            # Solicita sem parâmetros para maximizar compatibilidade
+            geolocator.get_current_position()
         except Exception as ex:
-            print(f"Falha imediata ao chamar GPS: {ex}")
-            # Se falhar na CHAMADA, tenta IP
+            print(f"Falha chamada GPS: {ex}")
             try_ip_location()
 
     def get_address_from_coords(lat, lon, source="GPS"):
@@ -326,6 +327,7 @@ def create_focus_form_view(page: ft.Page):
             addr = data.get("address", {})
             
             gps_address_data.clear()
+            
             gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality") or addr.get("village")
             gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood") or addr.get("quarter")
             gps_address_data["logradouro"] = addr.get("road") or addr.get("pedestrian")
@@ -399,7 +401,6 @@ def create_focus_form_view(page: ft.Page):
             try:
                 res = requests.get(f"https://viacep.com.br/ws/{cep}/json/").json()
                 if "erro" not in res: fill_address_fields(res)
-                else: page.snack_bar = ft.SnackBar(ft.Text("CEP não encontrado."), bgcolor="orange"); page.snack_bar.open = True; page.update()
             except: pass
 
     def search_address_by_name(e):
@@ -496,6 +497,7 @@ def create_focus_form_view(page: ft.Page):
                 gps_overlay, 
                 error_overlay 
             ]),
-            ft.Row([file_picker, geolocator], visible=False)
+            # Adicionado corretamente ao overlay agora
+            # (Removemos da Stack visual e colocamos no append acima)
         ]
     )
