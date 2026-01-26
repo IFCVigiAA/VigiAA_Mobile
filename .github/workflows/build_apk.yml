@@ -22,83 +22,69 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (FORÇA BRUTA)
+    - name: Build APK (ESTRATÉGIA INTERCEPTADOR)
       run: |
-        # 1. Cria e configura o ambiente virtual
+        # 1. Configura o ambiente
         python -m venv venv
-        
-        # Ativa o venv (importante para o find achar as coisas no lugar certo)
         source venv/bin/activate
-        
         pip install --upgrade pip
         pip install flet==0.28.3
+
+        # --- O TRUQUE DE MESTRE ---
+        # 2. Descobre onde está o Flutter original
+        REAL_FLUTTER=$(which flutter)
+        echo "📍 Flutter original está em: $REAL_FLUTTER"
+
+        # 3. Cria uma pasta para nosso espião
+        mkdir -p shim
         
-        echo "🕵️‍♂️ Iniciando busca implacável pelo template do Android..."
+        # 4. Cria o script 'flutter' falso que intercepta o build
+        cat <<EOF > shim/flutter
+        #!/bin/bash
         
-        # PROCURA O ARQUIVO COMPACTADO (O ESCONDERIJO PADRÃO)
-        TEMPLATE_PATH=$(find ./venv -name "flutter_app_template.tar.gz" -print -quit)
-        
-        if [ -n "$TEMPLATE_PATH" ]; then
-            echo "📦 Template compactado encontrado em: $TEMPLATE_PATH"
+        # Verifica se o comando é de build
+        if [[ "\$*" == *"build apk"* ]]; then
+            echo "🔥 INTERCEPTADOR ATIVADO: O Flet chamou o build!"
+            echo "🔍 Procurando AndroidManifest.xml gerado..."
             
-            # Cria área de trabalho temporária
-            mkdir -p temp_patch
-            cd temp_patch
+            # Procura o arquivo XML que o Flet acabou de criar
+            MANIFEST=\$(find . -name "AndroidManifest.xml" | grep "main/AndroidManifest.xml" | head -n 1)
             
-            # Abre o pacote
-            tar -xzf "$TEMPLATE_PATH"
-            
-            # Acha o arquivo de manifesto lá dentro
-            MANIFEST=$(find . -name "AndroidManifest.xml" | grep "main/AndroidManifest.xml")
-            
-            if [ -n "$MANIFEST" ]; then
-                echo "📝 Editando: $MANIFEST"
+            if [ -n "\$MANIFEST" ]; then
+                echo "📝 Injetando permissões em: \$MANIFEST"
                 
-                # Injeta as permissões
                 PERMISSIONS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
-                sed -i "s|<application|$PERMISSIONS\n    <application|g" "$MANIFEST"
                 
-                # Fecha o pacote de volta (com cuidado para manter a estrutura)
-                # O '.' inclui arquivos ocultos e mantém a estrutura original
-                tar -czf patched.tar.gz .
+                # Injeta a linha mágica
+                sed -i "s|<application|\$PERMISSIONS\n    <application|g" "\$MANIFEST"
                 
-                # Substitui o original pelo nosso modificado
-                mv patched.tar.gz "$TEMPLATE_PATH"
-                echo "✅ Template original substituído com sucesso!"
+                echo "✅ GPS LIBERADO COM SUCESSO!"
+                cat "\$MANIFEST" | grep "ACCESS_FINE_LOCATION"
             else
-                echo "⚠️ Manifest não encontrado dentro do pacote. Isso é estranho."
-            fi
-            
-            # Limpa a bagunça
-            cd ..
-            rm -rf temp_patch
-            
-        else
-            echo "⚠️ Template .tar.gz não encontrado. Procurando arquivos XML soltos..."
-            
-            # PROCURA O ARQUIVO SOLTO (CASO ESTEJA DESCOMPACTADO)
-            MANIFEST_PATH=$(find ./venv -name "AndroidManifest.xml" | grep "main/AndroidManifest.xml" | head -n 1)
-            
-            if [ -n "$MANIFEST_PATH" ]; then
-                 echo "📝 Patcheando arquivo solto: $MANIFEST_PATH"
-                 PERMISSIONS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
-                 sed -i "s|<application|$PERMISSIONS\n    <application|g" "$MANIFEST_PATH"
-                 echo "✅ Arquivo XML atualizado!"
-            else
-                 echo "❌ ERRO FATAL: Não foi possível encontrar nem o template nem o manifesto."
-                 echo "📂 Listando arquivos para debug:"
-                 find ./venv -maxdepth 4
-                 exit 1
+                echo "⚠️ Manifest não encontrado no diretório atual."
             fi
         fi
 
-        # AGORA SEGUE O BAILE NORMAL
+        # 5. Chama o Flutter original para terminar o serviço
+        exec "$REAL_FLUTTER" "\$@"
+        EOF
+
+        # Torna o espião executável
+        chmod +x shim/flutter
+
+        # Coloca nossa pasta shim no começo do PATH para enganar o Flet
+        export PATH=$PWD/shim:$PATH
+        
+        echo "🕵️‍♂️ Interceptador configurado. Iniciando o build..."
+        # ---------------------------
+
         cd frontend
         
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
+        # O Flet vai rodar, chamar 'flutter', cair no nosso script, ter o arquivo editado e finalizar!
         flet build apk --verbose
-
+        
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
