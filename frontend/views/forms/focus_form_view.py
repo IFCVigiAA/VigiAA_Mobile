@@ -3,6 +3,7 @@ import requests
 import config
 from urllib.parse import quote
 import unicodedata
+import time
 
 def create_focus_form_view(page: ft.Page):
     # Limpeza inicial
@@ -25,17 +26,29 @@ def create_focus_form_view(page: ft.Page):
         page.go("/novo")
 
     # ===============================================================
-    # 1. COMPONENTE GPS
+    # 1. COMPONENTE GPS (COM DEBUG VISUAL)
     # ===============================================================
     
     def on_gps_position(e):
         lat = e.latitude
         lon = e.longitude
-        print(f"GPS Nativo: {lat}, {lon}")
-        get_address_from_coords(lat, lon, source="GPS")
+        accuracy = e.accuracy
+        print(f"✅ GPS Nativo SUCESSO! Lat: {lat}, Lon: {lon}, Acc: {accuracy}")
+        get_address_from_coords(lat, lon, source="GPS (Preciso)")
 
     def on_gps_error(e):
-        print(f"Erro GPS Nativo: {e.error}")
+        print(f"❌ Erro GPS Nativo: {e.error}")
+        
+        # Mostra o erro na tela para você saber o que houve
+        page.snack_bar = ft.SnackBar(
+            ft.Text(f"GPS Nativo falhou: {e.error}. Tentando via Internet..."), 
+            bgcolor="orange",
+            duration=3000
+        )
+        page.snack_bar.open = True
+        page.update()
+        
+        # Só tenta IP se o erro não for de permissão (se for permissão, o IP não resolve a precisão)
         try_ip_location()
 
     geolocator = ft.Geolocator()
@@ -61,7 +74,7 @@ def create_focus_form_view(page: ft.Page):
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=20,
-                height=280, # Altura ajustada
+                height=280,
                 controls=[
                     ft.Icon(ft.Icons.LOCATION_OFF, color="red", size=60),
                     ft.Text("Fora da área!", size=22, weight="bold", color="black"),
@@ -88,13 +101,11 @@ def create_focus_form_view(page: ft.Page):
         page.update()
 
     def close_error_modal(e):
-        # Limpa os campos para evitar cadastro errado
         dd_municipio.value = None
         dd_bairro.value = None
         tf_rua.value = ""
         tf_numero.value = ""
         dd_bairro.disabled = True
-        
         error_overlay.visible = False
         page.update()
 
@@ -282,23 +293,27 @@ def create_focus_form_view(page: ft.Page):
         "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]
     }
 
-    # --- LÓGICA DO GPS ---
+    # --- LÓGICA DO GPS (COM FALLBACK IP) ---
     def try_ip_location():
         print("Tentando via IP (Fallback)...")
         try:
             res = requests.get("http://ip-api.com/json/", timeout=5)
             if res.status_code == 200:
                 data = res.json()
-                get_address_from_coords(data.get('lat'), data.get('lon'), source="Rede (Aproximado)")
+                get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
             else: raise Exception("API IP falhou")
         except:
             btn_gps.text = "GPS Indisponível"; btn_gps.disabled = False; page.update()
 
     def get_gps_click(e):
         btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
+        
+        # Tenta GPS Nativo com alta precisão
         try:
             geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.HIGH)
-        except:
+        except Exception as ex:
+            print(f"Falha imediata ao chamar GPS: {ex}")
+            # Se falhar na CHAMADA, tenta IP
             try_ip_location()
 
     def get_address_from_coords(lat, lon, source="GPS"):
@@ -311,7 +326,6 @@ def create_focus_form_view(page: ft.Page):
             addr = data.get("address", {})
             
             gps_address_data.clear()
-            
             gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality") or addr.get("village")
             gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood") or addr.get("quarter")
             gps_address_data["logradouro"] = addr.get("road") or addr.get("pedestrian")
@@ -323,6 +337,11 @@ def create_focus_form_view(page: ft.Page):
             lbl_gps_cidade.value = gps_address_data["localidade"] or "Cidade não detectada"
             lbl_gps_source.value = f"Fonte: {source}"
             
+            if "Internet" in source:
+                lbl_gps_source.color = "red"
+            else:
+                lbl_gps_source.color = "green"
+            
             gps_overlay.visible = True
             btn_gps.text = "Capturar localização pelo GPS"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False
             page.update()
@@ -331,7 +350,7 @@ def create_focus_form_view(page: ft.Page):
             page.snack_bar = ft.SnackBar(ft.Text("Erro ao traduzir coordenadas."), bgcolor="red"); page.snack_bar.open = True; page.update()
             btn_gps.text = "Tentar Novamente"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.disabled = False; page.update()
 
-    # --- PREENCHIMENTO E BLOQUEIO (VALIDAÇÃO DE ÁREA) ---
+    # --- PREENCHIMENTO E BLOQUEIO ---
     def normalize_string(s):
         if not s: return ""
         return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
@@ -343,19 +362,15 @@ def create_focus_form_view(page: ft.Page):
         city_clean = normalize_string(city_api)
         target_city = None
         
-        # --- VERIFICAÇÃO RÍGIDA DE ÁREA ---
         if "balneario" in city_clean and "camboriu" in city_clean:
             target_city = "Balneário Camboriú"
         elif "camboriu" in city_clean and "balneario" not in city_clean:
             target_city = "Camboriú"
         
-        # Se não for uma das duas, bloqueia!
         if not target_city:
-            print(f"Cidade bloqueada: {city_api}")
             open_error_modal()
             return
 
-        # Se passou, preenche os dados
         dd_municipio.value = target_city
         dd_bairro.disabled = False
         
@@ -363,7 +378,6 @@ def create_focus_form_view(page: ft.Page):
             current_opts = neighborhoods_db[target_city]
             bairro_api = data.get("bairro")
             if bairro_api:
-                # Adiciona bairro se não existir (para garantir)
                 if bairro_api not in current_opts:
                     current_opts.append(bairro_api)
                     current_opts.sort()
@@ -384,11 +398,8 @@ def create_focus_form_view(page: ft.Page):
         if len(cep) == 8:
             try:
                 res = requests.get(f"https://viacep.com.br/ws/{cep}/json/").json()
-                if "erro" not in res:
-                    # Chama a mesma função de preenchimento que tem a validação!
-                    fill_address_fields(res)
-                else:
-                    page.snack_bar = ft.SnackBar(ft.Text("CEP não encontrado."), bgcolor="orange"); page.snack_bar.open = True; page.update()
+                if "erro" not in res: fill_address_fields(res)
+                else: page.snack_bar = ft.SnackBar(ft.Text("CEP não encontrado."), bgcolor="orange"); page.snack_bar.open = True; page.update()
             except: pass
 
     def search_address_by_name(e):
