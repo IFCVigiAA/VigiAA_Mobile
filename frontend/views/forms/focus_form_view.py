@@ -32,7 +32,7 @@ def create_focus_form_view(page: ft.Page):
         lat = e.latitude
         lon = e.longitude
         print(f"GPS Nativo: {lat}, {lon}")
-        get_address_from_coords(lat, lon)
+        get_address_from_coords(lat, lon, source="GPS")
 
     def on_gps_error(e):
         print(f"Erro GPS Nativo: {e.error}")
@@ -43,7 +43,63 @@ def create_focus_form_view(page: ft.Page):
     geolocator.on_error = on_gps_error
 
     # ===============================================================
-    # 2. OVERLAY DE CONFIRMAÇÃO DO GPS
+    # 2. OVERLAY DE ERRO (ÁREA DE COBERTURA)
+    # ===============================================================
+    error_overlay = ft.Container(
+        visible=False,
+        bgcolor="#80000000",
+        alignment=ft.alignment.center,
+        expand=True,
+        on_click=lambda e: close_error_modal(None),
+        content=ft.Container(
+            width=300,
+            bgcolor="white",
+            border_radius=20,
+            padding=25,
+            shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"),
+            content=ft.Column(
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=20,
+                height=280, # Altura ajustada
+                controls=[
+                    ft.Icon(ft.Icons.LOCATION_OFF, color="red", size=60),
+                    ft.Text("Fora da área!", size=22, weight="bold", color="black"),
+                    ft.Text(
+                        "O endereço informado não pertence a Camboriú ou Balneário Camboriú.", 
+                        size=14, 
+                        color="grey", 
+                        text_align=ft.TextAlign.CENTER
+                    ),
+                    ft.ElevatedButton(
+                        "Entendi", 
+                        bgcolor="red", 
+                        color="white", 
+                        width=120, 
+                        on_click=lambda e: close_error_modal(None)
+                    )
+                ]
+            )
+        )
+    )
+
+    def open_error_modal():
+        error_overlay.visible = True
+        page.update()
+
+    def close_error_modal(e):
+        # Limpa os campos para evitar cadastro errado
+        dd_municipio.value = None
+        dd_bairro.value = None
+        tf_rua.value = ""
+        tf_numero.value = ""
+        dd_bairro.disabled = True
+        
+        error_overlay.visible = False
+        page.update()
+
+    # ===============================================================
+    # 3. OVERLAY DE CONFIRMAÇÃO DO GPS
     # ===============================================================
     gps_overlay = ft.Container(
         visible=False,
@@ -61,19 +117,21 @@ def create_focus_form_view(page: ft.Page):
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=15,
-                height=350,
+                height=380,
                 controls=[
                     ft.Icon(ft.Icons.MAP_SHARP, color="#39BFEF", size=50),
                     ft.Text("Localização Encontrada!", size=20, weight="bold", color="#39BFEF"),
+                    ft.Text(value="Fonte: GPS", size=10, color="grey", text_align=ft.TextAlign.CENTER),
                     ft.Divider(),
-                    ft.Text("Você está aqui?", size=14, color="grey"),
+                    ft.Text("Confira os dados abaixo:", size=14, color="grey"),
                     ft.Container(
                         bgcolor="#F5F5F5",
                         padding=15,
                         border_radius=10,
                         content=ft.Column([
-                            ft.Text(value="", weight="bold", color="black"), # Rua
-                            ft.Text(value="", size=12, color="grey"), # Bairro e Cidade
+                            ft.Text(value="", weight="bold", color="black", size=14), # Rua
+                            ft.Text(value="", size=13, color="black"), # Bairro
+                            ft.Text(value="", size=12, color="grey"), # Cidade
                         ], spacing=2)
                     ),
                     ft.Container(height=10),
@@ -89,8 +147,10 @@ def create_focus_form_view(page: ft.Page):
         )
     )
     
-    lbl_gps_rua = gps_overlay.content.content.controls[4].content.controls[0]
-    lbl_gps_bairro = gps_overlay.content.content.controls[4].content.controls[1]
+    lbl_gps_rua = gps_overlay.content.content.controls[5].content.controls[0]
+    lbl_gps_bairro = gps_overlay.content.content.controls[5].content.controls[1]
+    lbl_gps_cidade = gps_overlay.content.content.controls[5].content.controls[2]
+    lbl_gps_source = gps_overlay.content.content.controls[2]
 
     def close_gps_modal():
         gps_overlay.visible = False
@@ -104,7 +164,7 @@ def create_focus_form_view(page: ft.Page):
         close_gps_modal()
 
     # ===============================================================
-    # 3. OVERLAY DE SUCESSO
+    # 4. OVERLAY DE SUCESSO
     # ===============================================================
     success_overlay = ft.Container(
         visible=False,
@@ -144,7 +204,7 @@ def create_focus_form_view(page: ft.Page):
         back_click(None)
 
     # ===============================================================
-    # 4. OVERLAY DE ENDEREÇO (MANUAL)
+    # 5. OVERLAY DE ENDEREÇO (MANUAL)
     # ===============================================================
     overlay_list_content = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=0)
     
@@ -224,12 +284,12 @@ def create_focus_form_view(page: ft.Page):
 
     # --- LÓGICA DO GPS ---
     def try_ip_location():
-        print("Tentando via IP...")
+        print("Tentando via IP (Fallback)...")
         try:
             res = requests.get("http://ip-api.com/json/", timeout=5)
             if res.status_code == 200:
                 data = res.json()
-                get_address_from_coords(data.get('lat'), data.get('lon'))
+                get_address_from_coords(data.get('lat'), data.get('lon'), source="Rede (Aproximado)")
             else: raise Exception("API IP falhou")
         except:
             btn_gps.text = "GPS Indisponível"; btn_gps.disabled = False; page.update()
@@ -237,90 +297,80 @@ def create_focus_form_view(page: ft.Page):
     def get_gps_click(e):
         btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
         try:
-            geolocator.get_current_position()
-            try_ip_location() 
+            geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.HIGH)
         except:
             try_ip_location()
 
-    def get_address_from_coords(lat, lon):
+    def get_address_from_coords(lat, lon, source="GPS"):
         try:
             headers = {'User-Agent': 'VigiAA/1.0'}
-            url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+            url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
             response = requests.get(url, headers=headers)
             data = response.json()
             
-            address = data.get("address", {})
+            addr = data.get("address", {})
             
             gps_address_data.clear()
-            gps_address_data["localidade"] = address.get("city") or address.get("town") or address.get("municipality")
-            gps_address_data["bairro"] = address.get("suburb") or address.get("neighbourhood")
-            gps_address_data["logradouro"] = address.get("road")
-            gps_address_data["cep"] = address.get("postcode")
-            gps_address_data["numero"] = address.get("house_number")
             
-            # Normalização para exibição
-            rua_show = gps_address_data["logradouro"] or "Rua não detectada"
-            bairro_show = gps_address_data["bairro"] or "Bairro não detectado"
-            cidade_show = gps_address_data["localidade"] or "Cidade não detectada"
+            gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality") or addr.get("village")
+            gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood") or addr.get("quarter")
+            gps_address_data["logradouro"] = addr.get("road") or addr.get("pedestrian")
+            gps_address_data["cep"] = addr.get("postcode")
+            gps_address_data["numero"] = addr.get("house_number")
             
-            lbl_gps_rua.value = rua_show
-            lbl_gps_bairro.value = f"{bairro_show} - {cidade_show}"
+            lbl_gps_rua.value = gps_address_data["logradouro"] or "Rua não detectada"
+            lbl_gps_bairro.value = gps_address_data["bairro"] or "Bairro não detectado"
+            lbl_gps_cidade.value = gps_address_data["localidade"] or "Cidade não detectada"
+            lbl_gps_source.value = f"Fonte: {source}"
             
             gps_overlay.visible = True
             btn_gps.text = "Capturar localização pelo GPS"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False
             page.update()
-        except:
+        except Exception as ex:
+            print(f"Erro GPS: {ex}")
             page.snack_bar = ft.SnackBar(ft.Text("Erro ao traduzir coordenadas."), bgcolor="red"); page.snack_bar.open = True; page.update()
             btn_gps.text = "Tentar Novamente"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.disabled = False; page.update()
 
-    # --- PREENCHIMENTO INTELIGENTE (CORRIGIDO E ROBUSTO) ---
+    # --- PREENCHIMENTO E BLOQUEIO (VALIDAÇÃO DE ÁREA) ---
     def normalize_string(s):
-        """Remove acentos e minúsculas para comparação"""
         if not s: return ""
         return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
 
     def fill_address_fields(data):
-        print(f"Preenchendo dados: {data}")
+        print(f"Validando dados: {data}")
         
         city_api = data.get("localidade") or ""
         city_clean = normalize_string(city_api)
         target_city = None
         
-        # 1. Identifica a Cidade (Ignorando acentos)
-        if "balneario" in city_clean:
+        # --- VERIFICAÇÃO RÍGIDA DE ÁREA ---
+        if "balneario" in city_clean and "camboriu" in city_clean:
             target_city = "Balneário Camboriú"
-        elif "camboriu" in city_clean:
+        elif "camboriu" in city_clean and "balneario" not in city_clean:
             target_city = "Camboriú"
         
-        if target_city:
-            dd_municipio.value = target_city
-            
-            # Libera o dropdown de bairro IMEDIATAMENTE
-            dd_bairro.disabled = False
-            
-            # Carrega a lista de bairros correta
-            if target_city in neighborhoods_db:
-                current_opts = neighborhoods_db[target_city]
-                
-                # Tenta encaixar o bairro que veio da API
-                bairro_api = data.get("bairro")
-                if bairro_api:
-                    # Se o bairro não existe na lista, adiciona ele
-                    # Isso previne que o campo fique vazio se o GPS der um bairro novo
-                    if bairro_api not in current_opts:
-                        current_opts.append(bairro_api)
-                        current_opts.sort()
-                    dd_bairro.value = bairro_api
-                else:
-                    # Se não veio bairro, deixa em branco mas DESTROCA
-                    dd_bairro.value = None
-                
-                # Atualiza as opções
-                dd_bairro.options = [ft.dropdown.Option(b) for b in current_opts]
+        # Se não for uma das duas, bloqueia!
+        if not target_city:
+            print(f"Cidade bloqueada: {city_api}")
+            open_error_modal()
+            return
+
+        # Se passou, preenche os dados
+        dd_municipio.value = target_city
+        dd_bairro.disabled = False
         
-        else:
-            print(f"Cidade não reconhecida no sistema: {city_api}")
-            # Mesmo se não reconhecer a cidade, preenche o resto
+        if target_city in neighborhoods_db:
+            current_opts = neighborhoods_db[target_city]
+            bairro_api = data.get("bairro")
+            if bairro_api:
+                # Adiciona bairro se não existir (para garantir)
+                if bairro_api not in current_opts:
+                    current_opts.append(bairro_api)
+                    current_opts.sort()
+                dd_bairro.value = bairro_api
+            else:
+                dd_bairro.value = None
+            dd_bairro.options = [ft.dropdown.Option(b) for b in current_opts]
         
         tf_rua.value = data.get("logradouro")
         tf_cep.value = data.get("cep")
@@ -334,7 +384,11 @@ def create_focus_form_view(page: ft.Page):
         if len(cep) == 8:
             try:
                 res = requests.get(f"https://viacep.com.br/ws/{cep}/json/").json()
-                if "erro" not in res: fill_address_fields(res)
+                if "erro" not in res:
+                    # Chama a mesma função de preenchimento que tem a validação!
+                    fill_address_fields(res)
+                else:
+                    page.snack_bar = ft.SnackBar(ft.Text("CEP não encontrado."), bgcolor="orange"); page.snack_bar.open = True; page.update()
             except: pass
 
     def search_address_by_name(e):
@@ -426,11 +480,11 @@ def create_focus_form_view(page: ft.Page):
         controls=[
             ft.Stack(expand=True, controls=[
                 ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, thickness=1, color="#EEEEEE"), form_body]),
-                file_picker,
                 address_overlay,
                 success_overlay,
                 gps_overlay, 
-                geolocator
-            ])
+                error_overlay 
+            ]),
+            ft.Row([file_picker, geolocator], visible=False)
         ]
     )

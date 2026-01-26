@@ -7,31 +7,24 @@ from views.tabs.profile_tab import get_profile_tab
 
 def create_main_view(page: ft.Page, aba_inicial=0):
     
-    # 1. Carrega as abas
     view_home = get_home_tab(page)
-    view_add = get_new_tab(page) # Essa é a tela com os cards de seleção
+    view_add = get_new_tab(page)
     view_explore = get_explore_tab()
     view_profile = get_profile_tab(page)
 
     modulos = [view_home, view_add, view_explore, view_profile]
 
-    # 2. Corpo da página
     body = ft.Container(
         content=modulos[aba_inicial],
         expand=True
     )
 
-    # 3. Função de troca de aba
     def change_tab(e):
         index = e.control.selected_index
-        
-        # --- CORREÇÃO AQUI: Removemos o desvio direto para o formulário ---
-        # Agora ele carrega a aba correspondente (a view_add) normalmente
         
         body.content = modulos[index]
         body.update()
 
-    # 4. Barra de Navegação
     nav_bar = ft.NavigationBar(
         destinations=[
             ft.NavigationBarDestination(icon=ft.Icons.HOME, label="Home"),
@@ -41,10 +34,9 @@ def create_main_view(page: ft.Page, aba_inicial=0):
         ],
         selected_index=aba_inicial,
         on_change=change_tab,
-        bgcolor="#39BFEF", # Azul Ciano
+        bgcolor="#39BFEF",
     )
 
-    # 5. Cabeçalho Personalizado (VigiAA)
     header = ft.Container(
         height=60,
         padding=ft.padding.symmetric(horizontal=15),
@@ -57,7 +49,6 @@ def create_main_view(page: ft.Page, aba_inicial=0):
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             controls=[
-                # Logo com barra / para funcionar no Android
                 ft.Container(
                     content=ft.Image(
                         src="/logo-sem-fundo.png", 

@@ -3,9 +3,11 @@ import requests
 import config
 
 def create_change_password_view(page: ft.Page):
+    print("--- Abrindo Tela de Alterar Senha ---")
+    
     API_URL = config.API_URL
     
-    # --- ESTILOS VISUAIS (NOVO DESIGN) ---
+    # --- ESTILOS ---
     header_gradient = ft.LinearGradient(
         begin=ft.alignment.top_left,
         end=ft.alignment.bottom_right,
@@ -33,8 +35,13 @@ def create_change_password_view(page: ft.Page):
 
     # --- FUNÇÕES ---
     def go_back(e):
-        # Volta para a tela anterior (provavelmente a Home)
-        page.views.pop()
+        # CORREÇÃO: Verificação manual da pilha de telas
+        if len(page.views) > 1:
+            page.views.pop() # Remove a tela atual
+            top_view = page.views[-1] # Pega a tela anterior
+            page.go(top_view.route) # Navega para ela
+        else:
+            page.go("/perfil") # Se não tiver histórico, força ir para a Home
         page.update()
 
     def change_click(e):
@@ -43,7 +50,6 @@ def create_change_password_view(page: ft.Page):
             page.go("/login")
             return
             
-        # Validação
         if not old_pass.value or not new_pass.value or not confirm_pass.value:
             status_text.value = "Preencha todos os campos."
             status_text.color = "red"
@@ -63,7 +69,6 @@ def create_change_password_view(page: ft.Page):
         try:
             headers = {"Authorization": f"Bearer {token}", "ngrok-skip-browser-warning": "true"}
             
-            # Lógica corrigida para PUT e URL correta
             response = requests.put(
                 f"{API_URL}/api/change-password/", 
                 data={"old_password": old_pass.value, "new_password": new_pass.value},
@@ -73,18 +78,15 @@ def create_change_password_view(page: ft.Page):
             if response.status_code in [200, 204]:
                 status_text.value = "Senha alterada com sucesso!"
                 status_text.color = "green"
-                # Limpa os campos
-                old_pass.value = ""
-                new_pass.value = ""
-                confirm_pass.value = ""
+                old_pass.value = ""; new_pass.value = ""; confirm_pass.value = ""
                 old_pass.update(); new_pass.update(); confirm_pass.update()
             elif response.status_code == 400:
-                status_text.value = "Senha atual incorreta ou nova senha inválida."
+                status_text.value = "Senha incorreta ou inválida."
                 status_text.color = "red"
             elif response.status_code == 401:
                 page.go("/login")
             else:
-                status_text.value = f"Erro {response.status_code}: {response.text}"
+                status_text.value = f"Erro {response.status_code}"
                 status_text.color = "red"
         except Exception as ex:
             status_text.value = f"Erro de conexão: {ex}"
@@ -92,23 +94,21 @@ def create_change_password_view(page: ft.Page):
         
         status_text.update()
 
-    # --- HEADER (GRADIENTE) ---
+    # --- HEADER ---
     header = ft.Container(
         height=80,
-        decoration=ft.BoxDecoration(gradient=header_gradient),
+        gradient=header_gradient,
         padding=ft.padding.symmetric(horizontal=15),
         alignment=ft.alignment.center_left,
         content=ft.Row(
             controls=[
-                # Se não tiver a logo, pode comentar a linha abaixo ou usar um Icon
-                ft.Image(src="assets/logo_vigiaa.png", width=40, height=40, error_content=ft.Icon(ft.Icons.SECURITY, color="white")),
-                ft.Container(width=15),
-                ft.Text("Alterar senha", color="black", size=20, weight="bold")
+                ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="white", on_click=go_back),
+                ft.Text("Alterar senha", color="white", size=20, weight="bold")
             ]
         )
     )
 
-    # --- BOTÃO PRETO ---
+    # --- BOTÃO ---
     btn_save = ft.ElevatedButton(
         "Salvar Nova Senha",
         on_click=change_click,
@@ -119,31 +119,43 @@ def create_change_password_view(page: ft.Page):
         style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
     )
 
-    # --- CORPO DA PÁGINA ---
+    # --- BODY ---
+    body_content = ft.Column(
+        controls=[
+            ft.Text("Defina sua nova credencial", color="grey", size=14),
+            ft.Container(height=30),
+            old_pass,
+            ft.Container(height=20),
+            new_pass,
+            ft.Container(height=20),
+            confirm_pass,
+            ft.Container(height=40),
+            btn_save,
+            ft.Container(height=20),
+            status_text
+        ]
+    )
+
     body = ft.Container(
         padding=30,
         bgcolor="white",
         expand=True,
-        content=ft.Column(
-            controls=[
-                ft.Text("Defina sua nova credencial", color="grey", size=14),
-                ft.Container(height=30),
-                old_pass,
-                ft.Container(height=20),
-                new_pass,
-                ft.Container(height=20),
-                confirm_pass,
-                ft.Container(height=40),
-                btn_save,
-                ft.Container(height=20),
-                status_text
-            ]
+        content=ft.ListView(
+            controls=[body_content],
+            padding=0
         )
     )
 
+    # --- VIEW FINAL ---
     return ft.View(
         route="/change-password",
         bgcolor="white",
         padding=0,
-        controls=[header, body]
+        controls=[
+            ft.Column(
+                expand=True,
+                spacing=0,
+                controls=[header, body]
+            )
+        ]
     )

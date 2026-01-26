@@ -4,7 +4,7 @@ from views.home_view import create_main_view
 from views.login_view import create_login_view
 from views.register_view import create_register_view
 from views.forgot_password_view import create_forgot_password_view
-from views.change_password_view import create_change_password_view # <--- USANDO O ARQUIVO ORIGINAL
+from views.change_password_view import create_change_password_view
 from views.forms.focus_form_view import create_focus_form_view
 
 def main(page: ft.Page):
@@ -23,6 +23,7 @@ def main(page: ft.Page):
                 if not token:
                     page.go("/login") 
                     return
+                # Aba 0 = Home
                 page.views.append(create_main_view(page, aba_inicial=0))
 
             elif route == "/login":
@@ -35,14 +36,22 @@ def main(page: ft.Page):
                 page.views.append(create_forgot_password_view(page))
 
             elif route == "/change-password":
-                # Chama a visualização original (que agora tem o design novo)
                 page.views.append(create_change_password_view(page))
 
             elif route == "/novo":
                 if not page.client_storage.contains_key("token"):
                     page.go("/login")
                 else:
+                    # Aba 1 = Novo
                     page.views.append(create_main_view(page, aba_inicial=1))
+
+            # --- CORREÇÃO AQUI ---
+            elif route == "/perfil":
+                if not page.client_storage.contains_key("token"):
+                    page.go("/login")
+                else:
+                    # Aba 3 = Perfil (Home=0, Novo=1, Explorar=2, Perfil=3)
+                    page.views.append(create_main_view(page, aba_inicial=3))
 
             elif route == "/form-foco":
                 page.views.append(create_focus_form_view(page))
