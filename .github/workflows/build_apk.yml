@@ -27,42 +27,66 @@ jobs:
         # 1. Cria e configura o ambiente virtual
         python -m venv venv
         
-        ./venv/bin/pip install --upgrade pip
-        ./venv/bin/pip install flet==0.28.3
+        # Ativa o venv explicitamente para os comandos seguintes
+        source venv/bin/activate
         
-        # --- INICIO DA INJEÇÃO DE PERMISSÕES GPS ---
-        echo "🔍 Procurando AndroidManifest.xml dentro do venv..."
+        pip install --upgrade pip
+        pip install flet==0.28.3
         
-        # Procura o arquivo dentro do ambiente virtual criado
-        MANIFEST_PATH=$(find ./venv -name AndroidManifest.xml | grep "main/AndroidManifest.xml" | head -n 1)
+        # --- PASSO NOVO: INJEÇÃO VIA PYTHON (INFALÍVEL) ---
+        echo "🔧 Criando script de correção do Manifest..."
         
-        if [ -z "$MANIFEST_PATH" ]; then
-          echo "❌ ERRO CRÍTICO: AndroidManifest.xml não encontrado. O build vai falhar."
-          exit 1
-        fi
+        # Cria um arquivo python temporário para fazer o serviço sujo
+        cat <<EOF > patch_manifest.py
+        import flet
+        import sys
+        from pathlib import Path
+
+        # 1. Localiza onde o Flet foi instalado
+        flet_dir = Path(flet.__file__).parent
+        print(f"📍 Flet encontrado em: {flet_dir}")
+
+        # 2. Procura recursivamente pelo AndroidManifest.xml principal
+        # O template fica dentro de flet/sdk/...
+        manifests = list(flet_dir.rglob("AndroidManifest.xml"))
         
-        echo "✅ Arquivo encontrado em: $MANIFEST_PATH"
-        echo "🔧 Injetando permissões de localização..."
+        # Filtra para garantir que é o 'src/main/AndroidManifest.xml'
+        target = next((m for m in manifests if "src/main" in str(m) and "debug" not in str(m)), None)
+
+        if not target:
+            print("❌ ERRO: AndroidManifest.xml não encontrado na instalação do Flet.")
+            sys.exit(1)
+
+        print(f"✅ Arquivo alvo: {target}")
+
+        # 3. Lê e Injeta as permissões
+        content = target.read_text(encoding="utf-8")
         
-        # Define as permissões necessárias
-        PERMISSIONS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
+        permissions = '''
+        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+        <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+        '''
+
+        if "ACCESS_FINE_LOCATION" in content:
+            print("⚠️ Permissões já existem. Ignorando.")
+        else:
+            # Substitui a tag <application> pelas permissões + a tag <application>
+            new_content = content.replace("<application", f"{permissions}\n    <application")
+            target.write_text(new_content, encoding="utf-8")
+            print("🚀 Permissões de GPS injetadas com SUCESSO!")
+        EOF
         
-        # Insere as permissões antes da tag <application>
-        sed -i "s|<application|$PERMISSIONS\n    <application|g" "$MANIFEST_PATH"
-        
-        # Confirmação visual no log
-        if grep -q "ACCESS_FINE_LOCATION" "$MANIFEST_PATH"; then
-          echo "🎉 Permissões injetadas com SUCESSO!"
-        else
-          echo "⚠️ AVISO: Falha ao injetar permissões."
-        fi
-        # --- FIM DA INJEÇÃO ---
+        # Roda o script que acabamos de criar
+        python patch_manifest.py
+        # --------------------------------------------------
 
         cd frontend
         
+        # Gera requirements apenas com o essencial
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        ../venv/bin/flet build apk --verbose
+        # Roda o build (já usando o Flet modificado)
+        flet build apk --verbose
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
