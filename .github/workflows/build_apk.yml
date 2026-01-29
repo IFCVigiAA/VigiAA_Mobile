@@ -22,76 +22,73 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (INTERCEPTADOR EM TEMPO REAL)
+    - name: Build APK (INTERCEPTADOR BLINDADO)
       run: |
-        # 1. Configura o ambiente Python
+        # 1. Configura Python e instala Flet
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. Configura o Interceptador (O Espião)
-        # Descobre onde está o Flutter de verdade
+        # 2. Localiza o Flutter original
         REAL_FLUTTER_BIN=$(which flutter)
-        echo "📍 Flutter original localizado em: $REAL_FLUTTER_BIN"
+        echo "📍 Flutter original: $REAL_FLUTTER_BIN"
 
-        # Cria uma pasta para o nosso comando falso
+        # 3. Cria a pasta do nosso interceptador
         mkdir -p $GITHUB_WORKSPACE/shim
 
-        # Cria o script 'flutter' falso
+        # 4. Cria o script 'flutter' falso (O ESPIÃO)
         cat <<EOF > $GITHUB_WORKSPACE/shim/flutter
         #!/bin/bash
         
-        # O Flet chama 'flutter build apk'. Nós interceptamos aqui!
-        if [[ "\$*" == *"build apk"* ]]; then
-            echo "🚨 INTERCEPTADOR ATIVADO! O build começou."
+        echo "🔄 O comando 'flutter' foi chamado com: \$*"
+        
+        # Tenta encontrar o Manifesto em qualquer lugar aqui embaixo
+        # O Flet cria uma pasta temporária, então procuramos nela
+        MANIFEST=\$(find . -name "AndroidManifest.xml" | grep "src/main/AndroidManifest.xml" | head -n 1)
+        
+        if [ -n "\$MANIFEST" ]; then
+            echo "🎯 MANIFESTO ENCONTRADO: \$MANIFEST"
             
-            # O Flet gera o projeto numa pasta temporária. Vamos procurar o Manifesto nela.
-            echo "🔍 Procurando AndroidManifest.xml no diretório atual e subdiretórios..."
-            
-            # Procura o arquivo (o head -n 1 pega o primeiro encontrado, geralmente o correto)
-            MANIFEST=\$(find . -name "AndroidManifest.xml" | grep "src/main/AndroidManifest.xml" | head -n 1)
-            
-            if [ -n "\$MANIFEST" ]; then
-                echo "📝 Alvo encontrado: \$MANIFEST"
+            # Verifica se já tem permissão
+            if grep -q "ACCESS_FINE_LOCATION" "\$MANIFEST"; then
+                echo "⚠️ Permissões já existem. Nada a fazer."
+            else
+                echo "💉 INJETANDO PERMISSÕES AGORA..."
                 
-                # Permissões que queremos adicionar
                 PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
                 
-                # Injeta as permissões antes da tag <application>
+                # Injeta antes da tag <application>
                 sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
                 
-                echo "✅ SUCESSO: Permissões de GPS injetadas no código fonte!"
-                
-                # Mostra um pedaço do arquivo para provar que foi editado
-                grep -A 5 "uses-permission" "\$MANIFEST"
-            else
-                echo "⚠️ AVISO: AndroidManifest.xml não encontrado. O build pode falhar ou ficar sem GPS."
-                # Lista arquivos para debug caso falhe
-                find . -maxdepth 3 -name "*xml"
+                echo "✅ SUCESSO! Arquivo modificado."
+                # Mostra o resultado para prova
+                grep -B 5 "<application" "\$MANIFEST"
             fi
+        else
+            echo "Changes: Manifesto ainda não encontrado neste estágio."
         fi
 
-        # Agora chamamos o Flutter de verdade para compilar o App
+        # Executa o Flutter original para continuar o trabalho
         exec "$REAL_FLUTTER_BIN" "\$@"
         EOF
 
         # Torna o espião executável
         chmod +x $GITHUB_WORKSPACE/shim/flutter
 
-        # 3. Coloca nosso espião na frente do Flutter original
+        # 5. Coloca o espião na frente do PATH (Isso engana o Flet)
         export PATH=$GITHUB_WORKSPACE/shim:$PATH
         
-        echo "🕵️‍♂️ Caminho do sistema (PATH) atualizado. O 'flutter' agora é nosso script."
-        which flutter
+        echo "🕵️‍♂️ Espião ativado. 'flutter' agora aponta para: $(which flutter)"
 
-        # 4. Roda o Build do Flet
+        # 6. Roda o Build do Flet
         cd frontend
         
-        # Cria requirements limpo
+        # Cria requirements mínimo
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        # Roda o comando. O Flet vai chamar 'flutter', que vai cair no nosso script acima!
+        # A MÁGICA ACONTECE AQUI:
+        # O Flet vai chamar 'flutter', nosso script vai rodar, achar o arquivo e injetar a permissão!
         flet build apk --verbose
 
     - name: Upload APK Artifact
