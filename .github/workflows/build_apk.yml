@@ -22,91 +22,76 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (PYTHON FORCE INJECT)
+    - name: Build APK (INTERCEPTADOR EM TEMPO REAL)
       run: |
-        # 1. Cria ambiente e instala Flet
+        # 1. Configura o ambiente Python
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. SCRIPT DE INJEÇÃO DIRETA NO TEMPLATE
-        # Esse script edita o arquivo .tar.gz original do Flet
-        cat <<EOF > inject_perms.py
-        import os
-        import tarfile
-        import sys
-        import io
+        # 2. Configura o Interceptador (O Espião)
+        # Descobre onde está o Flutter de verdade
+        REAL_FLUTTER_BIN=$(which flutter)
+        echo "📍 Flutter original localizado em: $REAL_FLUTTER_BIN"
 
-        # Permissões que faltam no Flet
-        PERMS = '''
-        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-        <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-        '''
+        # Cria uma pasta para o nosso comando falso
+        mkdir -p $GITHUB_WORKSPACE/shim
 
-        # Localiza onde o Flet foi instalado no Linux
-        import flet
-        flet_dir = os.path.dirname(flet.__file__)
-        print(f"📍 Diretório do Flet: {flet_dir}")
-
-        # Procura o arquivo de template (o 'molde' do app Android)
-        template_path = None
-        for root, dirs, files in os.walk(flet_dir):
-            for file in files:
-                if file == "flutter_app_template.tar.gz":
-                    template_path = os.path.join(root, file)
-                    break
+        # Cria o script 'flutter' falso
+        cat <<EOF > $GITHUB_WORKSPACE/shim/flutter
+        #!/bin/bash
         
-        if not template_path:
-            print("❌ ERRO: Template do Flet não encontrado!")
-            sys.exit(1)
+        # O Flet chama 'flutter build apk'. Nós interceptamos aqui!
+        if [[ "\$*" == *"build apk"* ]]; then
+            echo "🚨 INTERCEPTADOR ATIVADO! O build começou."
             
-        print(f"📦 Modificando template em: {template_path}")
-
-        # Abre o arquivo compactado, edita o XML na memória e salva de volta
-        temp_tar = template_path + ".temp"
-        try:
-            with tarfile.open(template_path, "r:gz") as read_tar:
-                with tarfile.open(temp_tar, "w:gz") as write_tar:
-                    for member in read_tar.getmembers():
-                        # Se for o Manifesto Android, a gente edita
-                        if "AndroidManifest.xml" in member.name and "src/main" in member.name:
-                            print(f"📝 Injetando permissões em: {member.name}")
-                            f = read_tar.extractfile(member)
-                            content = f.read().decode("utf-8")
-                            
-                            # Injeta as permissões antes da tag <application>
-                            if "ACCESS_FINE_LOCATION" not in content:
-                                new_content = content.replace("<application", f"{PERMS}\n    <application")
-                                encoded = new_content.encode("utf-8")
-                                member.size = len(encoded)
-                                write_tar.addfile(member, io.BytesIO(encoded))
-                                print("✅ SUCESSO: Permissões inseridas!")
-                            else:
-                                print("⚠️ Permissões já existiam.")
-                                write_tar.addfile(member, io.BytesIO(content.encode("utf-8")))
-                        else:
-                            # Copia os outros arquivos sem mexer
-                            if member.isfile():
-                                write_tar.addfile(member, read_tar.extractfile(member))
-                            else:
-                                write_tar.addfile(member)
+            # O Flet gera o projeto numa pasta temporária. Vamos procurar o Manifesto nela.
+            echo "🔍 Procurando AndroidManifest.xml no diretório atual e subdiretórios..."
             
-            # Substitui o arquivo original pelo nosso modificado
-            os.replace(temp_tar, template_path)
-            print("🎉 Template original do Flet atualizado!")
+            # Procura o arquivo (o head -n 1 pega o primeiro encontrado, geralmente o correto)
+            MANIFEST=\$(find . -name "AndroidManifest.xml" | grep "src/main/AndroidManifest.xml" | head -n 1)
+            
+            if [ -n "\$MANIFEST" ]; then
+                echo "📝 Alvo encontrado: \$MANIFEST"
+                
+                # Permissões que queremos adicionar
+                PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
+                
+                # Injeta as permissões antes da tag <application>
+                sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
+                
+                echo "✅ SUCESSO: Permissões de GPS injetadas no código fonte!"
+                
+                # Mostra um pedaço do arquivo para provar que foi editado
+                grep -A 5 "uses-permission" "\$MANIFEST"
+            else
+                echo "⚠️ AVISO: AndroidManifest.xml não encontrado. O build pode falhar ou ficar sem GPS."
+                # Lista arquivos para debug caso falhe
+                find . -maxdepth 3 -name "*xml"
+            fi
+        fi
 
-        except Exception as e:
-            print(f"❌ Falha no script: {e}")
-            sys.exit(1)
+        # Agora chamamos o Flutter de verdade para compilar o App
+        exec "$REAL_FLUTTER_BIN" "\$@"
         EOF
+
+        # Torna o espião executável
+        chmod +x $GITHUB_WORKSPACE/shim/flutter
+
+        # 3. Coloca nosso espião na frente do Flutter original
+        export PATH=$GITHUB_WORKSPACE/shim:$PATH
         
-        # Executa a modificação
-        python inject_perms.py
-        
-        # 3. Agora faz o Build normal (que vai usar o template modificado)
+        echo "🕵️‍♂️ Caminho do sistema (PATH) atualizado. O 'flutter' agora é nosso script."
+        which flutter
+
+        # 4. Roda o Build do Flet
         cd frontend
+        
+        # Cria requirements limpo
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
+        
+        # Roda o comando. O Flet vai chamar 'flutter', que vai cair no nosso script acima!
         flet build apk --verbose
 
     - name: Upload APK Artifact
