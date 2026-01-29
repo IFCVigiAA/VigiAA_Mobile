@@ -22,69 +22,93 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (INTERCEPTADOR GLOABL)
+    - name: Build APK (PYTHON FORCE INJECT)
       run: |
-        # 1. Configura ambiente Python
+        # 1. Cria ambiente e instala Flet
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. Prepara o Interceptador (Espião)
-        mkdir -p shim
-        
-        # Encontra o Flutter original
-        REAL_FLUTTER=$(which flutter)
-        echo "📍 Flutter real: $REAL_FLUTTER"
-        
-        # Cria o script 'flutter' falso
-        cat <<EOF > shim/flutter
-        #!/bin/bash
-        
-        # Se for um comando de build, a gente age!
-        if [[ "\$*" == *"build apk"* ]]; then
-            echo "🔥 INTERCEPTADOR ATIVADO! Procurando AndroidManifest..."
-            
-            # Procura o arquivo XML recursivamente na pasta atual
-            MANIFEST=\$(find . -name "AndroidManifest.xml" | grep "main/AndroidManifest.xml" | head -n 1)
-            
-            if [ -n "\$MANIFEST" ]; then
-                echo "📝 Injetando permissões em: \$MANIFEST"
-                PERMISSIONS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
-                sed -i "s|<application|\$PERMISSIONS\n    <application|g" "\$MANIFEST"
-                echo "✅ Permissões GPS Injetadas!"
-            else
-                echo "⚠️ Manifest não encontrado aqui. O build pode estar em outro lugar."
-            fi
-        fi
+        # 2. SCRIPT DE INJEÇÃO DIRETA NO TEMPLATE
+        # Esse script edita o arquivo .tar.gz original do Flet
+        cat <<EOF > inject_perms.py
+        import os
+        import tarfile
+        import sys
+        import io
 
-        # Passa a bola para o Flutter real
-        exec "$REAL_FLUTTER" "\$@"
+        # Permissões que faltam no Flet
+        PERMS = '''
+        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+        <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+        '''
+
+        # Localiza onde o Flet foi instalado no Linux
+        import flet
+        flet_dir = os.path.dirname(flet.__file__)
+        print(f"📍 Diretório do Flet: {flet_dir}")
+
+        # Procura o arquivo de template (o 'molde' do app Android)
+        template_path = None
+        for root, dirs, files in os.walk(flet_dir):
+            for file in files:
+                if file == "flutter_app_template.tar.gz":
+                    template_path = os.path.join(root, file)
+                    break
+        
+        if not template_path:
+            print("❌ ERRO: Template do Flet não encontrado!")
+            sys.exit(1)
+            
+        print(f"📦 Modificando template em: {template_path}")
+
+        # Abre o arquivo compactado, edita o XML na memória e salva de volta
+        temp_tar = template_path + ".temp"
+        try:
+            with tarfile.open(template_path, "r:gz") as read_tar:
+                with tarfile.open(temp_tar, "w:gz") as write_tar:
+                    for member in read_tar.getmembers():
+                        # Se for o Manifesto Android, a gente edita
+                        if "AndroidManifest.xml" in member.name and "src/main" in member.name:
+                            print(f"📝 Injetando permissões em: {member.name}")
+                            f = read_tar.extractfile(member)
+                            content = f.read().decode("utf-8")
+                            
+                            # Injeta as permissões antes da tag <application>
+                            if "ACCESS_FINE_LOCATION" not in content:
+                                new_content = content.replace("<application", f"{PERMS}\n    <application")
+                                encoded = new_content.encode("utf-8")
+                                member.size = len(encoded)
+                                write_tar.addfile(member, io.BytesIO(encoded))
+                                print("✅ SUCESSO: Permissões inseridas!")
+                            else:
+                                print("⚠️ Permissões já existiam.")
+                                write_tar.addfile(member, io.BytesIO(content.encode("utf-8")))
+                        else:
+                            # Copia os outros arquivos sem mexer
+                            if member.isfile():
+                                write_tar.addfile(member, read_tar.extractfile(member))
+                            else:
+                                write_tar.addfile(member)
+            
+            # Substitui o arquivo original pelo nosso modificado
+            os.replace(temp_tar, template_path)
+            print("🎉 Template original do Flet atualizado!")
+
+        except Exception as e:
+            print(f"❌ Falha no script: {e}")
+            sys.exit(1)
         EOF
-
-        chmod +x shim/flutter
         
-        # --- O PULO DO GATO ---
-        # Adiciona nossa pasta shim no topo do PATH global do GitHub Actions
-        echo "$PWD/shim" >> $GITHUB_PATH
-        echo "🕵️‍♂️ Interceptador configurado no PATH global."
-
-    - name: Executar Build
-      run: |
-        source venv/bin/activate
+        # Executa a modificação
+        python inject_perms.py
         
-        # Confirma que estamos usando o flutter falso
-        WHICH_FLUTTER=$(which flutter)
-        echo "👀 O sistema está usando este flutter: $WHICH_FLUTTER"
-        # Deve apontar para /home/runner/.../shim/flutter
-        
+        # 3. Agora faz o Build normal (que vai usar o template modificado)
         cd frontend
-        
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
-        
-        # O Flet vai chamar 'flutter', que vai cair no nosso script!
         flet build apk --verbose
-        
+
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
