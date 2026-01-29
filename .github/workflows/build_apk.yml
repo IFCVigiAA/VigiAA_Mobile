@@ -22,67 +22,67 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (ESTRATÉGIA INTERCEPTADOR)
+    - name: Build APK (INTERCEPTADOR GLOABL)
       run: |
-        # 1. Configura o ambiente
+        # 1. Configura ambiente Python
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # --- O TRUQUE DE MESTRE ---
-        # 2. Descobre onde está o Flutter original
-        REAL_FLUTTER=$(which flutter)
-        echo "📍 Flutter original está em: $REAL_FLUTTER"
-
-        # 3. Cria uma pasta para nosso espião
+        # 2. Prepara o Interceptador (Espião)
         mkdir -p shim
         
-        # 4. Cria o script 'flutter' falso que intercepta o build
+        # Encontra o Flutter original
+        REAL_FLUTTER=$(which flutter)
+        echo "📍 Flutter real: $REAL_FLUTTER"
+        
+        # Cria o script 'flutter' falso
         cat <<EOF > shim/flutter
         #!/bin/bash
         
-        # Verifica se o comando é de build
+        # Se for um comando de build, a gente age!
         if [[ "\$*" == *"build apk"* ]]; then
-            echo "🔥 INTERCEPTADOR ATIVADO: O Flet chamou o build!"
-            echo "🔍 Procurando AndroidManifest.xml gerado..."
+            echo "🔥 INTERCEPTADOR ATIVADO! Procurando AndroidManifest..."
             
-            # Procura o arquivo XML que o Flet acabou de criar
+            # Procura o arquivo XML recursivamente na pasta atual
             MANIFEST=\$(find . -name "AndroidManifest.xml" | grep "main/AndroidManifest.xml" | head -n 1)
             
             if [ -n "\$MANIFEST" ]; then
                 echo "📝 Injetando permissões em: \$MANIFEST"
-                
                 PERMISSIONS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
-                
-                # Injeta a linha mágica
                 sed -i "s|<application|\$PERMISSIONS\n    <application|g" "\$MANIFEST"
-                
-                echo "✅ GPS LIBERADO COM SUCESSO!"
-                cat "\$MANIFEST" | grep "ACCESS_FINE_LOCATION"
+                echo "✅ Permissões GPS Injetadas!"
             else
-                echo "⚠️ Manifest não encontrado no diretório atual."
+                echo "⚠️ Manifest não encontrado aqui. O build pode estar em outro lugar."
             fi
         fi
 
-        # 5. Chama o Flutter original para terminar o serviço
+        # Passa a bola para o Flutter real
         exec "$REAL_FLUTTER" "\$@"
         EOF
 
-        # Torna o espião executável
         chmod +x shim/flutter
-
-        # Coloca nossa pasta shim no começo do PATH para enganar o Flet
-        export PATH=$PWD/shim:$PATH
         
-        echo "🕵️‍♂️ Interceptador configurado. Iniciando o build..."
-        # ---------------------------
+        # --- O PULO DO GATO ---
+        # Adiciona nossa pasta shim no topo do PATH global do GitHub Actions
+        echo "$PWD/shim" >> $GITHUB_PATH
+        echo "🕵️‍♂️ Interceptador configurado no PATH global."
 
+    - name: Executar Build
+      run: |
+        source venv/bin/activate
+        
+        # Confirma que estamos usando o flutter falso
+        WHICH_FLUTTER=$(which flutter)
+        echo "👀 O sistema está usando este flutter: $WHICH_FLUTTER"
+        # Deve apontar para /home/runner/.../shim/flutter
+        
         cd frontend
         
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        # O Flet vai rodar, chamar 'flutter', cair no nosso script, ter o arquivo editado e finalizar!
+        # O Flet vai chamar 'flutter', que vai cair no nosso script!
         flet build apk --verbose
         
     - name: Upload APK Artifact

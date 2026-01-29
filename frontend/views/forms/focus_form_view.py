@@ -77,7 +77,6 @@ def create_focus_form_view(page: ft.Page):
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=20,
-                height=280,
                 controls=[
                     ft.Icon(ft.Icons.LOCATION_OFF, color="red", size=60),
                     ft.Text("Fora da área!", size=22, weight="bold", color="black"),
