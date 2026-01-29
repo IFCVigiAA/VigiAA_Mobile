@@ -22,97 +22,78 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (HACK DO TEMPLATE)
+    - name: Build APK (SUBSTITUIÇÃO DE BINÁRIO)
       run: |
-        # 1. Configura ambiente
+        # 1. Configura Python
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        echo "🕵️‍♂️ INICIANDO CAÇADA AO ARQUIVO DE TEMPLATE..."
+        # 2. LOCALIZA E SEQUESTRA O FLUTTER
+        # Descobre onde o Flutter real está instalado
+        FLUTTER_BIN_PATH=$(which flutter)
+        FLUTTER_DIR=$(dirname "$FLUTTER_BIN_PATH")
+        REAL_FLUTTER="$FLUTTER_DIR/flutter_original"
         
-        # 2. A BUSCA IMPLACÁVEL
-        # Procura o arquivo .tar.gz em todo o diretório 'venv'
-        TEMPLATE_PATH=$(find venv -name "flutter_app_template.tar.gz" -print -quit)
+        echo "📍 Flutter instalado em: $FLUTTER_BIN_PATH"
         
-        if [ -z "$TEMPLATE_PATH" ]; then
-            echo "❌ ERRO CRÍTICO: Não achei o template. Vou listar tudo para debug:"
-            find venv -name "*.tar.gz"
-            exit 1
+        # Renomeia o original para 'flutter_original'
+        mv "$FLUTTER_BIN_PATH" "$REAL_FLUTTER"
+        
+        # 3. CRIA O IMPOSTOR
+        # Criamos um script chamado 'flutter' no lugar do original
+        cat <<EOF > "$FLUTTER_BIN_PATH"
+        #!/bin/bash
+        
+        # Log para provar que fomos chamados
+        echo "🥷 IMPOSTOR DO FLUTTER ATIVADO! Args: \$*"
+        
+        # Se o comando for de build, a gente age
+        if [[ "\$*" == *"build apk"* ]]; then
+            echo "🔎 O Flet pediu para compilar! Procurando AndroidManifest.xml..."
+            
+            # O Flet já gerou o projeto nesta altura. Procuramos o manifesto na pasta atual.
+            MANIFEST=\$(find . -name "AndroidManifest.xml" | grep "main/AndroidManifest.xml" | head -n 1)
+            
+            if [ -n "\$MANIFEST" ]; then
+                echo "📝 Alvo encontrado: \$MANIFEST"
+                
+                PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
+                
+                # Verifica se já tem permissão para não duplicar
+                if grep -q "ACCESS_FINE_LOCATION" "\$MANIFEST"; then
+                     echo "⚠️ Permissões já existem."
+                else
+                     # Injeta as permissões na força bruta
+                     sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
+                     echo "💉 SUCESSO: Permissões de GPS Injetadas!"
+                     
+                     # Mostra a prova no log
+                     grep -B 5 "<application" "\$MANIFEST"
+                fi
+            else
+                echo "❌ Manifesto não encontrado no diretório: \$(pwd)"
+                # Lista arquivos para ajudar a entender o erro se acontecer
+                find . -maxdepth 4 -name "*.xml"
+            fi
         fi
         
-        echo "✅ ALVO LOCALIZADO: $TEMPLATE_PATH"
-        
-        # 3. O HACK (Python Cirúrgico)
-        # Criamos um script que abre o zip, edita o XML lá dentro e fecha o zip.
-        cat <<EOF > hack_template.py
-        import tarfile
-        import io
-        import os
-        import sys
-
-        target_path = "$TEMPLATE_PATH"
-        temp_path = target_path + ".temp"
-        
-        # As permissões que o Android exige
-        PERMS = '''
-        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-        <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-        '''
-
-        print(f"🔧 Abrindo arquivo: {target_path}")
-        
-        try:
-            modified = False
-            with tarfile.open(target_path, "r:gz") as read_tar:
-                with tarfile.open(temp_path, "w:gz") as write_tar:
-                    for member in read_tar.getmembers():
-                        # Procura o Manifesto dentro do zip
-                        if "AndroidManifest.xml" in member.name and "src/main" in member.name:
-                            print(f"📝 Editando Manifesto: {member.name}")
-                            f = read_tar.extractfile(member)
-                            content = f.read().decode("utf-8")
-                            
-                            if "ACCESS_FINE_LOCATION" not in content:
-                                # Injeta as permissões antes da tag <application>
-                                new_content = content.replace("<application", f"{PERMS}\n    <application")
-                                encoded = new_content.encode("utf-8")
-                                
-                                member.size = len(encoded)
-                                write_tar.addfile(member, io.BytesIO(encoded))
-                                modified = True
-                                print("💉 Permissões injetadas com sucesso!")
-                            else:
-                                print("⚠️ Permissões já existiam.")
-                                write_tar.addfile(member, io.BytesIO(content.encode("utf-8")))
-                        else:
-                            # Copia o resto dos arquivos sem mexer
-                            if member.isfile():
-                                write_tar.addfile(member, read_tar.extractfile(member))
-                            else:
-                                write_tar.addfile(member)
-            
-            if modified:
-                os.replace(temp_path, target_path)
-                print("🎉 SUCESSO: O template do Flet foi hackeado!")
-            else:
-                print("ℹ️ Nenhuma alteração feita.")
-                if os.path.exists(temp_path): os.remove(temp_path)
-
-        except Exception as e:
-            print(f"❌ Falha no script Python: {e}")
-            sys.exit(1)
+        # 4. PASSA A BOLA PRO ORIGINAL
+        # Executa o flutter verdadeiro para terminar o serviço
+        exec "$REAL_FLUTTER" "\$@"
         EOF
         
-        # Roda o hack
-        python hack_template.py
+        # Dá permissão de execução para nosso impostor
+        chmod +x "$FLUTTER_BIN_PATH"
         
-        # 4. AGORA SIM, O BUILD
+        echo "✅ Armadilha configurada. O comando 'flutter' agora é nosso."
+
+        # 5. RODA O BUILD
         cd frontend
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        echo "🚀 Iniciando Build do APK (usando template modificado)..."
+        # O Flet vai chamar 'flutter', que vai cair na nossa armadilha!
         flet build apk --verbose
 
     - name: Upload APK Artifact
