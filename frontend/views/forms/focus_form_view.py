@@ -6,7 +6,7 @@ import unicodedata
 import threading
 
 def create_focus_form_view(page: ft.Page):
-    # Limpeza inicial
+    # Limpeza total de overlays anteriores
     page.overlay.clear()
     
     API_URL = config.API_URL
@@ -20,6 +20,7 @@ def create_focus_form_view(page: ft.Page):
             update_images_display()
             
     file_picker = ft.FilePicker(on_result=on_file_result)
+    # IMPORTANTE: Adiciona APENAS no overlay da página
     page.overlay.append(file_picker)
     
     def back_click(e):
@@ -32,21 +33,52 @@ def create_focus_form_view(page: ft.Page):
         back_click(None)
 
     success_dialog = ft.AlertDialog(
-        modal=True, title=ft.Text("Sucesso!"), content=ft.Text("O foco de dengue foi cadastrado corretamente."),
-        actions=[ft.TextButton("OK", on_click=close_success_dialog)], actions_alignment=ft.MainAxisAlignment.END,
+        modal=True,
+        title=ft.Text("Sucesso!"),
+        content=ft.Text("O foco de dengue foi cadastrado corretamente."),
+        actions=[ft.TextButton("OK", on_click=close_success_dialog)],
+        actions_alignment=ft.MainAxisAlignment.END,
     )
 
     # --- IMAGENS ---
     images_list_container = ft.Column(spacing=15)
+
     def remove_image(file_obj):
-        if file_obj in selected_files: selected_files.remove(file_obj); update_images_display()
+        if file_obj in selected_files:
+            selected_files.remove(file_obj)
+            update_images_display()
 
     def update_images_display():
         images_list_container.controls.clear()
         for file in selected_files:
-            img_row = ft.Row(controls=[ft.Image(src=file.path, width=60, height=60, fit=ft.ImageFit.COVER, border_radius=8), ft.Column(alignment=ft.MainAxisAlignment.CENTER, spacing=2, expand=True, controls=[ft.Text(file.name, weight="bold", max_lines=1, overflow=ft.TextOverflow.ELLIPSIS), ft.Text("Imagem", color="grey", size=12)]), ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_color="black54", on_click=lambda e, f=file: remove_image(f))], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+            img_row = ft.Row(
+                controls=[
+                    ft.Image(src=file.path, width=60, height=60, fit=ft.ImageFit.COVER, border_radius=8),
+                    ft.Column(
+                        alignment=ft.MainAxisAlignment.CENTER, spacing=2, expand=True,
+                        controls=[
+                            ft.Text(file.name, weight="bold", max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                            ft.Text("Imagem", color="grey", size=12)
+                        ]
+                    ),
+                    ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_color="black54", on_click=lambda e, f=file: remove_image(f))
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN
+            )
             images_list_container.controls.append(img_row)
-        add_btn_row = ft.Row(controls=[ft.Container(width=60, height=60, bgcolor="#E0E0E0", border_radius=8, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.ADD, size=30, color="black54"), on_click=lambda _: file_picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)), ft.Text("Adicionar imagem", color="grey", size=16)], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15)
+        
+        # Botão Adicionar
+        add_btn_row = ft.Row(
+            controls=[
+                ft.Container(
+                    width=60, height=60, bgcolor="#E0E0E0", border_radius=8, alignment=ft.alignment.center,
+                    content=ft.Icon(ft.Icons.ADD, size=30, color="black54"),
+                    on_click=lambda _: file_picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)
+                ),
+                ft.Text("Adicionar imagem", color="grey", size=16)
+            ],
+            vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15
+        )
         images_list_container.controls.append(add_btn_row)
         page.update()
 
@@ -65,6 +97,7 @@ def create_focus_form_view(page: ft.Page):
 
     def on_gps_error(e):
         print(f"Erro GPS: {e.error}")
+        # Usa o método moderno 'page.open' para evitar bugs visuais
         page.open(ft.SnackBar(ft.Text(f"GPS Falhou: {e.error}. Usando IP."), bgcolor="orange"))
         try_ip_location()
 
@@ -74,10 +107,11 @@ def create_focus_form_view(page: ft.Page):
     page.overlay.append(geolocator)
 
     # ===============================================================
-    # 2. OVERLAY GPS
+    # 2. OVERLAY VISUAL DO GPS (MODAL BRANCO)
     # ===============================================================
     gps_overlay = ft.Container(
-        visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, on_click=lambda e: None,
+        visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, 
+        on_click=lambda e: None, # Absorve clique para não fechar
         content=ft.Container(
             width=320, bgcolor="white", border_radius=20, padding=25, shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"),
             content=ft.Column(
@@ -107,7 +141,7 @@ def create_focus_form_view(page: ft.Page):
     def confirm_gps_fill():
         fill_address_fields(gps_address_data); close_gps_modal()
 
-    # --- LÓGICA GPS (TIMEOUT) ---
+    # --- LÓGICA GPS (TIMEOUT + IP) ---
     def try_ip_location():
         if btn_gps.disabled:
             try:
@@ -157,7 +191,7 @@ def create_focus_form_view(page: ft.Page):
             page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
             btn_gps.text = "Tentar Novamente"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.disabled = False; page.update()
 
-    # --- PREENCHIMENTO E VALIDAÇÃO (CORRIGIDO) ---
+    # --- PREENCHIMENTO E VALIDAÇÃO ---
     def normalize_string(s):
         if not s: return ""
         return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
@@ -167,15 +201,13 @@ def create_focus_form_view(page: ft.Page):
         city_clean = normalize_string(city_api)
         target_city = None
         
-        # 1. Verifica se a cidade é válida (Camboriú ou BC)
+        # Validação
         if "balneario" in city_clean and "camboriu" in city_clean: target_city = "Balneário Camboriú"
         elif "camboriu" in city_clean and "balneario" not in city_clean: target_city = "Camboriú"
         
         if target_city:
-            # SUCESSO: Preenche tudo
             dd_municipio.value = target_city
             dd_bairro.disabled = False
-            
             if target_city in neighborhoods_db:
                 opts = neighborhoods_db[target_city]
                 b = data.get("bairro")
@@ -187,9 +219,8 @@ def create_focus_form_view(page: ft.Page):
             tf_rua.value = data.get("logradouro")
             tf_cep.value = data.get("cep")
             if data.get("numero"): tf_numero.value = data.get("numero")
-            
         else:
-            # FALHA: Limpa tudo e AVISA usando page.open (Método Moderno)
+            # RESET TOTAL SE FOR FORA DA ÁREA
             dd_municipio.value = None
             dd_bairro.value = None
             dd_bairro.disabled = True
@@ -198,14 +229,11 @@ def create_focus_form_view(page: ft.Page):
             tf_numero.value = ""
             tf_cep.value = ""
             
-            msg = f"Serviço indisponível para {city_api or 'local desconhecido'}. Apenas Camboriú e BC."
-            print(f"AVISO: {msg}") # Debug no console
-            
-            # Garante que o aviso apareça mesmo dentro da View
+            # AVISO MODERNO (NÃO BLOQUEANTE)
             page.open(ft.SnackBar(
-                content=ft.Text(msg, color="white"),
+                content=ft.Text(f"Atenção: Serviço indisponível em {city_api}. Apenas Camboriú e BC.", color="white"),
                 bgcolor="red",
-                duration=5000 # 5 segundos na tela
+                duration=5000
             ))
 
         page.update()
@@ -286,10 +314,12 @@ def create_focus_form_view(page: ft.Page):
     header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Focos de mosquitos", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
     def create_row(label, field, extra=None): return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))), ft.Row([ft.Container(content=field, expand=True)] + ([extra] if extra else []), expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
 
+    # CORPO DO FORMULÁRIO (SEM OVERLAYS BLOQUEANTES)
     form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
         ft.Container(padding=20, content=btn_gps),
         create_row("CEP", tf_cep), create_row("MUNICÍPIO", dd_municipio), create_row("BAIRRO", dd_bairro), create_row("RUA", tf_rua, btn_search_rua), create_row("NÚMERO", tf_numero), create_row("DESCRIÇÃO", tf_descricao),
         ft.Container(padding=20, content=ft.Column([ft.Text("IMAGENS", weight="bold", size=12), images_list_container])), ft.Container(padding=20, content=btn_submit),
     ]))
 
-    return ft.View(route="/form-foco", bgcolor="white", padding=0, controls=[ft.Stack(expand=True, controls=[ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]), gps_overlay, address_overlay]), file_picker])
+    # STACK LIMPA: Apenas a estrutura base e os modais brancos controlados
+    return ft.View(route="/form-foco", bgcolor="white", padding=0, controls=[ft.Stack(expand=True, controls=[ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]), gps_overlay, address_overlay])])

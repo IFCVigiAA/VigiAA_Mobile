@@ -22,14 +22,14 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (INTERCEPTADOR DE ALCANCE TOTAL)
+    - name: Build APK (INTERCEPTADOR V3 - VARREDURA GLOBAL)
       run: |
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. Configura o Interceptador Global
+        # 2. Configura o Interceptador (Shim)
         REAL_FLUTTER_BIN=$(which flutter)
         echo "📍 Flutter original: $REAL_FLUTTER_BIN"
 
@@ -38,17 +38,24 @@ jobs:
         cat <<EOF > $GITHUB_WORKSPACE/shim/flutter
         #!/bin/bash
         
-        # O Interceptador acorda
+        # O Interceptador acorda quando o build é chamado
         if [[ "\$*" == *"build apk"* ]]; then
             echo "🚨 BUILD DETECTADO! Iniciando varredura por AndroidManifest.xml..."
             
-            # PROCURA EM TUDO: Pasta atual E pasta temporária /tmp
-            # O Flet 0.28+ constrói em /tmp/flet_flutter_build_...
-            MANIFEST=\$(find . /tmp -name "AndroidManifest.xml" 2>/dev/null | grep "src/main/AndroidManifest.xml" | head -n 1)
-            
-            if [ -n "\$MANIFEST" ]; then
-                echo "🎯 ALVO ENCONTRADO: \$MANIFEST"
+            # Tenta encontrar o arquivo por 10 segundos (para dar tempo do Flet criar)
+            for i in {1..10}; do
+                # Procura em . (pasta atual) e em /tmp (pasta temporária do Linux)
+                MANIFEST=\$(find . /tmp -name "AndroidManifest.xml" 2>/dev/null | grep "src/main/AndroidManifest.xml" | head -n 1)
                 
+                if [ -n "\$MANIFEST" ]; then
+                    echo "🎯 ALVO ENCONTRADO NA TENTATIVA \$i: \$MANIFEST"
+                    break
+                fi
+                echo "⏳ Tentativa \$i: Arquivo ainda não criado. Aguardando 1s..."
+                sleep 1
+            done
+
+            if [ -n "\$MANIFEST" ]; then
                 PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
                 
                 if grep -q "ACCESS_FINE_LOCATION" "\$MANIFEST"; then
@@ -56,25 +63,32 @@ jobs:
                 else
                     echo "💉 Injetando permissões..."
                     sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
-                    echo "✅ INJEÇÃO CONCLUÍDA!"
+                    echo "✅ INJEÇÃO CONCLUÍDA! O APK terá GPS."
                 fi
             else
-                echo "❌ Manifesto não encontrado em lugar nenhum. O GPS pode falhar."
-                # Lista estrutura para debug
-                find /tmp -maxdepth 3 -name "flet*" 2>/dev/null
+                echo "❌ FALHA CRÍTICA: Manifesto não encontrado após 10s. O GPS NÃO VAI FUNCIONAR."
             fi
         fi
 
-        # Passa a bola
+        # Passa a bola para o Flutter real
         exec "$REAL_FLUTTER_BIN" "\$@"
         EOF
 
         chmod +x $GITHUB_WORKSPACE/shim/flutter
-        export PATH=$GITHUB_WORKSPACE/shim:$PATH
         
-        # 3. Build
-        cd frontend
-        printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
+        # IMPORTANTE: Escreve no GITHUB_PATH para persistir no passo seguinte
+        echo "$GITHUB_WORKSPACE/shim" >> $GITHUB_PATH
+        
+        # Teste rápido
+        export PATH=$GITHUB_WORKSPACE/shim:$PATH
+        echo "Teste do espião: $(which flutter)"
+
+    - name: Executar Build
+      run: |
+        source venv/bin/activate
+        
+        # Roda o build. O nosso espião (configurado acima) vai interceptar,
+        # procurar no /tmp, achar o arquivo, injetar a permissão e liberar o build.
         flet build apk --verbose
 
     - name: Upload APK Artifact
