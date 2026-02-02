@@ -9,7 +9,7 @@ def create_main_view(page: ft.Page, aba_inicial=0):
     
     view_home = get_home_tab(page)
     view_add = get_new_tab(page)
-    view_explore = get_explore_tab()
+    view_explore = get_explore_tab(page)
     view_profile = get_profile_tab(page)
 
     modulos = [view_home, view_add, view_explore, view_profile]

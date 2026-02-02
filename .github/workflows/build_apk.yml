@@ -22,22 +22,24 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (DIAGNÓSTICO + FORÇA BRUTA)
+    - name: Build APK (AUTO-NAVEGAÇÃO + GPS)
       run: |
-        # 1. Configura Ambiente
+        # 1. Configura ambiente
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. Configura Interceptador GPS (O Shim V3)
+        # 2. Configura o Interceptador GPS (O Espião que garante a localização)
         REAL_FLUTTER_BIN=$(which flutter)
         mkdir -p $GITHUB_WORKSPACE/shim
 
         cat <<EOF > $GITHUB_WORKSPACE/shim/flutter
         #!/bin/bash
+        # Se for comando de build, ativa o espião
         if [[ "\$*" == *"build apk"* ]]; then
-            echo "🚨 BUILD DETECTADO! Varrendo manifesto..."
+            echo "🚨 BUILD DETECTADO! Procurando Manifesto para injetar GPS..."
+            # Tenta achar o manifesto por 15 segundos (varredura global)
             for i in {1..15}; do
                 MANIFEST=\$(find . /tmp -name "AndroidManifest.xml" 2>/dev/null | grep "src/main/AndroidManifest.xml" | head -n 1)
                 if [ -n "\$MANIFEST" ]; then
@@ -47,50 +49,44 @@ jobs:
                         echo "⚠️ Já possui permissões."
                     else
                         sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
-                        echo "✅ PERMISSÕES INJETADAS!"
+                        echo "✅ PERMISSÕES DE GPS INJETADAS!"
                     fi
                     break
                 fi
                 sleep 1
             done
         fi
+        # Passa o comando para o Flutter original
         exec "$REAL_FLUTTER_BIN" "\$@"
         EOF
 
         chmod +x $GITHUB_WORKSPACE/shim/flutter
         export PATH=$GITHUB_WORKSPACE/shim:$PATH
-        
-        # ---------------------------------------------------------
-        # 3. O DIAGNÓSTICO (AQUI VAMOS DESCOBRIR A VERDADE)
-        # ---------------------------------------------------------
-        echo "📍 Diretório Raiz: $(pwd)"
-        echo "📂 Listando TUDO que existe neste repositório:"
-        ls -R
-        
-        echo "-------------------------------------------------------"
-        echo "📂 Entrando na pasta frontend..."
-        cd frontend || echo "❌ ERRO: A pasta 'frontend' não existe!"
-        
-        echo "📍 Diretório Atual: $(pwd)"
-        echo "📄 Arquivos aqui dentro:"
-        ls -la
-        
-        if [ -f "main.py" ]; then
-            echo "✅ SUCESSO: main.py encontrado e confirmado!"
-        else
-            echo "❌ ERRO CRÍTICO: main.py NÃO ESTÁ AQUI. Veja a lista acima."
-            # Tenta achar onde ele foi parar
-            echo "🔍 Procurando main.py em outros lugares..."
-            find .. -name "main.py"
-        fi
-        echo "-------------------------------------------------------"
 
-        # 4. Tenta o Build forçando o módulo
+        # 3. AUTO-LOCALIZAÇÃO DO MAIN.PY (A Correção do Erro)
+        echo "🕵️‍♂️ Escaneando repositório em busca do main.py..."
+        
+        # Procura o arquivo main.py (ignorando a pasta venv)
+        MAIN_PATH=$(find . -type f -name "main.py" -not -path "*/venv/*" | head -n 1)
+        
+        if [ -z "$MAIN_PATH" ]; then
+            echo "❌ ERRO FATAL: O arquivo main.py sumiu! Listando tudo para você ver:"
+            ls -R
+            exit 1
+        fi
+        
+        echo "✅ Arquivo main.py encontrado em: $MAIN_PATH"
+        
+        # Descobre qual é a pasta dele e entra nela
+        TARGET_DIR=$(dirname "$MAIN_PATH")
+        echo "📂 Mudando diretório para: $TARGET_DIR"
+        cd "$TARGET_DIR"
+        
+        # 4. Prepara e Roda
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        echo "🚀 Iniciando Build forçado..."
-        # Adicionei --module-name main para obrigar ele a ler o arquivo
-        flet build apk --module-name main --verbose
+        echo "🚀 Iniciando Build..."
+        flet build apk --verbose
 
     - name: Executar Build
       run: |
