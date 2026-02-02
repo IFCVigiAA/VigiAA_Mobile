@@ -22,14 +22,14 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (INTERCEPTADOR V3 - VARREDURA GLOBAL)
+    - name: Build APK (INTERCEPTADOR V3 + DEBUG)
       run: |
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. Configura o Interceptador (Shim)
+        # 1. Configura o Interceptador Global (Shim)
         REAL_FLUTTER_BIN=$(which flutter)
         echo "📍 Flutter original: $REAL_FLUTTER_BIN"
 
@@ -38,20 +38,19 @@ jobs:
         cat <<EOF > $GITHUB_WORKSPACE/shim/flutter
         #!/bin/bash
         
-        # O Interceptador acorda quando o build é chamado
+        # O Interceptador acorda
         if [[ "\$*" == *"build apk"* ]]; then
             echo "🚨 BUILD DETECTADO! Iniciando varredura por AndroidManifest.xml..."
             
-            # Tenta encontrar o arquivo por 10 segundos (para dar tempo do Flet criar)
-            for i in {1..10}; do
-                # Procura em . (pasta atual) e em /tmp (pasta temporária do Linux)
+            # Tenta encontrar o arquivo por 15 segundos
+            for i in {1..15}; do
                 MANIFEST=\$(find . /tmp -name "AndroidManifest.xml" 2>/dev/null | grep "src/main/AndroidManifest.xml" | head -n 1)
                 
                 if [ -n "\$MANIFEST" ]; then
                     echo "🎯 ALVO ENCONTRADO NA TENTATIVA \$i: \$MANIFEST"
                     break
                 fi
-                echo "⏳ Tentativa \$i: Arquivo ainda não criado. Aguardando 1s..."
+                echo "⏳ Tentativa \$i: Aguardando criação do manifesto..."
                 sleep 1
             done
 
@@ -63,25 +62,32 @@ jobs:
                 else
                     echo "💉 Injetando permissões..."
                     sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
-                    echo "✅ INJEÇÃO CONCLUÍDA! O APK terá GPS."
+                    echo "✅ INJEÇÃO CONCLUÍDA!"
                 fi
             else
-                echo "❌ FALHA CRÍTICA: Manifesto não encontrado após 10s. O GPS NÃO VAI FUNCIONAR."
+                echo "❌ FALHA: Manifesto não encontrado. O GPS pode não funcionar."
             fi
         fi
 
-        # Passa a bola para o Flutter real
         exec "$REAL_FLUTTER_BIN" "\$@"
         EOF
 
         chmod +x $GITHUB_WORKSPACE/shim/flutter
-        
-        # IMPORTANTE: Escreve no GITHUB_PATH para persistir no passo seguinte
         echo "$GITHUB_WORKSPACE/shim" >> $GITHUB_PATH
-        
-        # Teste rápido
         export PATH=$GITHUB_WORKSPACE/shim:$PATH
-        echo "Teste do espião: $(which flutter)"
+        
+        # 2. DEBUG DE ARQUIVOS (A novidade está aqui)
+        cd frontend
+        echo "📂 --- ARQUIVOS NA PASTA FRONTEND ---"
+        ls -la
+        echo "📂 --- ARQUIVOS DENTRO DE VIEWS ---"
+        ls -R views || echo "Pasta views não encontrada"
+        echo "-------------------------------------"
+        
+        printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
+        
+        # Tenta rodar o build
+        flet build apk --verbose
 
     - name: Executar Build
       run: |
