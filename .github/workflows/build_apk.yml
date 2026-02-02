@@ -22,37 +22,34 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (V4 - AUTO-NAVEGAÇÃO + GPS)
+    - name: Build APK (AUTO-NAVEGAÇÃO + GPS)
       run: |
-        # 0. Mostra que o código novo está rodando (PROVA REAL)
-        echo "🚀 INICIANDO SCRIPT V4 - SE VOCÊ NÃO VÊ ISSO, O CÓDIGO É VELHO!"
-
         # 1. Configura ambiente
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. Configura o Interceptador GPS (Shim)
+        # 2. Configura o Interceptador GPS (O Espião)
         REAL_FLUTTER_BIN=$(which flutter)
         mkdir -p $GITHUB_WORKSPACE/shim
 
         cat <<EOF > $GITHUB_WORKSPACE/shim/flutter
         #!/bin/bash
-        # Intercepta o comando de build
+        # Se for comando de build, ativa o espião
         if [[ "\$*" == *"build apk"* ]]; then
-            echo "🕵️‍♂️ ESPIÃO DO GPS: Procurando Manifesto..."
-            # Tenta achar o manifesto por 20 segundos
+            echo "🚨 BUILD DETECTADO! Procurando Manifesto..."
             for i in {1..20}; do
+                # Procura em todo lugar (/tmp e local)
                 MANIFEST=\$(find . /tmp -name "AndroidManifest.xml" 2>/dev/null | grep "src/main/AndroidManifest.xml" | head -n 1)
                 if [ -n "\$MANIFEST" ]; then
-                    echo "🎯 ALVO ENCONTRADO: \$MANIFEST"
+                    echo "🎯 Manifesto encontrado: \$MANIFEST"
                     PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
                     if grep -q "ACCESS_FINE_LOCATION" "\$MANIFEST"; then
                         echo "⚠️ Já possui permissões."
                     else
                         sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
-                        echo "💉 PERMISSÕES INJETADAS COM SUCESSO!"
+                        echo "✅ PERMISSÕES DE GPS INJETADAS!"
                     fi
                     break
                 fi
@@ -65,29 +62,30 @@ jobs:
         chmod +x $GITHUB_WORKSPACE/shim/flutter
         export PATH=$GITHUB_WORKSPACE/shim:$PATH
 
-        # 3. AUTO-LOCALIZAÇÃO DO MAIN.PY (CORREÇÃO DO ERRO)
-        echo "🔍 Procurando onde o main.py se escondeu..."
+        # 3. AUTO-LOCALIZAÇÃO DO MAIN.PY (A Correção do Erro)
+        echo "🕵️‍♂️ Escaneando repositório em busca do main.py..."
         
-        # Encontra o main.py ignorando pastas de sistema
-        TARGET_FILE=$(find . -name "main.py" -not -path "*/venv/*" | head -n 1)
+        # Procura o arquivo main.py (ignorando a pasta venv)
+        MAIN_PATH=$(find . -type f -name "main.py" -not -path "*/venv/*" | head -n 1)
         
-        if [ -z "$TARGET_FILE" ]; then
-            echo "❌ ERRO: main.py não encontrado! Listando arquivos:"
+        if [ -z "$MAIN_PATH" ]; then
+            echo "❌ ERRO FATAL: O arquivo main.py sumiu! Listando tudo para debug:"
             ls -R
             exit 1
         fi
         
-        # Pega a pasta onde ele está (ex: ./frontend)
-        TARGET_DIR=$(dirname "$TARGET_FILE")
-        echo "✅ Pasta do projeto encontrada: $TARGET_DIR"
+        echo "✅ Arquivo main.py encontrado em: $MAIN_PATH"
         
-        # Entra na pasta para garantir que o Flet ache tudo
+        # Descobre qual é a pasta dele e entra nela
+        TARGET_DIR=$(dirname "$MAIN_PATH")
+        echo "📂 Mudando diretório para: $TARGET_DIR"
         cd "$TARGET_DIR"
         
-        # 4. Cria requirements e roda o build
+        # 4. Prepara e Roda
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        echo "🚀 Iniciando Build na pasta correta..."
+        echo "🚀 Iniciando Build..."
+        # O comando agora roda dentro da pasta certa!
         flet build apk --verbose
 
     - name: Executar Build
