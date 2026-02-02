@@ -22,78 +22,59 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (SUBSTITUIÇÃO DE BINÁRIO)
+    - name: Build APK (INTERCEPTADOR DE ALCANCE TOTAL)
       run: |
-        # 1. Configura Python
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. LOCALIZA E SEQUESTRA O FLUTTER
-        # Descobre onde o Flutter real está instalado
-        FLUTTER_BIN_PATH=$(which flutter)
-        FLUTTER_DIR=$(dirname "$FLUTTER_BIN_PATH")
-        REAL_FLUTTER="$FLUTTER_DIR/flutter_original"
-        
-        echo "📍 Flutter instalado em: $FLUTTER_BIN_PATH"
-        
-        # Renomeia o original para 'flutter_original'
-        mv "$FLUTTER_BIN_PATH" "$REAL_FLUTTER"
-        
-        # 3. CRIA O IMPOSTOR
-        # Criamos um script chamado 'flutter' no lugar do original
-        cat <<EOF > "$FLUTTER_BIN_PATH"
+        # 2. Configura o Interceptador Global
+        REAL_FLUTTER_BIN=$(which flutter)
+        echo "📍 Flutter original: $REAL_FLUTTER_BIN"
+
+        mkdir -p $GITHUB_WORKSPACE/shim
+
+        cat <<EOF > $GITHUB_WORKSPACE/shim/flutter
         #!/bin/bash
         
-        # Log para provar que fomos chamados
-        echo "🥷 IMPOSTOR DO FLUTTER ATIVADO! Args: \$*"
-        
-        # Se o comando for de build, a gente age
+        # O Interceptador acorda
         if [[ "\$*" == *"build apk"* ]]; then
-            echo "🔎 O Flet pediu para compilar! Procurando AndroidManifest.xml..."
+            echo "🚨 BUILD DETECTADO! Iniciando varredura por AndroidManifest.xml..."
             
-            # O Flet já gerou o projeto nesta altura. Procuramos o manifesto na pasta atual.
-            MANIFEST=\$(find . -name "AndroidManifest.xml" | grep "main/AndroidManifest.xml" | head -n 1)
+            # PROCURA EM TUDO: Pasta atual E pasta temporária /tmp
+            # O Flet 0.28+ constrói em /tmp/flet_flutter_build_...
+            MANIFEST=\$(find . /tmp -name "AndroidManifest.xml" 2>/dev/null | grep "src/main/AndroidManifest.xml" | head -n 1)
             
             if [ -n "\$MANIFEST" ]; then
-                echo "📝 Alvo encontrado: \$MANIFEST"
+                echo "🎯 ALVO ENCONTRADO: \$MANIFEST"
                 
                 PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
                 
-                # Verifica se já tem permissão para não duplicar
                 if grep -q "ACCESS_FINE_LOCATION" "\$MANIFEST"; then
-                     echo "⚠️ Permissões já existem."
+                    echo "⚠️ Já possui permissões."
                 else
-                     # Injeta as permissões na força bruta
-                     sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
-                     echo "💉 SUCESSO: Permissões de GPS Injetadas!"
-                     
-                     # Mostra a prova no log
-                     grep -B 5 "<application" "\$MANIFEST"
+                    echo "💉 Injetando permissões..."
+                    sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
+                    echo "✅ INJEÇÃO CONCLUÍDA!"
                 fi
             else
-                echo "❌ Manifesto não encontrado no diretório: \$(pwd)"
-                # Lista arquivos para ajudar a entender o erro se acontecer
-                find . -maxdepth 4 -name "*.xml"
+                echo "❌ Manifesto não encontrado em lugar nenhum. O GPS pode falhar."
+                # Lista estrutura para debug
+                find /tmp -maxdepth 3 -name "flet*" 2>/dev/null
             fi
         fi
-        
-        # 4. PASSA A BOLA PRO ORIGINAL
-        # Executa o flutter verdadeiro para terminar o serviço
-        exec "$REAL_FLUTTER" "\$@"
-        EOF
-        
-        # Dá permissão de execução para nosso impostor
-        chmod +x "$FLUTTER_BIN_PATH"
-        
-        echo "✅ Armadilha configurada. O comando 'flutter' agora é nosso."
 
-        # 5. RODA O BUILD
+        # Passa a bola
+        exec "$REAL_FLUTTER_BIN" "\$@"
+        EOF
+
+        chmod +x $GITHUB_WORKSPACE/shim/flutter
+        export PATH=$GITHUB_WORKSPACE/shim:$PATH
+        
+        # 3. Build
         cd frontend
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
-        
-        # O Flet vai chamar 'flutter', que vai cair na nossa armadilha!
         flet build apk --verbose
 
     - name: Upload APK Artifact
