@@ -88,16 +88,12 @@ jobs:
         # O comando agora roda dentro da pasta certa!
         flet build apk --verbose
 
-    - name: Executar Build
-      run: |
-        source venv/bin/activate
-        
-        # Roda o build. O nosso espião (configurado acima) vai interceptar,
-        # procurar no /tmp, achar o arquivo, injetar a permissão e liberar o build.
-        flet build apk --verbose
+    # APAGUEI O PASSO "Executar Build" QUE ESTAVA AQUI E CAUSAVA O ERRO
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: vigiaa-release
+        # O caminho abaixo depende de onde o main.py foi achado.
+        # Geralmente é frontend/build/apk/app-release.apk
         path: frontend/build/apk/app-release.apk
