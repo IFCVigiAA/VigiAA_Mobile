@@ -27,7 +27,7 @@ DEBUG = os.getenv('DEBUG') == 'True'
 ALLOWED_HOSTS = ['*', '.ngrok-free.dev'] 
 
 # Autoriza o HTTPS do seu link específico
-CSRF_TRUSTED_ORIGINS = ['https://unreconciled-unverdant-tess.ngrok-free.dev']
+CSRF_TRUSTED_ORIGINS = ['https://froglike-cataleya-quirkily.ngrok-free.dev']
 
 # Configuração para garantir que o Django entenda que é HTTPS
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
