@@ -7,31 +7,40 @@ import threading
 
 def create_focus_form_view(page: ft.Page):
     try:
-        # --- PREPARAÇÃO SEGURA ---
-        # NÃO usamos mais page.overlay.clear() pois isso trava a navegação no Android
-        
         API_URL = config.API_URL
         selected_files = []
         gps_address_data = {} 
         
-        # --- FILE PICKER (Gerenciamento Inteligente) ---
+        # --- 1. COMPONENTES INVISÍVEIS (FilePicker) ---
         def on_file_result(e):
             if e.files:
                 selected_files.extend(e.files)
                 update_images_display()
         
-        # Cria o FilePicker
         file_picker = ft.FilePicker(on_result=on_file_result)
         
-        # Só adiciona no overlay se ele já não estiver lá (evita acúmulo)
-        # Nota: Em produção, o ideal é limpar no main.py, mas aqui fazemos verificação
-        if file_picker not in page.overlay:
-            page.overlay.append(file_picker)
-        
-        def back_click(e):
-            page.go("/novo") # ou "/" dependendo da sua rota home
+        # --- 2. LÓGICA DO GPS ---
+        def on_gps_position(e):
+            print(f"GPS SUCESSO! Lat: {e.latitude}, Lon: {e.longitude}")
+            get_address_from_coords(e.latitude, e.longitude, source="GPS (Preciso)")
 
-        # --- DIÁLOGO DE SUCESSO ---
+        def on_gps_error(e):
+            print(f"Erro GPS: {e.error}")
+            try:
+                page.open(ft.SnackBar(ft.Text(f"GPS Falhou: {e.error}. Usando IP."), bgcolor="orange"))
+            except: pass
+            try_ip_location()
+
+        # *** CORREÇÃO DO ERRO AQUI ***
+        # Criamos vazio primeiro, depois atribuímos as funções.
+        geolocator = ft.Geolocator()
+        geolocator.on_position = on_gps_position
+        geolocator.on_error = on_gps_error
+
+        # --- NAVEGAÇÃO E DIÁLOGOS ---
+        def back_click(e):
+            page.go("/novo")
+
         def close_success_dialog(e):
             success_dialog.open = False
             page.update()
@@ -45,7 +54,7 @@ def create_focus_form_view(page: ft.Page):
             actions_alignment=ft.MainAxisAlignment.END,
         )
 
-        # --- IMAGENS ---
+        # --- LISTA DE IMAGENS ---
         images_list_container = ft.Column(spacing=15)
 
         def remove_image(file_obj):
@@ -72,7 +81,6 @@ def create_focus_form_view(page: ft.Page):
                 )
                 images_list_container.controls.append(img_row)
             
-            # Botão Adicionar
             add_btn_row = ft.Row(
                 controls=[
                     ft.Container(
@@ -85,7 +93,6 @@ def create_focus_form_view(page: ft.Page):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15
             )
             images_list_container.controls.append(add_btn_row)
-            page.update()
 
         # --- DADOS ---
         neighborhoods_db = {
@@ -93,26 +100,7 @@ def create_focus_form_view(page: ft.Page):
             "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]
         }
 
-        # ===============================================================
-        # 1. COMPONENTE GPS (PREGUIÇOSO/LAZY)
-        # ===============================================================
-        def on_gps_position(e):
-            print(f"GPS SUCESSO! Lat: {e.latitude}, Lon: {e.longitude}")
-            get_address_from_coords(e.latitude, e.longitude, source="GPS (Preciso)")
-
-        def on_gps_error(e):
-            print(f"Erro GPS: {e.error}")
-            try:
-                page.open(ft.SnackBar(ft.Text(f"GPS Falhou: {e.error}. Usando IP."), bgcolor="orange"))
-            except: pass
-            try_ip_location()
-
-        # Criamos o objeto, mas NÃO adicionamos ao overlay ainda
-        geolocator = ft.Geolocator(on_position=on_gps_position, on_error=on_gps_error)
-
-        # ===============================================================
-        # 2. OVERLAYS E MODAIS
-        # ===============================================================
+        # --- MODAL GPS ---
         gps_overlay = ft.Container(
             visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, 
             on_click=lambda e: None,
@@ -145,7 +133,7 @@ def create_focus_form_view(page: ft.Page):
         def confirm_gps_fill():
             fill_address_fields(gps_address_data); close_gps_modal()
 
-        # --- LÓGICA GPS ---
+        # --- FUNÇÕES AUXILIARES ---
         def try_ip_location():
             if btn_gps.disabled:
                 try:
@@ -163,20 +151,12 @@ def create_focus_form_view(page: ft.Page):
                 try_ip_location()
 
         def get_gps_click(e):
-            # *** SÓ AGORA ADICIONAMOS O GPS ***
-            # Isso evita que o app tente iniciar o GPS antes da hora e trave
-            if geolocator not in page.overlay:
-                page.overlay.append(geolocator)
-                page.update()
-
             btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
             threading.Timer(6.0, gps_timeout_handler).start()
-            
             try:
-                # Se não tiver permissão, vai cair no erro ou pedir (dependendo do OS)
                 geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.HIGH)
             except Exception as ex:
-                print(f"Erro ao chamar GPS: {ex}")
+                print(f"Erro GPS Call: {ex}")
                 try_ip_location()
 
         def get_address_from_coords(lat, lon, source="GPS"):
@@ -205,7 +185,6 @@ def create_focus_form_view(page: ft.Page):
                 page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
                 btn_gps.text = "Tentar Novamente"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.disabled = False; page.update()
 
-        # --- PREENCHIMENTO E VALIDAÇÃO ---
         def normalize_string(s):
             if not s: return ""
             return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
@@ -277,7 +256,7 @@ def create_focus_form_view(page: ft.Page):
             else: dd_bairro.disabled = True
             page.update()
 
-        # --- CAMPOS ---
+        # --- CAMPOS UI ---
         tf_cep = ft.TextField(hint_text="Digite o CEP", on_change=search_cep, keyboard_type=ft.KeyboardType.NUMBER, border="none", text_size=14, content_padding=10)
         dd_municipio = ft.Dropdown(hint_text="Selecione a cidade", options=[ft.dropdown.Option("Camboriú"), ft.dropdown.Option("Balneário Camboriú")], on_change=on_city_change, icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
         dd_bairro = ft.Dropdown(hint_text="Selecione o bairro", disabled=True, icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
@@ -306,6 +285,7 @@ def create_focus_form_view(page: ft.Page):
         btn_submit.on_click = submit_form
         update_images_display()
 
+        # --- LAYOUT FINAL ---
         header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Focos de mosquitos", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
         def create_row(label, field, extra=None): return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))), ft.Row([ft.Container(content=field, expand=True)] + ([extra] if extra else []), expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
 
@@ -315,15 +295,24 @@ def create_focus_form_view(page: ft.Page):
             ft.Container(padding=20, content=ft.Column([ft.Text("IMAGENS", weight="bold", size=12), images_list_container])), ft.Container(padding=20, content=btn_submit),
         ]))
 
-        return ft.View(route="/form-foco", bgcolor="white", padding=0, controls=[ft.Stack(expand=True, controls=[ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]), gps_overlay, address_overlay])])
-
-    except Exception as e:
-        # SE DER ERRO, VAI MOSTRAR ISSO EM VEZ DE TRAVAR
-        print(f"Erro fatal ao criar tela: {e}")
         return ft.View(
-            route="/form-foco",
+            route="/form-foco", 
+            bgcolor="white", 
+            padding=0, 
             controls=[
-                ft.AppBar(title=ft.Text("Erro"), bgcolor="red"),
-                ft.Center(content=ft.Text(f"Erro ao carregar formulário:\n{e}", color="red", size=20))
+                file_picker,
+                geolocator,
+                ft.Stack(
+                    expand=True, 
+                    controls=[
+                        ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]),
+                        gps_overlay, 
+                        address_overlay
+                    ]
+                )
             ]
         )
+
+    except Exception as e:
+        print(f"Erro ao criar tela: {e}")
+        return ft.View(route="/form-foco", controls=[ft.Text(f"Erro crítico: {e}", color="red")])

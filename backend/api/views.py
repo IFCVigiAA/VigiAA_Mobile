@@ -42,7 +42,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = "https://unreconciled-unverdant-tess.ngrok-free.dev/api/google-callback/"
+GOOGLE_REDIRECT_URI = "https://froglike-cataleya-quirkily.ngrok-free.dev/api/google-callback/"
 
 # ==============================================================================
 # LÓGICA MANUAL DE LOGIN (O QUE O PROFESSOR PEDIU)
