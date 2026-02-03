@@ -11,7 +11,9 @@ def create_focus_form_view(page: ft.Page):
         selected_files = []
         gps_address_data = {} 
         
-        # --- 1. COMPONENTES INVISÍVEIS (FilePicker) ---
+        # --- 1. COMPONENTES DO SISTEMA (FilePicker e GPS) ---
+        # Nós vamos criar e adicionar ao overlay com cuidado para não travar
+        
         def on_file_result(e):
             if e.files:
                 selected_files.extend(e.files)
@@ -19,7 +21,7 @@ def create_focus_form_view(page: ft.Page):
         
         file_picker = ft.FilePicker(on_result=on_file_result)
         
-        # --- 2. LÓGICA DO GPS ---
+        # Lógica do GPS
         def on_gps_position(e):
             print(f"GPS SUCESSO! Lat: {e.latitude}, Lon: {e.longitude}")
             get_address_from_coords(e.latitude, e.longitude, source="GPS (Preciso)")
@@ -31,11 +33,22 @@ def create_focus_form_view(page: ft.Page):
             except: pass
             try_ip_location()
 
-        # *** CORREÇÃO DO ERRO AQUI ***
-        # Criamos vazio primeiro, depois atribuímos as funções.
+        # Criamos o GPS Vazio
         geolocator = ft.Geolocator()
         geolocator.on_position = on_gps_position
         geolocator.on_error = on_gps_error
+
+        # *** AQUI ESTÁ A CORREÇÃO CRÍTICA ***
+        # Adicionamos ao overlay (onde invisíveis devem morar)
+        # Mas verificamos se já existe para não duplicar
+        if file_picker not in page.overlay:
+            page.overlay.append(file_picker)
+            
+        if geolocator not in page.overlay:
+            page.overlay.append(geolocator)
+            
+        # Importante: Atualizamos a página para o Flet registrar os componentes
+        page.update()
 
         # --- NAVEGAÇÃO E DIÁLOGOS ---
         def back_click(e):
@@ -147,12 +160,15 @@ def create_focus_form_view(page: ft.Page):
 
         def gps_timeout_handler():
             if btn_gps.disabled == True:
-                page.open(ft.SnackBar(ft.Text("Sem sinal de GPS. Tentando rede..."), bgcolor="orange"))
+                page.open(ft.SnackBar(ft.Text("Sinal de GPS demorou. Usando rede..."), bgcolor="orange"))
                 try_ip_location()
 
         def get_gps_click(e):
             btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
-            threading.Timer(20.0, gps_timeout_handler).start()
+            
+            # AUMENTAMOS PARA 15 SEGUNDOS (Tempo para o satélite responder)
+            threading.Timer(15.0, gps_timeout_handler).start()
+            
             try:
                 geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.HIGH)
             except Exception as ex:
@@ -300,8 +316,7 @@ def create_focus_form_view(page: ft.Page):
             bgcolor="white", 
             padding=0, 
             controls=[
-                file_picker,
-                geolocator,
+                # O Overlay e o AddressOverlay estão na Stack, não no page.overlay
                 ft.Stack(
                     expand=True, 
                     controls=[
