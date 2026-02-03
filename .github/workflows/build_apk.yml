@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # Versão estável do Ubuntu (evita filas travadas)
 
     steps:
     - uses: actions/checkout@v4
@@ -22,78 +22,63 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (AUTO-NAVEGAÇÃO + GPS)
+    - name: Construção Manual do APK (Com GPS Garantido)
       run: |
-        # 1. Configura ambiente
+        echo "🚀 INICIANDO BUILD MANUAL VIGIAA"
+
+        # 1. Instalação de Dependências
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. Configura o Interceptador GPS (O Espião)
-        REAL_FLUTTER_BIN=$(which flutter)
-        mkdir -p $GITHUB_WORKSPACE/shim
-
-        cat <<EOF > $GITHUB_WORKSPACE/shim/flutter
-        #!/bin/bash
-        # Se for comando de build, ativa o espião
-        if [[ "\$*" == *"build apk"* ]]; then
-            echo "🚨 BUILD DETECTADO! Procurando Manifesto..."
-            for i in {1..20}; do
-                # Procura em todo lugar (/tmp e local)
-                MANIFEST=\$(find . /tmp -name "AndroidManifest.xml" 2>/dev/null | grep "src/main/AndroidManifest.xml" | head -n 1)
-                if [ -n "\$MANIFEST" ]; then
-                    echo "🎯 Manifesto encontrado: \$MANIFEST"
-                    PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
-                    if grep -q "ACCESS_FINE_LOCATION" "\$MANIFEST"; then
-                        echo "⚠️ Já possui permissões."
-                    else
-                        sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
-                        echo "✅ PERMISSÕES DE GPS INJETADAS!"
-                    fi
-                    break
-                fi
-                sleep 1
-            done
-        fi
-        exec "$REAL_FLUTTER_BIN" "\$@"
-        EOF
-
-        chmod +x $GITHUB_WORKSPACE/shim/flutter
-        export PATH=$GITHUB_WORKSPACE/shim:$PATH
-
-        # 3. AUTO-LOCALIZAÇÃO DO MAIN.PY (A Correção do Erro)
-        echo "🕵️‍♂️ Escaneando repositório em busca do main.py..."
-        
-        # Procura o arquivo main.py (ignorando a pasta venv)
+        # 2. Encontrar a pasta correta (Auto-Navegação)
         MAIN_PATH=$(find . -type f -name "main.py" -not -path "*/venv/*" | head -n 1)
-        
         if [ -z "$MAIN_PATH" ]; then
-            echo "❌ ERRO FATAL: O arquivo main.py sumiu! Listando tudo para debug:"
-            ls -R
+            echo "❌ ERRO: main.py não encontrado."
             exit 1
         fi
-        
-        echo "✅ Arquivo main.py encontrado em: $MAIN_PATH"
-        
-        # Descobre qual é a pasta dele e entra nela
         TARGET_DIR=$(dirname "$MAIN_PATH")
-        echo "📂 Mudando diretório para: $TARGET_DIR"
+        echo "📂 Entrando na pasta: $TARGET_DIR"
         cd "$TARGET_DIR"
         
-        # 4. Prepara e Roda
+        # 3. Gerar dependências
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
-        
-        echo "🚀 Iniciando Build..."
-        # O comando agora roda dentro da pasta certa!
-        flet build apk --verbose
 
-    # APAGUEI O PASSO "Executar Build" QUE ESTAVA AQUI E CAUSAVA O ERRO
+        # 4. GERAR O CÓDIGO NATIVO (Sem compilar ainda)
+        # O flag --no-build apenas cria a pasta 'build/flutter'
+        echo "⚙️ Gerando projeto Flutter..."
+        flet build apk --no-build --verbose
+
+        # 5. INJEÇÃO CIRÚRGICA DE PERMISSÕES 💉
+        # Agora sabemos exatamente onde o arquivo está
+        MANIFEST="build/flutter/android/app/src/main/AndroidManifest.xml"
+        
+        if [ -f "$MANIFEST" ]; then
+            echo "🎯 Manifesto encontrado para injeção!"
+            
+            # Permissões que vamos injetar
+            PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n<uses-permission android:name="android.permission.INTERNET" />'
+            
+            # Usa o comando sed para inserir as permissões antes da tag <application>
+            sed -i "s|<application|$PERMS\n    <application|g" "$MANIFEST"
+            
+            echo "✅ Permissões injetadas com sucesso! Confira:"
+            grep "uses-permission" "$MANIFEST"
+        else
+            echo "❌ ERRO CRÍTICO: Manifesto não gerado!"
+            ls -R build
+            exit 1
+        fi
+
+        # 6. COMPILAR O APK FINAL (Usando Flutter direto)
+        echo "🔨 Compilando APK final..."
+        cd build/flutter
+        flutter build apk --release
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: vigiaa-release
-        # O caminho abaixo depende de onde o main.py foi achado.
-        # Geralmente é frontend/build/apk/app-release.apk
-        path: frontend/build/apk/app-release.apk
+        # O caminho muda quando compilamos manualmente via Flutter
+        path: frontend/build/flutter/build/app/outputs/flutter-apk/app-release.apk

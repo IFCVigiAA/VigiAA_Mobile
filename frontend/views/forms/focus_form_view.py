@@ -6,9 +6,13 @@ import unicodedata
 import threading
 
 def create_focus_form_view(page: ft.Page):
-    # Limpeza total de overlays anteriores
-    page.overlay.clear()
-    
+    # --- 1. PREPARAÇÃO SEGURA (Evita Tela Vermelha) ---
+    # Limpa overlays anteriores para não sobrepor telas
+    try:
+        page.overlay.clear()
+    except:
+        pass
+
     API_URL = config.API_URL
     selected_files = []
     gps_address_data = {} 
@@ -20,7 +24,6 @@ def create_focus_form_view(page: ft.Page):
             update_images_display()
             
     file_picker = ft.FilePicker(on_result=on_file_result)
-    # IMPORTANTE: Adiciona APENAS no overlay da página
     page.overlay.append(file_picker)
     
     def back_click(e):
@@ -82,7 +85,7 @@ def create_focus_form_view(page: ft.Page):
         images_list_container.controls.append(add_btn_row)
         page.update()
 
-    # --- DADOS ---
+    # --- DADOS (SEUS DADOS COMPLETOS) ---
     neighborhoods_db = {
         "Camboriú": ["Areias", "Braço", "Caetés", "Cedro", "Centro", "Conde Vila Verde", "João da Costa", "Lídia Duarte", "Macacos", "Monte Alegre", "Rio do Meio", "Rio Pequeno", "Santa Regina", "São Francisco de Assis", "Tabuleiro", "Várzea do Ranchinho", "Vila Conceição"],
         "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]
@@ -98,7 +101,9 @@ def create_focus_form_view(page: ft.Page):
     def on_gps_error(e):
         print(f"Erro GPS: {e.error}")
         # Usa o método moderno 'page.open' para evitar bugs visuais
-        page.open(ft.SnackBar(ft.Text(f"GPS Falhou: {e.error}. Usando IP."), bgcolor="orange"))
+        try:
+            page.open(ft.SnackBar(ft.Text(f"GPS Falhou: {e.error}. Usando IP."), bgcolor="orange"))
+        except: pass
         try_ip_location()
 
     geolocator = ft.Geolocator()
@@ -314,7 +319,6 @@ def create_focus_form_view(page: ft.Page):
     header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Focos de mosquitos", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
     def create_row(label, field, extra=None): return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))), ft.Row([ft.Container(content=field, expand=True)] + ([extra] if extra else []), expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
 
-    # CORPO DO FORMULÁRIO (SEM OVERLAYS BLOQUEANTES)
     form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
         ft.Container(padding=20, content=btn_gps),
         create_row("CEP", tf_cep), create_row("MUNICÍPIO", dd_municipio), create_row("BAIRRO", dd_bairro), create_row("RUA", tf_rua, btn_search_rua), create_row("NÚMERO", tf_numero), create_row("DESCRIÇÃO", tf_descricao),
