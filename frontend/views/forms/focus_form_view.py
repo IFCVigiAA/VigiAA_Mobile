@@ -152,7 +152,7 @@ def create_focus_form_view(page: ft.Page):
 
         def get_gps_click(e):
             btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
-            threading.Timer(6.0, gps_timeout_handler).start()
+            threading.Timer(20.0, gps_timeout_handler).start()
             try:
                 geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.HIGH)
             except Exception as ex:
