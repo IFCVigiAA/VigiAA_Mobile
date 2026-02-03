@@ -6,8 +6,7 @@ import unicodedata
 import threading
 
 def create_focus_form_view(page: ft.Page):
-    # --- 1. PREPARAÇÃO SEGURA (Evita Tela Vermelha) ---
-    # Limpa overlays anteriores para não sobrepor telas
+    # --- 1. PREPARAÇÃO ---
     try:
         page.overlay.clear()
     except:
@@ -17,7 +16,7 @@ def create_focus_form_view(page: ft.Page):
     selected_files = []
     gps_address_data = {} 
     
-    # --- FILE PICKER ---
+    # --- FILE PICKER (Esse não dá erro, pode ficar) ---
     def on_file_result(e):
         if e.files:
             selected_files.extend(e.files)
@@ -85,38 +84,37 @@ def create_focus_form_view(page: ft.Page):
         images_list_container.controls.append(add_btn_row)
         page.update()
 
-    # --- DADOS (SEUS DADOS COMPLETOS) ---
+    # --- DADOS ---
     neighborhoods_db = {
         "Camboriú": ["Areias", "Braço", "Caetés", "Cedro", "Centro", "Conde Vila Verde", "João da Costa", "Lídia Duarte", "Macacos", "Monte Alegre", "Rio do Meio", "Rio Pequeno", "Santa Regina", "São Francisco de Assis", "Tabuleiro", "Várzea do Ranchinho", "Vila Conceição"],
         "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]
     }
 
     # ===============================================================
-    # 1. COMPONENTE GPS
+    # 1. COMPONENTE GPS (AGORA É PREGUIÇOSO/LAZY)
     # ===============================================================
+    # Só criamos as funções, mas NÃO adicionamos o componente na página ainda.
+    
     def on_gps_position(e):
         print(f"GPS SUCESSO! Lat: {e.latitude}, Lon: {e.longitude}")
         get_address_from_coords(e.latitude, e.longitude, source="GPS (Preciso)")
 
     def on_gps_error(e):
         print(f"Erro GPS: {e.error}")
-        # Usa o método moderno 'page.open' para evitar bugs visuais
         try:
-            page.open(ft.SnackBar(ft.Text(f"GPS Falhou: {e.error}. Usando IP."), bgcolor="orange"))
+            page.open(ft.SnackBar(ft.Text(f"GPS Falhou ou Sem Permissão. Usando IP."), bgcolor="orange"))
         except: pass
         try_ip_location()
 
-    geolocator = ft.Geolocator()
-    geolocator.on_position = on_gps_position
-    geolocator.on_error = on_gps_error
-    page.overlay.append(geolocator)
+    # Criamos o objeto, mas ele fica guardado na memória
+    geolocator = ft.Geolocator(on_position=on_gps_position, on_error=on_gps_error)
 
     # ===============================================================
-    # 2. OVERLAY VISUAL DO GPS (MODAL BRANCO)
+    # 2. OVERLAYS E MODAIS
     # ===============================================================
     gps_overlay = ft.Container(
         visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, 
-        on_click=lambda e: None, # Absorve clique para não fechar
+        on_click=lambda e: None,
         content=ft.Container(
             width=320, bgcolor="white", border_radius=20, padding=25, shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"),
             content=ft.Column(
@@ -146,7 +144,7 @@ def create_focus_form_view(page: ft.Page):
     def confirm_gps_fill():
         fill_address_fields(gps_address_data); close_gps_modal()
 
-    # --- LÓGICA GPS (TIMEOUT + IP) ---
+    # --- LÓGICA GPS ---
     def try_ip_location():
         if btn_gps.disabled:
             try:
@@ -160,15 +158,25 @@ def create_focus_form_view(page: ft.Page):
 
     def gps_timeout_handler():
         if btn_gps.disabled == True:
-            page.open(ft.SnackBar(ft.Text("Sinal de GPS fraco. Usando rede aproximada."), bgcolor="orange"))
+            page.open(ft.SnackBar(ft.Text("Sem sinal de GPS. Tentando rede..."), bgcolor="orange"))
             try_ip_location()
 
     def get_gps_click(e):
+        # *** AQUI ESTÁ A CORREÇÃO DA TELA VERMELHA ***
+        # Só adicionamos o GPS na tela quando o usuário clica.
+        if geolocator not in page.overlay:
+            page.overlay.append(geolocator)
+            page.update()
+
         btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
         threading.Timer(6.0, gps_timeout_handler).start()
+        
         try:
+            # Tenta pegar a posição. Se não tiver permissão, o Android vai negar e cair no on_error
             geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.HIGH)
-        except: pass
+        except Exception as ex:
+            print(f"Erro ao chamar GPS: {ex}")
+            try_ip_location()
 
     def get_address_from_coords(lat, lon, source="GPS"):
         try:
@@ -196,7 +204,10 @@ def create_focus_form_view(page: ft.Page):
             page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
             btn_gps.text = "Tentar Novamente"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.disabled = False; page.update()
 
-    # --- PREENCHIMENTO E VALIDAÇÃO ---
+    # ... (RESTANTE DO CÓDIGO IGUAL - FILL ADDRESS, SEARCH, CAMPOS, LAYOUT) ...
+    # Copie daqui para baixo do seu código anterior, ou use o que mandei antes,
+    # pois a única mudança crítica foi no `get_gps_click` e na criação do `geolocator`.
+    
     def normalize_string(s):
         if not s: return ""
         return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
@@ -205,11 +216,8 @@ def create_focus_form_view(page: ft.Page):
         city_api = data.get("localidade") or ""
         city_clean = normalize_string(city_api)
         target_city = None
-        
-        # Validação
         if "balneario" in city_clean and "camboriu" in city_clean: target_city = "Balneário Camboriú"
         elif "camboriu" in city_clean and "balneario" not in city_clean: target_city = "Camboriú"
-        
         if target_city:
             dd_municipio.value = target_city
             dd_bairro.disabled = False
@@ -220,30 +228,14 @@ def create_focus_form_view(page: ft.Page):
                     if b not in opts: opts.append(b); opts.sort()
                     dd_bairro.value = b
                 dd_bairro.options = [ft.dropdown.Option(o) for o in opts]
-            
             tf_rua.value = data.get("logradouro")
             tf_cep.value = data.get("cep")
             if data.get("numero"): tf_numero.value = data.get("numero")
         else:
-            # RESET TOTAL SE FOR FORA DA ÁREA
-            dd_municipio.value = None
-            dd_bairro.value = None
-            dd_bairro.disabled = True
-            dd_bairro.options = []
-            tf_rua.value = ""
-            tf_numero.value = ""
-            tf_cep.value = ""
-            
-            # AVISO MODERNO (NÃO BLOQUEANTE)
-            page.open(ft.SnackBar(
-                content=ft.Text(f"Atenção: Serviço indisponível em {city_api}. Apenas Camboriú e BC.", color="white"),
-                bgcolor="red",
-                duration=5000
-            ))
-
+            dd_municipio.value = None; dd_bairro.value = None; dd_bairro.disabled = True; dd_bairro.options = []; tf_rua.value = ""; tf_numero.value = ""; tf_cep.value = ""
+            page.open(ft.SnackBar(content=ft.Text(f"Atenção: Serviço indisponível em {city_api}. Apenas Camboriú e BC.", color="white"), bgcolor="red", duration=5000))
         page.update()
 
-    # --- BUSCA DE RUA ---
     overlay_list_content = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=0)
     address_overlay = ft.Container(
         visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, on_click=lambda e: close_manual_modal(None),
@@ -256,10 +248,10 @@ def create_focus_form_view(page: ft.Page):
         for addr in address_list:
             overlay_list_content.controls.append(ft.Container(padding=15, border=ft.border.only(bottom=ft.BorderSide(1, "#F5F5F5")), content=ft.Row([ft.Icon(ft.Icons.PLACE, color="grey", size=16), ft.Column([ft.Text(addr.get("logradouro", ""), weight="bold", size=14, color="#333333"), ft.Text(f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}", size=12, color="grey")], spacing=2, expand=True)], spacing=10), on_click=lambda e, a=addr: select_address_manual(a), bgcolor="white", ink=True, border_radius=8))
         address_overlay.visible = True; page.update()
-
+    
     def close_manual_modal(e): address_overlay.visible = False; page.update()
     def select_address_manual(addr_data): address_overlay.visible = False; page.update(); fill_address_fields(addr_data)
-
+    
     def search_cep(e):
         cep = tf_cep.value.replace("-", "").replace(".", "").strip()
         if len(cep) == 8:
@@ -267,7 +259,7 @@ def create_focus_form_view(page: ft.Page):
                 res = requests.get(f"https://viacep.com.br/ws/{cep}/json/").json()
                 if "erro" not in res: fill_address_fields(res)
             except: pass
-
+    
     def search_address_by_name(e):
         city = dd_municipio.value; street = tf_rua.value
         if not city: page.open(ft.SnackBar(ft.Text("Selecione a cidade!"), bgcolor="orange")); return
@@ -286,7 +278,6 @@ def create_focus_form_view(page: ft.Page):
         else: dd_bairro.disabled = True
         page.update()
 
-    # --- CAMPOS ---
     tf_cep = ft.TextField(hint_text="Digite o CEP", on_change=search_cep, keyboard_type=ft.KeyboardType.NUMBER, border="none", text_size=14, content_padding=10)
     dd_municipio = ft.Dropdown(hint_text="Selecione a cidade", options=[ft.dropdown.Option("Camboriú"), ft.dropdown.Option("Balneário Camboriú")], on_change=on_city_change, icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
     dd_bairro = ft.Dropdown(hint_text="Selecione o bairro", disabled=True, icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
@@ -315,7 +306,6 @@ def create_focus_form_view(page: ft.Page):
     btn_submit.on_click = submit_form
     update_images_display()
 
-    # Layout
     header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Focos de mosquitos", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
     def create_row(label, field, extra=None): return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))), ft.Row([ft.Container(content=field, expand=True)] + ([extra] if extra else []), expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
 
@@ -325,5 +315,4 @@ def create_focus_form_view(page: ft.Page):
         ft.Container(padding=20, content=ft.Column([ft.Text("IMAGENS", weight="bold", size=12), images_list_container])), ft.Container(padding=20, content=btn_submit),
     ]))
 
-    # STACK LIMPA: Apenas a estrutura base e os modais brancos controlados
     return ft.View(route="/form-foco", bgcolor="white", padding=0, controls=[ft.Stack(expand=True, controls=[ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]), gps_overlay, address_overlay])])

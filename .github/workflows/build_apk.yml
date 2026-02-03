@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # Versão estável
+    runs-on: ubuntu-22.04
 
     steps:
     - uses: actions/checkout@v4
@@ -22,83 +22,72 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (V5 - O Retorno do Espião)
+    - name: Build APK (V6 - O Caçador Silencioso)
       run: |
-        echo "🚀 INICIANDO BUILD V5 (INTERCEPTADOR + AUTO-NAV)"
+        echo "🚀 INICIANDO BUILD V6"
 
-        # 1. Instala Dependências
+        # 1. Configura Ambiente
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
-
-        # 2. Cria o 'Robô Espião' (Shim) para o Flutter
-        # Ele vai enganar o Flet: quando o Flet chamar o flutter, nosso script roda primeiro.
-        REAL_FLUTTER_BIN=$(which flutter)
-        mkdir -p $GITHUB_WORKSPACE/shim
-
-        cat <<EOF > $GITHUB_WORKSPACE/shim/flutter
+        
+        # 2. Prepara o Script Caçador (Roda em paralelo)
+        cat <<EOF > hunter.sh
         #!/bin/bash
-        # Se o comando for de build, o espião entra em ação
-        if [[ "\$*" == *"build apk"* ]]; then
-            echo "🕵️‍♂️ ESPIÃO ATIVADO: O Flet chamou o Flutter! Procurando manifesto..."
+        echo "🏹 CAÇADOR INICIADO: Procurando AndroidManifest.xml..."
+        
+        # Loop infinito que dura 300 segundos (5 min)
+        for i in {1..300}; do
+            # Procura o arquivo em qualquer lugar dentro da pasta atual e subpastas
+            # O grep filtra para garantir que é o arquivo principal do app
+            TARGET=\$(find . -name "AndroidManifest.xml" | grep "src/main/AndroidManifest.xml" | head -n 1)
             
-            # Tenta achar o arquivo por 60 segundos (Flet demora para criar as pastas)
-            for i in {1..60}; do
-                # Procura no diretório temporário do Linux (/tmp) onde o Flet trabalha
-                MANIFEST=\$(find /tmp -name "AndroidManifest.xml" 2>/dev/null | grep "src/main/AndroidManifest.xml" | head -n 1)
+            if [ -n "\$TARGET" ]; then
+                echo "🎯 ALVO ENCONTRADO EM: \$TARGET"
                 
-                if [ -n "\$MANIFEST" ]; then
-                    echo "🎯 ALVO LOCALIZADO: \$MANIFEST"
-                    
-                    # Permissões Obrigatórias para o seu App
+                # Verifica se já tem permissão
+                if grep -q "ACCESS_FINE_LOCATION" "\$TARGET"; then
+                    echo "⚠️ O arquivo já tinha permissão. Monitorando..."
+                else
+                    echo "💉 INJETANDO PERMISSÕES..."
                     PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n<uses-permission android:name="android.permission.INTERNET" />'
-                    
-                    if grep -q "ACCESS_FINE_LOCATION" "\$MANIFEST"; then
-                        echo "⚠️ O arquivo já tinha permissões (estranho, mas ok)."
-                    else
-                        # Injeta as permissões antes da tag <application>
-                        sed -i "s|<application|\$PERMS\n    <application|g" "\$MANIFEST"
-                        echo "💉 PERMISSÕES INJETADAS COM SUCESSO!"
-                    fi
-                    break
+                    sed -i "s|<application|\$PERMS\n    <application|g" "\$TARGET"
+                    echo "✅ SUCESSO! Permissões gravadas."
+                    # Não paramos o loop, pois o Flet pode recriar o arquivo.
+                    # Continuamos vigiando para garantir.
                 fi
-                # Espera 1 segundo e tenta de novo
-                sleep 1
-            done
-        fi
-        
-        # Devolve o controle para o Flutter original
-        exec "$REAL_FLUTTER_BIN" "\$@"
+            fi
+            sleep 1
+        done
         EOF
-
-        # Torna o espião executável e coloca ele na frente do flutter original
-        chmod +x $GITHUB_WORKSPACE/shim/flutter
-        export PATH=$GITHUB_WORKSPACE/shim:$PATH
-
-        # 3. Auto-Navegação (Encontrar o main.py)
-        echo "🔍 Localizando seu projeto..."
+        
+        chmod +x hunter.sh
+        
+        # 3. Encontra a pasta do projeto
         MAIN_PATH=$(find . -type f -name "main.py" -not -path "*/venv/*" | head -n 1)
-        
-        if [ -z "$MAIN_PATH" ]; then
-            echo "❌ ERRO: main.py não encontrado."
-            exit 1
-        fi
-        
         TARGET_DIR=$(dirname "$MAIN_PATH")
         echo "📂 Entrando na pasta: $TARGET_DIR"
+        
+        # Move o caçador para a pasta correta e entra nela
+        mv hunter.sh "$TARGET_DIR/"
         cd "$TARGET_DIR"
 
-        # 4. Rodar o Build
-        # O Flet vai rodar, chamar o 'flutter', nosso espião vai pegar, injetar o GPS e devolver.
-        printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
+        # 4. DISPARA O CAÇADOR EM SEGUNDO PLANO (&)
+        ./hunter.sh &
+        HUNTER_PID=$!
         
+        # 5. Roda o Build (Enquanto o caçador trabalha)
+        printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         echo "🚀 Iniciando Flet Build..."
+        
         flet build apk --verbose
+        
+        # Mata o caçador quando terminar
+        kill $HUNTER_PID || true
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: vigiaa-release
-        # O Flet joga o APK nesta pasta relativa ao main.py
         path: frontend/build/apk/app-release.apk
