@@ -22,40 +22,39 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (V6 - O Caçador Silencioso)
+    - name: Build APK (V7 - Direto ao Ponto)
       run: |
-        echo "🚀 INICIANDO BUILD V6"
+        echo "🚀 INICIANDO BUILD V7 (SEM BUSCA AUTOMÁTICA)"
 
         # 1. Configura Ambiente
+        # Vamos criar o venv na raiz mesmo para garantir
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
-        
-        # 2. Prepara o Script Caçador (Roda em paralelo)
+
+        # 2. OBRIGAR a entrada na pasta frontend
+        # Se der erro aqui, é porque a pasta não chama 'frontend'
+        echo "📂 Entrando na pasta frontend..."
+        cd frontend 
+
+        # 3. Prepara o Caçador (Hunter Script) AQUI DENTRO
         cat <<EOF > hunter.sh
         #!/bin/bash
-        echo "🏹 CAÇADOR INICIADO: Procurando AndroidManifest.xml..."
-        
-        # Loop infinito que dura 300 segundos (5 min)
+        echo "🏹 CAÇADOR V7: Procurando AndroidManifest..."
         for i in {1..300}; do
-            # Procura o arquivo em qualquer lugar dentro da pasta atual e subpastas
-            # O grep filtra para garantir que é o arquivo principal do app
+            # Procura apenas aqui dentro
             TARGET=\$(find . -name "AndroidManifest.xml" | grep "src/main/AndroidManifest.xml" | head -n 1)
             
             if [ -n "\$TARGET" ]; then
-                echo "🎯 ALVO ENCONTRADO EM: \$TARGET"
-                
-                # Verifica se já tem permissão
+                echo "🎯 ALVO: \$TARGET"
                 if grep -q "ACCESS_FINE_LOCATION" "\$TARGET"; then
-                    echo "⚠️ O arquivo já tinha permissão. Monitorando..."
+                    echo "⚠️ Já possui permissão."
                 else
                     echo "💉 INJETANDO PERMISSÕES..."
                     PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n<uses-permission android:name="android.permission.INTERNET" />'
                     sed -i "s|<application|\$PERMS\n    <application|g" "\$TARGET"
-                    echo "✅ SUCESSO! Permissões gravadas."
-                    # Não paramos o loop, pois o Flet pode recriar o arquivo.
-                    # Continuamos vigiando para garantir.
+                    echo "✅ SUCESSO!"
                 fi
             fi
             sleep 1
@@ -64,30 +63,24 @@ jobs:
         
         chmod +x hunter.sh
         
-        # 3. Encontra a pasta do projeto
-        MAIN_PATH=$(find . -type f -name "main.py" -not -path "*/venv/*" | head -n 1)
-        TARGET_DIR=$(dirname "$MAIN_PATH")
-        echo "📂 Entrando na pasta: $TARGET_DIR"
-        
-        # Move o caçador para a pasta correta e entra nela
-        mv hunter.sh "$TARGET_DIR/"
-        cd "$TARGET_DIR"
-
-        # 4. DISPARA O CAÇADOR EM SEGUNDO PLANO (&)
+        # 4. Dispara o Caçador em Background
         ./hunter.sh &
         HUNTER_PID=$!
         
-        # 5. Roda o Build (Enquanto o caçador trabalha)
+        # 5. Gera requirements e Roda o Build
+        # O Flet precisa saber o que instalar
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
-        echo "🚀 Iniciando Flet Build..."
         
+        echo "🚀 Flet Build Iniciado na pasta FRONTEND..."
         flet build apk --verbose
         
-        # Mata o caçador quando terminar
+        # Mata o caçador
         kill $HUNTER_PID || true
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: vigiaa-release-V7-${{ github.run_number }}
+        # Nome único para garantir download novo
+        name: vigiaa-release-FINAL-${{ github.run_number }}
+        # O caminho agora é direto dentro de frontend
         path: frontend/build/apk/app-release.apk
