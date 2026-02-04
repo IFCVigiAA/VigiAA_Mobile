@@ -141,7 +141,7 @@ def create_focus_form_view(page: ft.Page):
         lbl_gps_source = gps_overlay.content.content.controls[2]
 
         def close_gps_modal():
-            gps_overlay.visible = False; btn_gps.text = "Capturar localização pelo GPS"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
+            gps_overlay.visible = False; btn_gps.text = "GPS NOVO V7"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
 
         def confirm_gps_fill():
             fill_address_fields(gps_address_data); close_gps_modal()
