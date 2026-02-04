@@ -89,5 +89,5 @@ jobs:
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: vigiaa-release
+        name: vigiaa-release-V7-${{ github.run_number }}
         path: frontend/build/apk/app-release.apk
