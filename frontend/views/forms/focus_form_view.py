@@ -311,16 +311,24 @@ def create_focus_form_view(page: ft.Page):
             ft.Container(padding=20, content=ft.Column([ft.Text("IMAGENS", weight="bold", size=12), images_list_container])), ft.Container(padding=20, content=btn_submit),
         ]))
 
+# --- AQUI ESTÁ A GARANTIA CONTRA TELA VERMELHA ---
         return ft.View(
             route="/form-foco", 
             bgcolor="white", 
             padding=0, 
             controls=[
-                # O Overlay e o AddressOverlay estão na Stack, não no page.overlay
+                # 1. Os invisíveis ficam aqui "soltos" (O Flet sabe lidar com eles aqui)
+                file_picker,
+                geolocator,
+                
+                # 2. A parte visual fica dentro da Stack
                 ft.Stack(
                     expand=True, 
                     controls=[
+                        # Cabeçalho e Corpo
                         ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]),
+                        
+                        # Modais (Janelas flutuantes)
                         gps_overlay, 
                         address_overlay
                     ]
