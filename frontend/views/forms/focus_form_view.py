@@ -11,7 +11,17 @@ def create_focus_form_view(page: ft.Page):
         selected_files = []
         gps_address_data = {} 
         
-        # --- 1. COMPONENTES DO SISTEMA (FilePicker e GPS) ---
+        # --- 1. PREPARAÇÃO E LIMPEZA (O Segredo do V10) ---
+        # Antes de criar novos, vamos remover lixo antigo do overlay para não travar
+        # Isso evita a "Tela Branca" por excesso de componentes
+        try:
+            for control in page.overlay[:]:
+                if isinstance(control, (ft.Geolocator, ft.FilePicker)):
+                    page.overlay.remove(control)
+        except:
+            pass # Se der erro na limpeza, segue o baile
+        
+        # --- 2. COMPONENTES INVISÍVEIS ---
         
         def on_file_result(e):
             if e.files:
@@ -32,20 +42,18 @@ def create_focus_form_view(page: ft.Page):
             except: pass
             try_ip_location()
 
-        # Criamos o GPS
         geolocator = ft.Geolocator()
         geolocator.on_position = on_gps_position
         geolocator.on_error = on_gps_error
 
-        # ---------------------------------------------------------------------
-        # REMOVI O TRECHO QUE ADICIONAVA AO PAGE.OVERLAY AQUI
-        # ISSO ERA O QUE CAUSAVA A TELA BRANCA (DUPLICIDADE)
-        # ---------------------------------------------------------------------
+        # Adiciona ao overlay (Lugar correto para invisíveis)
+        page.overlay.append(file_picker)
+        page.overlay.append(geolocator)
+        page.update() # Garante que eles foram registrados
 
         # --- NAVEGAÇÃO E DIÁLOGOS ---
         def back_click(e):
-            # Volta para a rota que você pediu (/novo)
-            page.go("/novo")
+            page.go("/")
 
         def close_success_dialog(e):
             success_dialog.open = False
@@ -99,8 +107,8 @@ def create_focus_form_view(page: ft.Page):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15
             )
             images_list_container.controls.append(add_btn_row)
-            # Atualiza apenas se a página já estiver montada
-            if page.views and page.views[-1].route == "/form-foco":
+            # Verifica se a página ainda existe antes de atualizar
+            if page.views:
                 page.update()
 
         # --- DADOS ---
@@ -137,7 +145,7 @@ def create_focus_form_view(page: ft.Page):
         lbl_gps_source = gps_overlay.content.content.controls[2]
 
         def close_gps_modal():
-            gps_overlay.visible = False; btn_gps.text = "GPS NOVO V9"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
+            gps_overlay.visible = False; btn_gps.text = "GPS FUNCIONANDO V10"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
 
         def confirm_gps_fill():
             fill_address_fields(gps_address_data); close_gps_modal()
@@ -161,7 +169,9 @@ def create_focus_form_view(page: ft.Page):
 
         def get_gps_click(e):
             btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
+            
             threading.Timer(15.0, gps_timeout_handler).start()
+            
             try:
                 geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.HIGH)
             except Exception as ex:
@@ -274,8 +284,8 @@ def create_focus_form_view(page: ft.Page):
         tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10)
         tf_descricao = ft.TextField(hint_text="Descreva o local", multiline=True, min_lines=3, border="none", text_size=14, content_padding=10)
         
-        # BOTÃO GPS (V9 para teste)
-        btn_gps = ft.ElevatedButton("GPS NOVO V9", icon=ft.Icons.LOCATION_ON, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)), on_click=get_gps_click)
+        # BOTÃO GPS (Verifique se aparece V10)
+        btn_gps = ft.ElevatedButton("GPS FUNCIONANDO V10", icon=ft.Icons.LOCATION_ON, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)), on_click=get_gps_click)
         
         btn_submit = ft.ElevatedButton("CADASTRAR", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
 
@@ -297,7 +307,7 @@ def create_focus_form_view(page: ft.Page):
         btn_submit.on_click = submit_form
         update_images_display()
 
-        # --- LAYOUT FINAL ---
+        # --- LAYOUT FINAL (Sem o geolocator aqui dentro, para não dar erro vermelho) ---
         header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Focos de mosquitos", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
         def create_row(label, field, extra=None): return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))), ft.Row([ft.Container(content=field, expand=True)] + ([extra] if extra else []), expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
 
@@ -312,11 +322,9 @@ def create_focus_form_view(page: ft.Page):
             bgcolor="white", 
             padding=0, 
             controls=[
-                # 1. Os invisíveis ficam aqui "soltos" (Somente aqui!)
-                file_picker,
-                geolocator,
+                # *** ATENÇÃO: Retirei o file_picker e geolocator daqui ***
+                # Eles já foram adicionados no page.overlay lá em cima com limpeza.
                 
-                # 2. A parte visual fica dentro da Stack
                 ft.Stack(
                     expand=True, 
                     controls=[
