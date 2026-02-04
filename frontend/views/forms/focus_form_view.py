@@ -12,7 +12,6 @@ def create_focus_form_view(page: ft.Page):
         gps_address_data = {} 
         
         # --- 1. COMPONENTES DO SISTEMA (FilePicker e GPS) ---
-        # Nós vamos criar e adicionar ao overlay com cuidado para não travar
         
         def on_file_result(e):
             if e.files:
@@ -33,25 +32,19 @@ def create_focus_form_view(page: ft.Page):
             except: pass
             try_ip_location()
 
-        # Criamos o GPS Vazio
+        # Criamos o GPS
         geolocator = ft.Geolocator()
         geolocator.on_position = on_gps_position
         geolocator.on_error = on_gps_error
 
-        # *** AQUI ESTÁ A CORREÇÃO CRÍTICA ***
-        # Adicionamos ao overlay (onde invisíveis devem morar)
-        # Mas verificamos se já existe para não duplicar
-        if file_picker not in page.overlay:
-            page.overlay.append(file_picker)
-            
-        if geolocator not in page.overlay:
-            page.overlay.append(geolocator)
-            
-        # Importante: Atualizamos a página para o Flet registrar os componentes
-        page.update()
+        # ---------------------------------------------------------------------
+        # REMOVI O TRECHO QUE ADICIONAVA AO PAGE.OVERLAY AQUI
+        # ISSO ERA O QUE CAUSAVA A TELA BRANCA (DUPLICIDADE)
+        # ---------------------------------------------------------------------
 
         # --- NAVEGAÇÃO E DIÁLOGOS ---
         def back_click(e):
+            # Volta para a rota que você pediu (/novo)
             page.go("/novo")
 
         def close_success_dialog(e):
@@ -106,6 +99,9 @@ def create_focus_form_view(page: ft.Page):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15
             )
             images_list_container.controls.append(add_btn_row)
+            # Atualiza apenas se a página já estiver montada
+            if page.views and page.views[-1].route == "/form-foco":
+                page.update()
 
         # --- DADOS ---
         neighborhoods_db = {
@@ -141,7 +137,7 @@ def create_focus_form_view(page: ft.Page):
         lbl_gps_source = gps_overlay.content.content.controls[2]
 
         def close_gps_modal():
-            gps_overlay.visible = False; btn_gps.text = "GPS NOVO V7"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
+            gps_overlay.visible = False; btn_gps.text = "GPS NOVO V9"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
 
         def confirm_gps_fill():
             fill_address_fields(gps_address_data); close_gps_modal()
@@ -165,10 +161,7 @@ def create_focus_form_view(page: ft.Page):
 
         def get_gps_click(e):
             btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
-            
-            # AUMENTAMOS PARA 15 SEGUNDOS (Tempo para o satélite responder)
             threading.Timer(15.0, gps_timeout_handler).start()
-            
             try:
                 geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.HIGH)
             except Exception as ex:
@@ -280,7 +273,10 @@ def create_focus_form_view(page: ft.Page):
         btn_search_rua = ft.IconButton(icon=ft.Icons.SEARCH, icon_color="#39BFEF", tooltip="Pesquisar rua", on_click=search_address_by_name)
         tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10)
         tf_descricao = ft.TextField(hint_text="Descreva o local", multiline=True, min_lines=3, border="none", text_size=14, content_padding=10)
-        btn_gps = ft.ElevatedButton("VERSÃO FINAL V8", icon=ft.Icons.LOCATION_ON, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)), on_click=get_gps_click)
+        
+        # BOTÃO GPS (V9 para teste)
+        btn_gps = ft.ElevatedButton("GPS NOVO V9", icon=ft.Icons.LOCATION_ON, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)), on_click=get_gps_click)
+        
         btn_submit = ft.ElevatedButton("CADASTRAR", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
 
         def submit_form(e):
@@ -311,13 +307,12 @@ def create_focus_form_view(page: ft.Page):
             ft.Container(padding=20, content=ft.Column([ft.Text("IMAGENS", weight="bold", size=12), images_list_container])), ft.Container(padding=20, content=btn_submit),
         ]))
 
-# --- AQUI ESTÁ A GARANTIA CONTRA TELA VERMELHA ---
         return ft.View(
             route="/form-foco", 
             bgcolor="white", 
             padding=0, 
             controls=[
-                # 1. Os invisíveis ficam aqui "soltos" (O Flet sabe lidar com eles aqui)
+                # 1. Os invisíveis ficam aqui "soltos" (Somente aqui!)
                 file_picker,
                 geolocator,
                 
@@ -325,10 +320,7 @@ def create_focus_form_view(page: ft.Page):
                 ft.Stack(
                     expand=True, 
                     controls=[
-                        # Cabeçalho e Corpo
                         ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]),
-                        
-                        # Modais (Janelas flutuantes)
                         gps_overlay, 
                         address_overlay
                     ]
