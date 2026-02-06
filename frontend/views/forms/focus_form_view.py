@@ -12,41 +12,92 @@ def create_focus_form_view(page: ft.Page):
         gps_address_data = {} 
         
         # =====================================================================
-        # 1. SINGLETONS (Componentes de Memória)
+        # 1. COMPONENTES DO SISTEMA (A TÉCNICA DA CAPA INVISÍVEL - CORRIGIDA)
         # =====================================================================
         
-        # --- File Picker ---
-        if not hasattr(page, "vigi_file_picker"):
-            page.vigi_file_picker = ft.FilePicker()
-            page.overlay.append(page.vigi_file_picker)
-            page.update()
-        
-        def on_file_result_current(e):
+        def on_file_result(e):
             if e.files:
                 selected_files.extend(e.files)
                 update_images_display()
         
-        page.vigi_file_picker.on_result = on_file_result_current
+        file_picker = ft.FilePicker(on_result=on_file_result)
+        
+        # --- DEFINIÇÃO DAS FUNÇÕES DO GPS (ANTES DE CRIAR O OBJETO) ---
+        def run_ip_location():
+            try:
+                res = requests.get("http://ip-api.com/json/", timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
+                else: raise Exception("Falha IP")
+            except:
+                btn_gps.text = "GPS Indisponível"; btn_gps.disabled = False; page.update()
 
-        # --- GPS ---
-        if not hasattr(page, "vigi_geolocator"):
-            page.vigi_geolocator = ft.Geolocator()
-            page.overlay.append(page.vigi_geolocator)
-            page.update()
+        def try_ip_location_thread():
+             threading.Thread(target=run_ip_location).start()
+
+        def get_address_from_coords(lat, lon, source="GPS"):
+            try:
+                headers = {'User-Agent': 'VigiAA/1.0'}
+                url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
+                res = requests.get(url, headers=headers).json()
+                addr = res.get("address", {})
+                
+                gps_address_data.clear()
+                gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality")
+                gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood")
+                gps_address_data["logradouro"] = addr.get("road")
+                gps_address_data["cep"] = addr.get("postcode")
+                gps_address_data["numero"] = addr.get("house_number")
+                
+                # Atualiza os textos do modal
+                txt_gps_rua.value = gps_address_data["logradouro"] or "Rua não detectada"
+                txt_gps_bairro.value = gps_address_data["bairro"] or "Bairro não detectado"
+                txt_gps_cidade.value = gps_address_data["localidade"] or "Cidade não detectada"
+                txt_gps_source.value = f"Fonte: {source}"
+                txt_gps_source.color = "red" if "Internet" in source else "green"
+                
+                gps_overlay.visible = True
+                btn_gps.text = "Capturar localização pelo GPS"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
+            except:
+                page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
+                btn_gps.text = "Tentar Novamente"; btn_gps.disabled = False; page.update()
+
+        def on_gps_position(e):
+            print(f"GPS SUCESSO! Lat: {e.latitude}, Lon: {e.longitude}")
+            get_address_from_coords(e.latitude, e.longitude, source="GPS (Preciso)")
+
+        def on_gps_error(e):
+            print(f"Erro GPS: {e.error}")
+            try:
+                if "permission" in str(e.error).lower():
+                    page.open(ft.SnackBar(ft.Text("Ative a permissão de localização nas configurações!"), bgcolor="red"))
+                else:
+                    page.open(ft.SnackBar(ft.Text(f"Sinal fraco. Tentando rede..."), bgcolor="orange"))
+            except: pass
+            try_ip_location_thread()
+
+        # --- CRIAÇÃO DO GPS (SINTAXE CORRIGIDA V16) ---
+        # 1. Cria Vazio
+        geolocator = ft.Geolocator()
+        # 2. Atribui as funções depois
+        geolocator.on_position = on_gps_position
+        geolocator.on_error = on_gps_error
+
+        # --- CAPA DA INVISIBILIDADE (FIX TELA VERMELHA) ---
+        system_components = ft.Row(
+            controls=[file_picker, geolocator],
+            visible=False # O Android ignora o desenho, mas o Python mantém vivo
+        )
 
         # =====================================================================
-        # 2. DEFINIÇÃO VISUAL SEGURA (Criamos os Textos ANTES do Layout)
+        # 2. UI HELPERS E TEXTOS
         # =====================================================================
-        # Isso evita o erro de "Index out of range" que quebrava o modal
         
         txt_gps_rua = ft.Text(value="Carregando rua...", weight="bold", color="black", size=14)
         txt_gps_bairro = ft.Text(value="Carregando bairro...", size=13, color="black")
         txt_gps_cidade = ft.Text(value="Carregando cidade...", size=12, color="grey")
         txt_gps_source = ft.Text(value="Fonte: ...", size=10, color="grey")
-
-        # =====================================================================
-        # 3. FUNÇÕES LÓGICAS
-        # =====================================================================
 
         def normalize_string(s):
             if not s: return ""
@@ -70,7 +121,6 @@ def create_focus_form_view(page: ft.Page):
                         if b not in opts: opts.append(b); opts.sort()
                         dd_bairro.value = b
                     dd_bairro.options = [ft.dropdown.Option(o) for o in opts]
-                
                 tf_rua.value = data.get("logradouro")
                 tf_cep.value = data.get("cep")
                 if data.get("numero"): tf_numero.value = data.get("numero")
@@ -78,7 +128,6 @@ def create_focus_form_view(page: ft.Page):
                 dd_municipio.value = None; dd_bairro.value = None; dd_bairro.disabled = True; dd_bairro.options = []
                 tf_rua.value = ""; tf_numero.value = ""; tf_cep.value = ""
                 page.open(ft.SnackBar(content=ft.Text(f"Serviço indisponível em {city_api}", color="white"), bgcolor="red"))
-            
             page.update()
 
         # --- Overlay Manual ---
@@ -137,74 +186,24 @@ def create_focus_form_view(page: ft.Page):
             else: dd_bairro.disabled = True
             page.update()
 
-        # --- LÓGICA DO GPS (MODO MEDIUM) ---
-        def run_ip_location():
-            # Roda em thread separada para não travar a UI
-            try:
-                res = requests.get("http://ip-api.com/json/", timeout=5)
-                if res.status_code == 200:
-                    data = res.json()
-                    get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
-                else: raise Exception("Falha IP")
-            except:
-                btn_gps.text = "GPS Indisponível"; btn_gps.disabled = False; page.update()
-
         def gps_timeout_handler():
             if btn_gps.disabled == True:
                 page.open(ft.SnackBar(ft.Text("Sinal GPS fraco. Usando rede..."), bgcolor="orange"))
-                threading.Thread(target=run_ip_location).start()
-        
-        def get_address_from_coords(lat, lon, source="GPS"):
-            try:
-                headers = {'User-Agent': 'VigiAA/1.0'}
-                url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-                res = requests.get(url, headers=headers).json()
-                addr = res.get("address", {})
-                
-                gps_address_data.clear()
-                gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality")
-                gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood")
-                gps_address_data["logradouro"] = addr.get("road")
-                gps_address_data["cep"] = addr.get("postcode")
-                gps_address_data["numero"] = addr.get("house_number")
-                
-                # Atualiza os textos do modal (Seguro)
-                txt_gps_rua.value = gps_address_data["logradouro"] or "Rua não detectada"
-                txt_gps_bairro.value = gps_address_data["bairro"] or "Bairro não detectado"
-                txt_gps_cidade.value = gps_address_data["localidade"] or "Cidade não detectada"
-                txt_gps_source.value = f"Fonte: {source}"
-                txt_gps_source.color = "red" if "Internet" in source else "green"
-                
-                gps_overlay.visible = True
-                btn_gps.text = "Capturar localização pelo GPS"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
-            except:
-                page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
-                btn_gps.text = "Tentar Novamente"; btn_gps.disabled = False; page.update()
-
-        def on_gps_position(e):
-            get_address_from_coords(e.latitude, e.longitude, source="GPS (Preciso)")
-
-        def on_gps_error(e):
-            print(f"Erro GPS: {e.error}")
-            try_ip_location_thread()
-
-        def try_ip_location_thread():
-             threading.Thread(target=run_ip_location).start()
-
-        page.vigi_geolocator.on_position = on_gps_position
-        page.vigi_geolocator.on_error = on_gps_error
+                try_ip_location_thread()
 
         def get_gps_click(e):
             btn_gps.text = "Localizando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
+            # 12 segundos antes de desistir e ir pra internet
             threading.Timer(12.0, gps_timeout_handler).start()
             try:
-                # MUDANÇA: MEDIUM é mais rápido e funciona dentro de casa
-                page.vigi_geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.MEDIUM)
-            except:
+                # Mudamos para MEDIUM (funciona melhor dentro de casa)
+                geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.MEDIUM)
+            except Exception as ex:
+                print(f"Erro imediato GPS: {ex}")
                 try_ip_location_thread()
 
         # =====================================================================
-        # 4. CRIAÇÃO DOS CAMPOS VISUAIS (CORREÇÃO DE LAYOUT)
+        # 3. CRIAÇÃO DOS CAMPOS VISUAIS
         # =====================================================================
         
         tf_cep = ft.TextField(hint_text="Digite o CEP", on_change=search_cep, keyboard_type=ft.KeyboardType.NUMBER, border="none", text_size=14, content_padding=10)
@@ -214,10 +213,13 @@ def create_focus_form_view(page: ft.Page):
         btn_search_rua = ft.IconButton(icon=ft.Icons.SEARCH, icon_color="#39BFEF", tooltip="Pesquisar rua", on_click=search_address_by_name)
         tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10)
         tf_descricao = ft.TextField(hint_text="Descreva o local", multiline=True, min_lines=3, border="none", text_size=14, content_padding=10)
-        btn_gps = ft.ElevatedButton("GPS V14 (MEDIUM)", icon=ft.Icons.LOCATION_ON, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)), on_click=get_gps_click)
+        
+        # Botão V16 (Syntax Fixed)
+        btn_gps = ft.ElevatedButton("GPS V16 (FINAL)", icon=ft.Icons.LOCATION_ON, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)), on_click=get_gps_click)
+        
         btn_submit = ft.ElevatedButton("CADASTRAR", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
 
-        # --- MODAL DO GPS (CORRIGIDO) ---
+        # --- MODAL DO GPS ---
         gps_overlay = ft.Container(
             visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True,
             on_click=lambda e: None,
@@ -228,13 +230,11 @@ def create_focus_form_view(page: ft.Page):
                     controls=[
                         ft.Icon(ft.Icons.MAP_SHARP, color="#39BFEF", size=50),
                         ft.Text("Localização Encontrada!", size=20, weight="bold", color="#39BFEF"),
-                        txt_gps_source, # Usando variável direta
+                        txt_gps_source,
                         ft.Divider(),
                         ft.Text("Confira os dados abaixo:", size=14, color="grey"),
                         ft.Container(bgcolor="#F5F5F5", padding=15, border_radius=10, content=ft.Column([
-                            txt_gps_rua, # Usando variável direta
-                            txt_gps_bairro, # Usando variável direta
-                            txt_gps_cidade # Usando variável direta
+                            txt_gps_rua, txt_gps_bairro, txt_gps_cidade
                         ], spacing=2)),
                         ft.Container(height=10),
                         ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.OutlinedButton("Cancelar", on_click=lambda e: close_gps_modal()), ft.ElevatedButton("Confirmar", bgcolor="#39BFEF", color="white", on_click=lambda e: confirm_gps_fill())])
@@ -244,9 +244,9 @@ def create_focus_form_view(page: ft.Page):
         )
 
         def close_gps_modal():
-            gps_overlay.visible = False; btn_gps.text = "GPS V14 (MEDIUM)"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
+            gps_overlay.visible = False; btn_gps.text = "GPS V16 (FINAL)"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
 
-        # --- LISTA DE IMAGENS ---
+        # --- IMAGENS ---
         images_list_container = ft.Column(spacing=15)
         def remove_image(file_obj):
             if file_obj in selected_files: selected_files.remove(file_obj); update_images_display()
@@ -261,7 +261,7 @@ def create_focus_form_view(page: ft.Page):
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
             
             images_list_container.controls.append(ft.Row([
-                ft.Container(width=60, height=60, bgcolor="#E0E0E0", border_radius=8, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.ADD, size=30), on_click=lambda _: page.vigi_file_picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)),
+                ft.Container(width=60, height=60, bgcolor="#E0E0E0", border_radius=8, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.ADD, size=30), on_click=lambda _: file_picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)),
                 ft.Text("Adicionar imagem", size=16)
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15))
             if page.views: page.update()
@@ -284,33 +284,18 @@ def create_focus_form_view(page: ft.Page):
         btn_submit.on_click = submit_form
         update_images_display()
 
-        # --- LAYOUT FINAL (SIMPLIFICADO) ---
-        # Aqui removemos a complexidade de Rows dentro de Rows que quebrava o Android
-        
+        # --- LAYOUT FINAL ---
         def back_click(e): page.go("/")
         def close_success_dialog(e): success_dialog.open = False; page.update(); back_click(None)
-        
         success_dialog = ft.AlertDialog(modal=True, title=ft.Text("Sucesso!"), content=ft.Text("Foco cadastrado!"), actions=[ft.TextButton("OK", on_click=close_success_dialog)])
         
-        header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Focos V14 (Safe)", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
+        header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Focos V16 (Final)", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
         
-        # FUNÇÃO CREATE_ROW CORRIGIDA (SEM expand NO CONTAINER INTERNO)
-        # Isso evita que o celular tente esticar o campo infinitamente e dê tela vermelha
+        # Row Segura (Sem expand interno para evitar bug visual)
         def create_row(label, field, extra=None): 
             content_list = [ft.Container(content=field, expand=True)]
             if extra: content_list.append(extra)
-            
-            return ft.Column([
-                ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN, 
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER, 
-                    controls=[
-                        ft.Container(width=100, content=ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))), 
-                        ft.Row(content_list, expand=True) # Row interna segura
-                    ]
-                )), 
-                ft.Divider(height=1, color="#F5F5F5")
-            ], spacing=0)
+            return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))), ft.Row(content_list, expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
 
         form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
             ft.Container(padding=20, content=btn_gps),
@@ -323,6 +308,13 @@ def create_focus_form_view(page: ft.Page):
             bgcolor="white", 
             padding=0, 
             controls=[
+                # *** AQUI É O PULO DO GATO ***
+                # O system_components tem (file_picker + geolocator) dentro dele.
+                # Mas ele é visible=False.
+                # O Android NÃO TENTA desenhar, logo, não dá tela vermelha.
+                # Mas eles existem na memória, logo, o GPS funciona.
+                system_components,
+                
                 ft.Stack(
                     expand=True, 
                     controls=[
