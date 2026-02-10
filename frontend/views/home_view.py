@@ -51,7 +51,7 @@ def create_main_view(page: ft.Page, aba_inicial=0):
             controls=[
                 ft.Container(
                     content=ft.Image(
-                        src="/logo-sem-fundo.png", 
+                        src="images/logo-sem-fundo.png", 
                         width=40, 
                         height=40, 
                         fit=ft.ImageFit.CONTAIN,

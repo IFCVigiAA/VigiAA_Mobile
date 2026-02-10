@@ -145,7 +145,7 @@ def create_login_view(page: ft.Page):
                             spacing=15, 
                             controls=[
                                 ft.Image(
-                                    src="/logo-sem-fundo.png", 
+                                    src="images/logo-sem-fundo.png", 
                                     width=160, 
                                     height=160, 
                                     error_content=ft.Icon(ft.Icons.BUG_REPORT, size=80, color="#1B5E20")

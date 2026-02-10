@@ -7,21 +7,19 @@ def get_new_tab(page: ft.Page):
 
     # --- Componente: Card de Cadastro ---
     def create_action_card(title, description, img_filename, route):
-        # MUDANÇA: Adiciona o prefixo /images/ automaticamente
         img_src = f"/images/{img_filename}"
 
         return ft.Container(
             bgcolor="white",
             border_radius=15,
-            # MUDANÇA: Hexadecimal direto para evitar erro de 'ft.colors'
+            # Sombra com Hexadecimal Direto (Sem erro de ft.colors)
             shadow=ft.BoxShadow(
                 blur_radius=10, 
-                color="#1A000000", # Preto com 10% de opacidade
+                color="#1A000000", 
                 offset=ft.Offset(0, 4)
             ),
             content=ft.Stack(
                 controls=[
-                    # Conteúdo do Card
                     ft.Column(
                         spacing=0,
                         controls=[
@@ -31,7 +29,6 @@ def get_new_tab(page: ft.Page):
                                 width=float("inf"),
                                 fit=ft.ImageFit.COVER,
                                 border_radius=ft.border_radius.only(top_left=15, top_right=15),
-                                # Fallback caso a imagem não exista
                                 error_content=ft.Container(bgcolor="#EEEEEE", height=150, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, color="grey"))
                             ),
                             ft.Container(
@@ -47,7 +44,6 @@ def get_new_tab(page: ft.Page):
                         ]
                     ),
                     
-                    # Botão Flutuante (+)
                     ft.Container(
                         content=ft.IconButton(
                             icon=ft.Icons.ADD, 
@@ -60,12 +56,11 @@ def get_new_tab(page: ft.Page):
                         width=50, height=50,
                         alignment=ft.alignment.center,
                         right=20, top=125,
-                        # MUDANÇA: Hexadecimal direto para evitar erro
-                        shadow=ft.BoxShadow(blur_radius=5, color="#4D000000") # Preto com 30% opacidade
+                        shadow=ft.BoxShadow(blur_radius=5, color="#4D000000")
                     )
                 ]
             ),
-            margin=ft.margin.only(bottom=20)
+            margin=ft.margin.only(bottom=40) # Aumentei o espaço aqui!
         )
 
     # --- Conteúdo da Aba ---
@@ -76,15 +71,13 @@ def get_new_tab(page: ft.Page):
                 ft.Text("Cadastro", size=24, weight="bold", color="black"),
                 ft.Container(height=10),
                 
-                # Card 1: Foco de Dengue
                 create_action_card(
                     "Cadastrar novo foco de dengue",
                     "Forneça informações necessárias para o cadastro de um local com possíveis focos do mosquito.",
-                    "focos.jpg", # A função vai procurar em /images/focos.jpg
+                    "focos.jpg", 
                     "/form-foco"
                 ),
 
-                # Card 2: Paciente
                 create_action_card(
                     "Cadastrar novo paciente",
                     "Forneça informações necessárias para o cadastro de um paciente.",
