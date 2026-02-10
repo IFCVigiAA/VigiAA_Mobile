@@ -18,7 +18,8 @@ def get_home_tab(page: ft.Page = None):
             else:
                 btn.bgcolor = "white"
                 btn.content.color = "black"
-                btn.shadow = ft.BoxShadow(blur_radius=2, color=ft.Colors.with_opacity(0.1, "black"))
+                # CORREÇÃO: Uso de hexadecimal direto para evitar erro de ft.colors
+                btn.shadow = ft.BoxShadow(blur_radius=2, color="#1A000000")
             
             btn.update()
 
@@ -32,7 +33,7 @@ def get_home_tab(page: ft.Page = None):
             data=year,
             on_click=toggle_year,
             animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT), 
-            shadow=ft.BoxShadow(blur_radius=2, color=ft.Colors.with_opacity(0.1, "black")) if not is_selected else None
+            shadow=ft.BoxShadow(blur_radius=2, color="#1A000000") if not is_selected else None
         )
         year_buttons_refs.append(btn)
         return btn
@@ -44,43 +45,42 @@ def get_home_tab(page: ft.Page = None):
             create_year_button("2023"),
         ],
         spacing=10,
-        scroll=ft.ScrollMode.HIDDEN # Permite rolar lateralmente se a tela for MUITO pequena
+        scroll=ft.ScrollMode.HIDDEN 
     )
 
-    # --- Cards de Estatística (AJUSTADOS PARA MOBILE) ---
+    # --- Cards de Estatística ---
     def stat_card(title, value, subtext):
         return ft.Container(
             content=ft.Column(
                 controls=[
-                    # Fonte reduzida de 14 para 13 e sem negrito excessivo para economizar espaço
                     ft.Text(title, size=13, weight="w600", color="black"), 
-                    
-                    # Fonte reduzida de 32 para 26
                     ft.Text(value, size=26, weight="bold", color="black"),
-                    
                     ft.Text(subtext, size=11, color="grey"),
                 ],
-                spacing=2, # Menos espaço entre as linhas
+                spacing=2, 
                 alignment=ft.MainAxisAlignment.CENTER
             ),
             bgcolor="white",
-            # Padding reduzido de 20 para 15
             padding=15, 
             border_radius=10,
             expand=True,
-            shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.with_opacity(0.05, "black"))
+            shadow=ft.BoxShadow(blur_radius=10, color="#0D000000")
         )
 
     stats_row = ft.Row(
         controls=[
-            stat_card("Casos confirmados", "457", "+20 este mês"), # Encurtei o texto um pouco
+            stat_card("Casos confirmados", "457", "+20 este mês"), 
             stat_card("Suspeitas de dengue", "2,405", "+300 este mês"),
         ],
-        spacing=10 # Espaçamento entre cards reduzido levemente
+        spacing=10 
     )
 
-    # --- Cards de Gráfico ---
-    def chart_card(title, img_src):
+    # --- Cards de Gráfico (COM CAMINHO ASSETS/IMAGES) ---
+    def chart_card(title, img_filename):
+        # MUDANÇA AQUI: Adiciona o prefixo correto /images/
+        # O Flet mapeia a pasta assets para a raiz /, então assets/images vira /images/
+        img_src = f"/images/{img_filename}"
+        
         return ft.Container(
             content=ft.Column(
                 controls=[
@@ -91,6 +91,7 @@ def get_home_tab(page: ft.Page = None):
                         content=ft.Image(
                             src=img_src,
                             fit=ft.ImageFit.CONTAIN,
+                            error_content=ft.Container(bgcolor="#F0F0F0", alignment=ft.alignment.center, content=ft.Text("Imagem não encontrada", size=10, color="grey"))
                         ),
                         height=200, 
                         alignment=ft.alignment.center,
@@ -102,7 +103,7 @@ def get_home_tab(page: ft.Page = None):
             bgcolor="white",
             padding=20,
             border_radius=10,
-            shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.with_opacity(0.05, "black")),
+            shadow=ft.BoxShadow(blur_radius=10, color="#0D000000"),
             margin=ft.margin.only(bottom=10)
         )
 
@@ -114,14 +115,15 @@ def get_home_tab(page: ft.Page = None):
                 ft.Container(height=10),
                 stats_row,
                 ft.Container(height=10),
+                # Passamos apenas o nome do arquivo, a função adiciona /images/
                 chart_card("Casos confirmados por mês", "grafico1.png"),
-                chart_card("Proporção de focos por tipo de atividade", "grafico2.png"),
+                chart_card("Proporção de focos por tipo", "grafico2.png"),
                 ft.Container(height=20),
             ],
             scroll=ft.ScrollMode.AUTO,
             spacing=15
         ),
-        padding=15, # Reduzi o padding geral da tela também
+        padding=15, 
         alignment=ft.alignment.top_center,
         expand=True
     )

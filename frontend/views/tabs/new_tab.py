@@ -1,20 +1,22 @@
 import flet as ft
 
-# 1. Agora aceitamos 'page' como argumento
 def get_new_tab(page: ft.Page):
     
     def go_to_form(route):
-        # 2. Agora navegamos de verdade!
         page.go(route)
 
     # --- Componente: Card de Cadastro ---
-    def create_action_card(title, description, img_src, route):
+    def create_action_card(title, description, img_filename, route):
+        # MUDANÇA: Adiciona o prefixo /images/ automaticamente
+        img_src = f"/images/{img_filename}"
+
         return ft.Container(
             bgcolor="white",
             border_radius=15,
+            # MUDANÇA: Hexadecimal direto para evitar erro de 'ft.colors'
             shadow=ft.BoxShadow(
                 blur_radius=10, 
-                color=ft.Colors.with_opacity(0.1, "black"),
+                color="#1A000000", # Preto com 10% de opacidade
                 offset=ft.Offset(0, 4)
             ),
             content=ft.Stack(
@@ -28,7 +30,9 @@ def get_new_tab(page: ft.Page):
                                 height=150,
                                 width=float("inf"),
                                 fit=ft.ImageFit.COVER,
-                                border_radius=ft.border_radius.only(top_left=15, top_right=15)
+                                border_radius=ft.border_radius.only(top_left=15, top_right=15),
+                                # Fallback caso a imagem não exista
+                                error_content=ft.Container(bgcolor="#EEEEEE", height=150, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, color="grey"))
                             ),
                             ft.Container(
                                 padding=ft.padding.only(top=15, left=20, right=20, bottom=20),
@@ -56,7 +60,8 @@ def get_new_tab(page: ft.Page):
                         width=50, height=50,
                         alignment=ft.alignment.center,
                         right=20, top=125,
-                        shadow=ft.BoxShadow(blur_radius=5, color=ft.Colors.with_opacity(0.3, "black"))
+                        # MUDANÇA: Hexadecimal direto para evitar erro
+                        shadow=ft.BoxShadow(blur_radius=5, color="#4D000000") # Preto com 30% opacidade
                     )
                 ]
             ),
@@ -75,7 +80,7 @@ def get_new_tab(page: ft.Page):
                 create_action_card(
                     "Cadastrar novo foco de dengue",
                     "Forneça informações necessárias para o cadastro de um local com possíveis focos do mosquito.",
-                    "focos.jpg", 
+                    "focos.jpg", # A função vai procurar em /images/focos.jpg
                     "/form-foco"
                 ),
 
