@@ -1,140 +1,97 @@
 import flet as ft
 
-def get_explore_tab(page: ft.Page):
-    # --- 1. BARRA DE PESQUISA ---
-    search_bar = ft.Container(
-        padding=ft.padding.symmetric(horizontal=5),
-        content=ft.TextField(
-            hint_text="Pesquisar",
-            prefix_icon=ft.Icons.SEARCH,
-            text_size=14,
-            bgcolor="#F5F5F5",
-            border_radius=30,
-            border_width=0,
-            content_padding=10
-        )
+def get_explore_tab(page):
+    # Texto longo sobre o projeto
+    long_text = """O VigiAA é uma iniciativa focada na prevenção e combate ao mosquito Aedes aegypti. 
+Nossa missão é utilizar a tecnologia para mapear focos, conscientizar a população e agilizar a ação dos agentes de endemias. 
+Com a sua ajuda, podemos reduzir drasticamente os casos de Dengue, Zika e Chikungunya na nossa região. 
+Participe ativamente reportando focos e seguindo as orientações de prevenção."""
+
+    # Controle de texto com limite de linhas
+    txt_description = ft.Text(
+        long_text,
+        size=14,
+        color="grey",
+        max_lines=3, # Começa resumido
+        overflow=ft.TextOverflow.ELLIPSIS,
+        text_align=ft.TextAlign.JUSTIFY
     )
 
-    # --- 2. BANNER PRINCIPAL ---
-    pagination_dots = ft.Row(
-        alignment=ft.MainAxisAlignment.CENTER,
-        spacing=5,
-        controls=[
-            ft.Container(width=6, height=6, border_radius=6, bgcolor="white"),
-            ft.Container(width=6, height=6, border_radius=6, bgcolor="grey"),
-            ft.Container(width=6, height=6, border_radius=6, bgcolor="grey"),
-            ft.Container(width=6, height=6, border_radius=6, bgcolor="grey"),
-            ft.Container(width=6, height=6, border_radius=6, bgcolor="grey"),
-        ]
-    )
+    # Botão que expande o texto
+    btn_read_more = ft.TextButton("Ler mais", style=ft.ButtonStyle(color="#39BFEF"))
 
-    banner_card = ft.Container(
-        height=180,
-        border_radius=12,
-        clip_behavior=ft.ClipBehavior.HARD_EDGE,
-        content=ft.Stack(
-            controls=[
-                # Imagem de fundo
-                ft.Image(
-                    src="assets/focos.jpg",
-                    fit=ft.ImageFit.COVER,
-                    width=float("inf"),
-                    height=180,
-                ),
-                # Gradiente e Texto
-                ft.Container(
-                    alignment=ft.alignment.bottom_center,
-                    gradient=ft.LinearGradient(
-                        begin=ft.alignment.top_center,
-                        end=ft.alignment.bottom_center,
-                        colors=[ft.Colors.TRANSPARENT, ft.Colors.BLACK87]
-                    ),
-                    padding=15,
-                    content=ft.Column(
-                        # --- CORREÇÃO AQUI ---
-                        alignment=ft.MainAxisAlignment.END,            # Era main_AxisAlignment
-                        horizontal_alignment=ft.CrossAxisAlignment.START, # Era cross_AxisAlignment
-                        # ---------------------
-                        spacing=5,
-                        controls=[
-                            ft.Text("Banner estado", color="white", size=12, weight="bold"),
-                            ft.Container(content=pagination_dots, alignment=ft.alignment.center)
-                        ]
-                    )
-                )
-            ]
-        )
-    )
-
-    # --- 3. CARD INFORMATIVO AZUL ---
-    info_card = ft.Container(
-        bgcolor="#E1F5FE",
-        border_radius=12,
-        padding=20,
-        content=ft.Column(
-            spacing=5,
-            controls=[
-                ft.Text(
-                    spans=[
-                        ft.TextSpan("A dengue ", style=ft.TextStyle(weight="bold", color="black", size=14)),
-                        ft.TextSpan(
-                            "é uma arbovirose causada por vírus transmitidos principalmente pelo mosquito ", 
-                            style=ft.TextStyle(color="black", size=14)
-                        ),
-                        ft.TextSpan(
-                            "Aedes aegypti. ", 
-                            style=ft.TextStyle(color="black", size=14, italic=True)
-                        ),
-                        ft.TextSpan(
-                            "ler mais...", 
-                            style=ft.TextStyle(color="#0288D1", weight="bold", size=14)
-                        ),
-                    ]
-                )
-            ]
-        )
-    )
-
-    # --- 4. LISTA DE NAVEGAÇÃO ---
-    def create_nav_item(icon_data, title, route, is_image=False):
-        if is_image:
-            visual_content = ft.Image(src=icon_data, width=30, height=30, fit=ft.ImageFit.CONTAIN)
+    def toggle_read_more(e):
+        if txt_description.max_lines == 3:
+            txt_description.max_lines = None
+            btn_read_more.text = "Ler menos"
         else:
-            visual_content = ft.Icon(icon_data, size=24, color="#555555")
+            txt_description.max_lines = 3
+            btn_read_more.text = "Ler mais"
+        
+        # Atualiza a página para redesenhar o texto
+        if page: page.update()
 
+    btn_read_more.on_click = toggle_read_more
+
+    # Função para criar os botões da lista (Sintomas, Prevenção, Campanhas)
+    def create_info_item(image_name, text, route_name):
         return ft.Container(
-            padding=ft.padding.symmetric(vertical=12),
-            on_click=lambda _: page.go(route),
+            padding=ft.padding.symmetric(vertical=10),
+            on_click=lambda _: page.go(route_name),
             content=ft.Row(
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 controls=[
-                    ft.Container(
-                        width=50, height=50,
-                        bgcolor="#E0E0E0",
-                        border_radius=25,
-                        alignment=ft.alignment.center,
-                        content=visual_content
+                    ft.Row(
+                        spacing=15,
+                        controls=[
+                            # Imagem redonda
+                            ft.Container(
+                                width=50, height=50,
+                                border_radius=25,
+                                content=ft.Image(src=f"/images/{image_name}", fit=ft.ImageFit.COVER),
+                                clip_behavior=ft.ClipBehavior.HARD_EDGE
+                            ),
+                            # Texto
+                            ft.Text(text, weight="bold", size=15, color="black")
+                        ]
                     ),
-                    ft.Container(width=10),
-                    ft.Text(title, weight="bold", size=15, color="black", expand=True),
-                    ft.Icon(ft.Icons.CHEVRON_RIGHT, color="grey")
+                    ft.Icon(ft.Icons.ARROW_FORWARD_IOS, size=16, color="grey")
                 ]
             )
         )
 
-    item_sintomas = create_nav_item(ft.Icons.THERMOSTAT, "Sintomas", "/sintomas") 
-    item_prevencao = create_nav_item(ft.Icons.BLOCK, "Conheça as formas de prevenção", "/prevencao")
-
-    # --- MONTAGEM FINAL ---
-    return ft.ListView(
-        padding=20,
-        spacing=15,
+    # Retorna o conteúdo da Tab (Coluna)
+    return ft.Column(
+        scroll=ft.ScrollMode.AUTO,
+        expand=True,
         controls=[
-            search_bar,
-            ft.Container(height=5),
-            banner_card,
-            info_card,
-            ft.Container(height=5),
-            item_sintomas,
-            item_prevencao
+            ft.Text("Sobre o Projeto", size=22, weight="bold", color="#39BFEF"),
+            ft.Divider(height=20, color="transparent"),
+            
+            # Imagem de Capa (Opcional, se tiver)
+            ft.Container(
+                border_radius=15,
+                clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                content=ft.Image(src="/images/capa_explore.png", fit=ft.ImageFit.COVER, height=180, width=float("inf"),
+                                 error_content=ft.Container(bgcolor="#EEEEEE", height=180)) 
+            ),
+            ft.Divider(height=10, color="transparent"),
+
+            # Descrição e Ler Mais
+            txt_description,
+            ft.Row([btn_read_more], alignment=ft.MainAxisAlignment.END),
+            
+            ft.Divider(height=20, color="#EEEEEE"),
+            
+            # Lista de Botões
+            ft.Text("Saiba mais", size=18, weight="bold", color="black"),
+            ft.Divider(height=10, color="transparent"),
+            
+            create_info_item("termometro.png", "Sintomas", "/sintomas"),
+            create_info_item("mosquito_proibido.png", "Conheça as formas de prevenção", "/prevencao"),
+            # O NOVO BOTÃO AQUI EMBAIXO 👇
+            create_info_item("agentes.jpeg", "Campanhas", "/campanhas"),
+            
+            ft.Divider(height=50, color="transparent"),
         ]
     )
