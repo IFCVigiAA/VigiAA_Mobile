@@ -1,42 +1,28 @@
 import flet as ft
-# Imports das abas
+# Imports das 4 abas oficiais
 from views.tabs.home_tab import get_home_tab
 from views.tabs.new_tab import get_new_tab
 from views.tabs.explore_tab import get_explore_tab
-from views.tabs.profile_tab import get_profile_tab
+from views.tabs.profile_tab import get_profile_tab 
 
 def create_main_view(page: ft.Page, aba_inicial=0):
     
-    view_home = get_home_tab(page)
-    view_add = get_new_tab(page)
-    view_explore = get_explore_tab(page)
-    view_profile = get_profile_tab(page)
+    # Lista de Módulos (Conteúdo das abas)
+    # A ORDEM DEVE SER IDÊNTICA À DO MAIN.PY
+    # 0: Home, 1: Novo, 2: Explorar, 3: Perfil
+    modulos = [
+        get_home_tab(page),      # Índice 0
+        get_new_tab(page),       # Índice 1
+        get_explore_tab(page),   # Índice 2
+        get_profile_tab(page)    # Índice 3
+    ]
 
-    modulos = [view_home, view_add, view_explore, view_profile]
+    # Proteção: Se o código pedir uma aba que não existe (ex: 4), joga para Home (0)
+    if aba_inicial >= len(modulos):
+        print(f"AVISO: Aba {aba_inicial} inválida. Redirecionando para Home.")
+        aba_inicial = 0
 
-    body = ft.Container(
-        content=modulos[aba_inicial],
-        expand=True
-    )
-
-    def change_tab(e):
-        index = e.control.selected_index
-        
-        body.content = modulos[index]
-        body.update()
-
-    nav_bar = ft.NavigationBar(
-        destinations=[
-            ft.NavigationBarDestination(icon=ft.Icons.HOME, label="Home"),
-            ft.NavigationBarDestination(icon=ft.Icons.ADD_CIRCLE, label="Novo"),
-            ft.NavigationBarDestination(icon=ft.Icons.EXPLORE, label="Explorar"),
-            ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="Perfil"),
-        ],
-        selected_index=aba_inicial,
-        on_change=change_tab,
-        bgcolor="#39BFEF",
-    )
-
+    # Header
     header = ft.Container(
         height=60,
         padding=ft.padding.symmetric(horizontal=15),
@@ -51,35 +37,36 @@ def create_main_view(page: ft.Page, aba_inicial=0):
             controls=[
                 ft.Container(
                     content=ft.Image(
-                        src="images/logo-sem-fundo.png", 
-                        width=40, 
-                        height=40, 
+                        src="/images/logo-sem-fundo.png", 
+                        width=40, height=40, 
                         fit=ft.ImageFit.CONTAIN,
                         error_content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, color="white")
                     ),
                     alignment=ft.alignment.center
                 ),
-                
                 ft.Text("VigiAA", size=22, weight="bold", color="black"),
-                
                 ft.IconButton(ft.Icons.NOTIFICATIONS_NONE, icon_color="black")
             ]
-        )
+        ),
+        shadow=ft.BoxShadow(blur_radius=5, color="#1A000000")
     )
 
+    # View Principal
     return ft.View(
-        route="/",
+        route="/", 
+        padding=0,
+        bgcolor="#F5F5F5",
         controls=[
             ft.Column(
+                spacing=0,
+                expand=True,
                 controls=[
                     header,
-                    body,
-                    nav_bar
-                ],
-                spacing=0,
-                expand=True
+                    ft.Container(
+                        content=modulos[aba_inicial], # Carrega a aba correta (0 a 3)
+                        expand=True
+                    )
+                ]
             )
-        ],
-        padding=0,
-        bgcolor="#F5F5F5"
+        ]
     )
