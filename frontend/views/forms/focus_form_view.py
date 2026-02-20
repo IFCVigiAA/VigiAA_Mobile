@@ -4,7 +4,6 @@ import config
 from urllib.parse import quote
 import unicodedata
 import threading
-import time
 
 def create_focus_form_view(page: ft.Page):
     try:
@@ -13,7 +12,7 @@ def create_focus_form_view(page: ft.Page):
         gps_address_data = {} 
         
         # =====================================================================
-        # 1. COMPONENTES DO SISTEMA
+        # 1. SISTEMA E GPS (Com Fallback e Configurações)
         # =====================================================================
         
         def on_file_result(e):
@@ -23,42 +22,33 @@ def create_focus_form_view(page: ft.Page):
         
         file_picker = ft.FilePicker(on_result=on_file_result)
         
-        # --- LÓGICA DO GPS ---
         def on_gps_position(e):
             print(f"GPS SUCESSO: Lat {e.latitude}, Lon {e.longitude}")
             get_address_from_coords(e.latitude, e.longitude, source="GPS (Satélite)")
 
         def on_gps_error(e):
             print(f"Erro GPS: {e.error}")
-            error_msg = str(e.error).lower()
+            page.open(ft.SnackBar(ft.Text("Android bloqueou o sinal. Clique em ABRIR CONFIGURAÇÕES."), bgcolor="red"))
             
-            # Se der qualquer erro, assumimos que precisa de ajuda manual
-            page.open(ft.SnackBar(ft.Text("O Android bloqueou o GPS. Clique em 'ABRIR CONFIGURAÇÕES'."), bgcolor="red"))
-            
-            # MUDANÇA V24: Transforma o botão em um atalho para Configurações
-            btn_gps.text = "ABRIR CONFIGURAÇÕES (Ativar GPS)"; 
-            btn_gps.icon = ft.Icons.SETTINGS_APPLICATIONS; 
-            btn_gps.bgcolor = "red"; 
-            btn_gps.disabled = False; 
-            # Define uma 'tag' para saber que o próximo clique abre settings
+            # Muda o botão para modo "Acesso às Configurações"
+            btn_gps.text = "ABRIR CONFIGURAÇÕES (Ativar GPS)"
+            btn_gps.icon = ft.Icons.SETTINGS_APPLICATIONS
+            btn_gps.bgcolor = "red"
+            btn_gps.disabled = False
             btn_gps.data = "open_settings" 
             page.update()
             
-            # Tenta internet só pra não ficar vazio
             threading.Thread(target=run_ip_location).start()
 
         geolocator = ft.Geolocator()
         geolocator.on_position = on_gps_position
         geolocator.on_error = on_gps_error
 
-        # Capa Invisível
-        system_components = ft.Row(
-            controls=[file_picker, geolocator],
-            visible=False 
-        )
+        # Proteção contra tela vermelha
+        system_components = ft.Row(controls=[file_picker, geolocator], visible=False)
 
         # =====================================================================
-        # 2. DEFINIÇÃO VISUAL
+        # 2. VARIÁVEIS VISUAIS E LÓGICA DE ENDEREÇO
         # =====================================================================
         
         txt_gps_rua = ft.Text(value="Carregando...", weight="bold", color="black", size=14)
@@ -66,22 +56,8 @@ def create_focus_form_view(page: ft.Page):
         txt_gps_cidade = ft.Text(value="...", size=12, color="grey")
         txt_gps_source = ft.Text(value="...", size=10, color="grey")
         
-        # Botão V24 (Começa normal, vira Settings se der erro)
-        btn_gps = ft.ElevatedButton(
-            "LOCALIZAR (GPS V24)", 
-            icon=ft.Icons.LOCATION_ON, 
-            bgcolor="#39BFEF", 
-            color="white", 
-            width=float("inf"), 
-            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
-            data="locate" # Estado inicial
-        )
-        
-        btn_submit = ft.ElevatedButton("CADASTRAR", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
-
-        # =====================================================================
-        # 3. LÓGICA DE NEGÓCIO
-        # =====================================================================
+        btn_gps = ft.ElevatedButton("LOCALIZAR COM GPS", icon=ft.Icons.LOCATION_ON, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)), data="locate")
+        btn_submit = ft.ElevatedButton("CADASTRAR FOCO", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
 
         gps_overlay = ft.Container(visible=False) 
         address_overlay = ft.Container(visible=False)
@@ -121,8 +97,7 @@ def create_focus_form_view(page: ft.Page):
                 if res.status_code == 200:
                     data = res.json()
                     get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
-            except:
-                pass # Silencioso no fallback
+            except: pass
 
         def get_address_from_coords(lat, lon, source="GPS"):
             try:
@@ -146,82 +121,46 @@ def create_focus_form_view(page: ft.Page):
                 else: txt_gps_source.color = "green"
                 
                 gps_overlay.visible = True
-                # Reseta o botão para estado normal se der sucesso
                 btn_gps.text = "Localização Encontrada!"; btn_gps.icon = ft.Icons.CHECK; btn_gps.bgcolor = "#39BFEF"; btn_gps.data = "locate"; btn_gps.disabled = False; page.update()
             except:
                 page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
                 btn_gps.disabled = False; page.update()
 
-        # --- AÇÃO DO BOTÃO V24 (Híbrida) ---
         def get_gps_click(e):
-            # Se o botão estiver no modo "open_settings", abrimos as configurações
             if btn_gps.data == "open_settings":
                 try:
                     geolocator.open_app_settings()
-                    # Reseta o botão para o usuário tentar de novo depois de voltar
-                    btn_gps.text = "Tentar GPS Novamente"; btn_gps.bgcolor = "#39BFEF"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.data = "locate"
-                    page.update()
-                except:
-                    page.open(ft.SnackBar(ft.Text("Não foi possível abrir configurações."), bgcolor="red"))
+                    btn_gps.text = "Tentar GPS Novamente"; btn_gps.bgcolor = "#39BFEF"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.data = "locate"; page.update()
+                except: page.open(ft.SnackBar(ft.Text("Não foi possível abrir configurações."), bgcolor="red"))
                 return
 
-            # Modo normal: Tenta localizar
             btn_gps.text = "Buscando..."; btn_gps.icon = ft.Icons.SEARCH; btn_gps.disabled = True; page.update()
-            
             try:
-                # Tenta LOWEST para forçar permissão
                 geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.LOWEST)
             except Exception as ex:
-                print(f"Erro Click: {ex}")
-                # Força o erro para ativar o modo 'Settings'
                 on_gps_error(type('obj', (object,), {'error': str(ex)}))
         
         btn_gps.on_click = get_gps_click
 
         # =====================================================================
-        # 4. MODAIS
+        # 3. CONSTRUÇÃO DA INTERFACE (Asteriscos e Modais)
         # =====================================================================
 
-        def close_gps_modal(e=None): 
-            gps_overlay.visible = False
-            btn_gps.text = "LOCALIZAR (GPS V24)"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
+        def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "LOCALIZAR COM GPS"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
+        def confirm_gps_fill(e=None): fill_address_fields(gps_address_data); close_gps_modal()
 
-        def confirm_gps_fill(e=None): 
-            fill_address_fields(gps_address_data); close_gps_modal()
-
-        gps_overlay = ft.Container(
-            visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True,
-            content=ft.Container(width=320, bgcolor="white", border_radius=20, padding=25, shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"),
-                content=ft.Column(alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, height=350,
-                    controls=[
-                        ft.Icon(ft.Icons.MAP_SHARP, color="#39BFEF", size=50),
-                        ft.Text("Localização Encontrada!", size=20, weight="bold", color="#39BFEF"),
-                        txt_gps_source, ft.Divider(), ft.Text("Confira os dados abaixo:", size=14, color="grey"),
-                        ft.Container(bgcolor="#F5F5F5", padding=15, border_radius=10, content=ft.Column([txt_gps_rua, txt_gps_bairro, txt_gps_cidade], spacing=2)),
-                        ft.Container(height=10),
-                        ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.OutlinedButton("Cancelar", on_click=close_gps_modal), ft.ElevatedButton("Confirmar", bgcolor="#39BFEF", color="white", on_click=confirm_gps_fill)])
-                    ])))
-
+        gps_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, bgcolor="white", border_radius=20, padding=25, shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"), content=ft.Column(alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, height=350, controls=[ft.Icon(ft.Icons.MAP_SHARP, color="#39BFEF", size=50), ft.Text("Localização Encontrada!", size=20, weight="bold", color="#39BFEF"), txt_gps_source, ft.Divider(), ft.Text("Confira os dados abaixo:", size=14, color="grey"), ft.Container(bgcolor="#F5F5F5", padding=15, border_radius=10, content=ft.Column([txt_gps_rua, txt_gps_bairro, txt_gps_cidade], spacing=2)), ft.Container(height=10), ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.OutlinedButton("Cancelar", on_click=close_gps_modal), ft.ElevatedButton("Confirmar", bgcolor="#39BFEF", color="white", on_click=confirm_gps_fill)])])))
+        
         overlay_list_content = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=0)
         def close_manual_modal(e): address_overlay.visible = False; page.update()
         def select_address_manual(addr_data): address_overlay.visible = False; page.update(); fill_address_fields(addr_data)
 
-        address_overlay = ft.Container(
-            visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True,
-            content=ft.Container(width=320, height=500, bgcolor="white", border_radius=20, padding=20,
-                content=ft.Column(controls=[
-                    ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.Text("Selecione a Rua", size=18, weight="bold", color="#39BFEF"), ft.Icon(ft.Icons.LOCATION_CITY, color="#39BFEF")]),
-                    ft.Divider(height=1, color="#EEEEEE"),
-                    ft.Container(content=overlay_list_content, expand=True),
-                    ft.ElevatedButton("Fechar", bgcolor="#39BFEF", color="white", width=float("inf"), on_click=close_manual_modal)
-                ]))
-        )
+        address_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, height=500, bgcolor="white", border_radius=20, padding=20, content=ft.Column(controls=[ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.Text("Selecione a Rua", size=18, weight="bold", color="#39BFEF"), ft.Icon(ft.Icons.LOCATION_CITY, color="#39BFEF")]), ft.Divider(height=1, color="#EEEEEE"), ft.Container(content=overlay_list_content, expand=True), ft.ElevatedButton("Fechar", bgcolor="#39BFEF", color="white", width=float("inf"), on_click=close_manual_modal)])))
 
         def open_manual_modal(address_list):
             overlay_list_content.controls.clear()
             overlay_list_content.controls.append(ft.Text(f"{len(address_list)} ruas encontradas:", size=12, color="grey"))
-            for addr in address_list:
-                overlay_list_content.controls.append(ft.Container(padding=10, content=ft.Row([ft.Icon(ft.Icons.PLACE, size=16), ft.Column([ft.Text(addr.get("logradouro", ""), weight="bold"), ft.Text(f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}", size=12)])]), on_click=lambda e, a=addr: select_address_manual(a), ink=True))
+            for addr in address_list: overlay_list_content.controls.append(ft.Container(padding=10, content=ft.Row([ft.Icon(ft.Icons.PLACE, size=16), ft.Column([ft.Text(addr.get("logradouro", ""), weight="bold"), ft.Text(f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}", size=12)])]), on_click=lambda e, a=addr: select_address_manual(a), ink=True))
             address_overlay.visible = True; page.update()
 
         def search_cep(e):
@@ -266,41 +205,68 @@ def create_focus_form_view(page: ft.Page):
 
         def update_images_display():
             images_list_container.controls.clear()
-            for file in selected_files:
-                images_list_container.controls.append(ft.Row([ft.Image(src=file.path, width=60, height=60, fit=ft.ImageFit.COVER, border_radius=8), ft.Column([ft.Text(file.name, weight="bold"), ft.Text("Imagem", size=12)], alignment=ft.MainAxisAlignment.CENTER), ft.IconButton(ft.Icons.DELETE_OUTLINE, on_click=lambda e, f=file: remove_image(f))], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
+            for file in selected_files: images_list_container.controls.append(ft.Row([ft.Image(src=file.path, width=60, height=60, fit=ft.ImageFit.COVER, border_radius=8), ft.Column([ft.Text(file.name, weight="bold"), ft.Text("Imagem", size=12)], alignment=ft.MainAxisAlignment.CENTER), ft.IconButton(ft.Icons.DELETE_OUTLINE, on_click=lambda e, f=file: remove_image(f))], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
             images_list_container.controls.append(ft.Row([ft.Container(width=60, height=60, bgcolor="#E0E0E0", border_radius=8, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.ADD, size=30), on_click=lambda _: file_picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)), ft.Text("Adicionar imagem", size=16)], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15))
             if page.views: page.update()
+
+        # --- NOVA LÓGICA DO DIÁLOGO DE SUCESSO (Garantido!) ---
+        def close_success_dialog(e):
+            try: page.close(success_dialog)
+            except: pass
+            page.go("/novo")
+
+        success_dialog = ft.AlertDialog(
+            modal=True, 
+            title=ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, color="green", size=30), ft.Text("Sucesso!")]), 
+            content=ft.Text("Foco de dengue cadastrado com sucesso!"), 
+            actions=[ft.TextButton("OK", on_click=close_success_dialog)]
+        )
 
         def submit_form(e):
             token = page.client_storage.get("token")
             if not token: page.go("/login"); return
-            if not all([dd_municipio.value, dd_bairro.value, tf_rua.value, tf_numero.value]): page.open(ft.SnackBar(ft.Text("Preencha obrigatórios!"), bgcolor="red")); return
+            if not all([dd_municipio.value, dd_bairro.value, tf_rua.value, tf_numero.value]): page.open(ft.SnackBar(ft.Text("Preencha os campos obrigatórios (*)!"), bgcolor="red")); return
             btn_submit.text = "Enviando..."; btn_submit.disabled = True; page.update()
             try:
                 data = {"cep": tf_cep.value, "city": dd_municipio.value, "neighborhood": dd_bairro.value, "street": tf_rua.value, "number": tf_numero.value, "description": tf_descricao.value, "latitude": "-27.000", "longitude": "-48.000"}
                 files = [('uploaded_images', (f.name, open(f.path, 'rb'), 'image/jpeg')) for f in selected_files]
                 headers = {"Authorization": f"Bearer {token}"}
                 res = requests.post(f"{API_URL}/api/report-focus/", data=data, files=files, headers=headers)
-                if res.status_code == 201: page.dialog = success_dialog; success_dialog.open = True; page.update()
+                
+                if res.status_code == 201: 
+                    # Método blindado para abrir diálogo na versão atual do Flet
+                    try: page.open(success_dialog)
+                    except: page.dialog = success_dialog; success_dialog.open = True; page.update()
                 else: page.open(ft.SnackBar(ft.Text(f"Erro: {res.text}"), bgcolor="red"))
             except Exception as ex: page.open(ft.SnackBar(ft.Text(f"Erro: {ex}"), bgcolor="red"))
-            btn_submit.text = "CADASTRAR"; btn_submit.disabled = False; page.update()
+            btn_submit.text = "CADASTRAR FOCO"; btn_submit.disabled = False; page.update()
 
         btn_submit.on_click = submit_form
         update_images_display()
 
         def back_click(e): page.go("/novo")
-        def close_success_dialog(e): success_dialog.open = False; page.update(); back_click(None)
-        success_dialog = ft.AlertDialog(modal=True, title=ft.Text("Sucesso!"), content=ft.Text("Foco cadastrado!"), actions=[ft.TextButton("OK", on_click=close_success_dialog)])
-        header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Focos V24 (Manual Override)", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
-        def create_row(label, field, extra=None): 
+        header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Cadastrar Foco", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
+        
+        # --- ASTERISCOS VERMELHOS (Obrigatórios) ---
+        def create_row(label, field, extra=None, obrigatorio=False): 
             content_list = [ft.Container(content=field, expand=True)]
             if extra: content_list.append(extra)
-            return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))), ft.Row(content_list, expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
+            
+            # Adiciona o asterisco vermelho se for obrigatório
+            label_controls = [ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))]
+            if obrigatorio:
+                label_controls.append(ft.Text(" *", color="red", weight="bold", size=14))
+                
+            return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Row(label_controls, spacing=0)), ft.Row(content_list, expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
 
         form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
             ft.Container(padding=20, content=btn_gps),
-            create_row("CEP", tf_cep), create_row("MUNICÍPIO", dd_municipio), create_row("BAIRRO", dd_bairro), create_row("RUA", tf_rua, btn_search_rua), create_row("NÚMERO", tf_numero), create_row("DESCRIÇÃO", tf_descricao),
+            create_row("CEP", tf_cep, obrigatorio=True), 
+            create_row("MUNICÍPIO", dd_municipio, obrigatorio=True), 
+            create_row("BAIRRO", dd_bairro, obrigatorio=True), 
+            create_row("RUA", tf_rua, btn_search_rua, obrigatorio=True), 
+            create_row("NÚMERO", tf_numero, obrigatorio=True), 
+            create_row("DESCRIÇÃO", tf_descricao, obrigatorio=False),
             ft.Container(padding=20, content=ft.Column([ft.Text("IMAGENS", weight="bold", size=12), images_list_container])), ft.Container(padding=20, content=btn_submit),
         ]))
 

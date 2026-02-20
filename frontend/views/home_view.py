@@ -1,5 +1,4 @@
 import flet as ft
-# Imports das 4 abas oficiais
 from views.tabs.home_tab import get_home_tab
 from views.tabs.new_tab import get_new_tab
 from views.tabs.explore_tab import get_explore_tab
@@ -7,22 +6,16 @@ from views.tabs.profile_tab import get_profile_tab
 
 def create_main_view(page: ft.Page, aba_inicial=0):
     
-    # Lista de Módulos (Conteúdo das abas)
-    # A ORDEM DEVE SER IDÊNTICA À DO MAIN.PY
-    # 0: Home, 1: Novo, 2: Explorar, 3: Perfil
     modulos = [
-        get_home_tab(page),      # Índice 0
-        get_new_tab(page),       # Índice 1
-        get_explore_tab(page),   # Índice 2
-        get_profile_tab(page)    # Índice 3
+        get_home_tab(page),      # 0
+        get_new_tab(page),       # 1
+        get_explore_tab(page),   # 2
+        get_profile_tab(page)    # 3
     ]
 
-    # Proteção: Se o código pedir uma aba que não existe (ex: 4), joga para Home (0)
     if aba_inicial >= len(modulos):
-        print(f"AVISO: Aba {aba_inicial} inválida. Redirecionando para Home.")
         aba_inicial = 0
 
-    # Header
     header = ft.Container(
         height=60,
         padding=ft.padding.symmetric(horizontal=15),
@@ -51,7 +44,6 @@ def create_main_view(page: ft.Page, aba_inicial=0):
         shadow=ft.BoxShadow(blur_radius=5, color="#1A000000")
     )
 
-    # View Principal
     return ft.View(
         route="/", 
         padding=0,
@@ -63,10 +55,12 @@ def create_main_view(page: ft.Page, aba_inicial=0):
                 controls=[
                     header,
                     ft.Container(
-                        content=modulos[aba_inicial], # Carrega a aba correta (0 a 3)
+                        content=modulos[aba_inicial],
                         expand=True
                     )
                 ]
             )
-        ]
+        ],
+        # A MÁGICA QUE FALTAVA: Conectando a tela com a barra do main!
+        navigation_bar=page.navigation_bar
     )

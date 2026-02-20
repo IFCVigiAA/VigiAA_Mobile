@@ -12,10 +12,35 @@ def main(page: ft.Page):
     page.padding = 0 
     page.scroll = ft.ScrollMode.ADAPTIVE
 
+    # --- 1. CRIA A BARRA PRIMEIRO (AGORA AZUL) ---
+    page.navigation_bar = ft.NavigationBar(
+        height=60, 
+        bgcolor="#39BFEF", # CORREÇÃO: Azul do projeto
+        indicator_color="#2898C2", # Azul um pouco mais escuro para o item selecionado
+        surface_tint_color="#39BFEF",
+        shadow_color="black",
+        elevation=10,
+        label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW,
+        destinations=[
+            # Usando NavigationBarDestination compatível com sua versão
+            ft.NavigationBarDestination(icon=ft.Icons.HOME_OUTLINED, selected_icon=ft.Icons.HOME, label="Início"),
+            ft.NavigationBarDestination(icon=ft.Icons.ADD_CIRCLE_OUTLINE, selected_icon=ft.Icons.ADD_CIRCLE, label="Novo"),
+            ft.NavigationBarDestination(icon=ft.Icons.EXPLORE_OUTLINED, selected_icon=ft.Icons.EXPLORE, label="Explorar"),
+            ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINE, selected_icon=ft.Icons.PERSON, label="Perfil"),
+        ],
+        on_change=lambda e: change_tab(e.control.selected_index)
+    )
+
+    def change_tab(index):
+        if index == 0: page.go("/")
+        elif index == 1: page.go("/novo")
+        elif index == 2: page.go("/explorar")
+        elif index == 3: page.go("/perfil")
+
+    # --- 2. GERENCIA AS ROTAS ---
     def route_change(e):
         page.views.clear()
         
-        # Roteamento baseado na URL
         if page.route == "/login":
             page.views.append(create_login_view(page))
         
@@ -28,20 +53,24 @@ def main(page: ft.Page):
         elif page.route == "/change-password":
             page.views.append(create_change_password_view(page))
             
-        # --- ABAS PRINCIPAIS (0 a 3) ---
+        # Abas
         elif page.route == "/":
-            page.views.append(create_main_view(page, aba_inicial=0)) # 0: Home
+            page.navigation_bar.selected_index = 0
+            page.views.append(create_main_view(page, aba_inicial=0))
             
         elif page.route == "/novo":
-            page.views.append(create_main_view(page, aba_inicial=1)) # 1: Novo
+            page.navigation_bar.selected_index = 1
+            page.views.append(create_main_view(page, aba_inicial=1))
             
         elif page.route == "/explorar":
-            page.views.append(create_main_view(page, aba_inicial=2)) # 2: Explorar
+            page.navigation_bar.selected_index = 2
+            page.views.append(create_main_view(page, aba_inicial=2))
             
         elif page.route == "/perfil":
-            page.views.append(create_main_view(page, aba_inicial=3)) # 3: Perfil
+            page.navigation_bar.selected_index = 3
+            page.views.append(create_main_view(page, aba_inicial=3))
 
-        # Formulários (Tela Cheia)
+        # Formulários
         elif page.route == "/form-foco":
             page.views.append(create_focus_form_view(page))
             
@@ -54,39 +83,8 @@ def main(page: ft.Page):
 
     page.on_route_change = route_change
     page.on_view_pop = view_pop
-    
-    # --- BARRA DE NAVEGAÇÃO (4 ITENS) ---
-    page.navigation_bar = ft.NavigationBar(
-        height=60, 
-        bgcolor="white",
-        indicator_color="#E0F7FA",
-        icon_color=ft.Colors.GREY_500, # Ícones não selecionados mais claros
-        surface_tint_color="white",
-        shadow_color="black",
-        elevation=10,
-        label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW,
-        
-        destinations=[
-            # 0. Home
-            ft.NavigationBarDestination(icon=ft.Icons.HOME_OUTLINED, selected_icon=ft.Icons.HOME, label="Início"),
-            # 1. Novo
-            ft.NavigationBarDestination(icon=ft.Icons.ADD_CIRCLE_OUTLINE, selected_icon=ft.Icons.ADD_CIRCLE, label="Novo"),
-            # 2. Explorar
-            ft.NavigationBarDestination(icon=ft.Icons.EXPLORE_OUTLINED, selected_icon=ft.Icons.EXPLORE, label="Explorar"),
-            # 3. Perfil
-            ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINE, selected_icon=ft.Icons.PERSON, label="Perfil"),
-        ],
-        on_change=lambda e: change_tab(e.control.selected_index)
-    )
 
-    # Lógica de troca (Sincronizada com a lista acima)
-    def change_tab(index):
-        if index == 0: page.go("/")
-        elif index == 1: page.go("/novo")
-        elif index == 2: page.go("/explorar")
-        elif index == 3: page.go("/perfil")
-
-    # Verifica login inicial
+    # --- 3. INICIA O APP ---
     token = page.client_storage.get("token")
     if token:
         page.go("/")
