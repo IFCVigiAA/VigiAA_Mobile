@@ -12,7 +12,7 @@ def create_focus_form_view(page: ft.Page):
         gps_address_data = {} 
         
         # =====================================================================
-        # 1. SISTEMA E GPS (Com Fallback e Configurações)
+        # 1. SISTEMA E GPS (Livres da Capa Invisível)
         # =====================================================================
         
         def on_file_result(e):
@@ -27,25 +27,34 @@ def create_focus_form_view(page: ft.Page):
             get_address_from_coords(e.latitude, e.longitude, source="GPS (Satélite)")
 
         def on_gps_error(e):
-            print(f"Erro GPS: {e.error}")
-            page.open(ft.SnackBar(ft.Text("Android bloqueou o sinal. Clique em ABRIR CONFIGURAÇÕES."), bgcolor="red"))
+            erro_real = str(e.error).lower()
+            print(f"Erro GPS Nativo: {erro_real}")
             
-            # Muda o botão para modo "Acesso às Configurações"
-            btn_gps.text = "ABRIR CONFIGURAÇÕES (Ativar GPS)"
-            btn_gps.icon = ft.Icons.SETTINGS_APPLICATIONS
+            # --- O RAIO-X DE ERROS ---
+            if "disabled" in erro_real or "location services" in erro_real:
+                msg = "⚠️ O GPS do celular está desligado! Ligue a 'Localização' na barra de cima do Android."
+            elif "permission" in erro_real or "denied" in erro_real:
+                msg = "⚠️ O Android ainda está negando a permissão."
+            elif "timeout" in erro_real:
+                msg = "⚠️ Sinal fraco (Timeout). O celular não achou satélites. Tentando via Internet..."
+                threading.Thread(target=run_ip_location).start()
+            else:
+                msg = f"Erro no sensor: {erro_real}"
+                threading.Thread(target=run_ip_location).start()
+
+            page.open(ft.SnackBar(ft.Text(msg), bgcolor="red"))
+            
+            # Reseta o botão para o usuário poder tentar de novo
+            btn_gps.text = "TENTAR GPS NOVAMENTE"
+            btn_gps.icon = ft.Icons.REFRESH
             btn_gps.bgcolor = "red"
             btn_gps.disabled = False
-            btn_gps.data = "open_settings" 
             page.update()
-            
-            threading.Thread(target=run_ip_location).start()
 
+        # CORREÇÃO AQUI: Criamos vazio e atribuímos depois!
         geolocator = ft.Geolocator()
         geolocator.on_position = on_gps_position
         geolocator.on_error = on_gps_error
-
-        # Proteção contra tela vermelha
-        system_components = ft.Row(controls=[file_picker, geolocator], visible=False)
 
         # =====================================================================
         # 2. VARIÁVEIS VISUAIS E LÓGICA DE ENDEREÇO
@@ -56,7 +65,7 @@ def create_focus_form_view(page: ft.Page):
         txt_gps_cidade = ft.Text(value="...", size=12, color="grey")
         txt_gps_source = ft.Text(value="...", size=10, color="grey")
         
-        btn_gps = ft.ElevatedButton("LOCALIZAR COM GPS", icon=ft.Icons.LOCATION_ON, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)), data="locate")
+        btn_gps = ft.ElevatedButton("LOCALIZAR COM GPS", icon=ft.Icons.LOCATION_ON, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
         btn_submit = ft.ElevatedButton("CADASTRAR FOCO", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
 
         gps_overlay = ft.Container(visible=False) 
@@ -121,22 +130,15 @@ def create_focus_form_view(page: ft.Page):
                 else: txt_gps_source.color = "green"
                 
                 gps_overlay.visible = True
-                btn_gps.text = "Localização Encontrada!"; btn_gps.icon = ft.Icons.CHECK; btn_gps.bgcolor = "#39BFEF"; btn_gps.data = "locate"; btn_gps.disabled = False; page.update()
+                btn_gps.text = "Localização Encontrada!"; btn_gps.icon = ft.Icons.CHECK; btn_gps.bgcolor = "#39BFEF"; btn_gps.disabled = False; page.update()
             except:
                 page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
-                btn_gps.disabled = False; page.update()
+                btn_gps.text = "TENTAR GPS NOVAMENTE"; btn_gps.bgcolor = "red"; btn_gps.disabled = False; page.update()
 
         def get_gps_click(e):
-            if btn_gps.data == "open_settings":
-                try:
-                    geolocator.open_app_settings()
-                    btn_gps.text = "Tentar GPS Novamente"; btn_gps.bgcolor = "#39BFEF"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.data = "locate"; page.update()
-                except: page.open(ft.SnackBar(ft.Text("Não foi possível abrir configurações."), bgcolor="red"))
-                return
-
-            btn_gps.text = "Buscando..."; btn_gps.icon = ft.Icons.SEARCH; btn_gps.disabled = True; page.update()
+            btn_gps.text = "Buscando Sinal de GPS..."; btn_gps.icon = ft.Icons.SEARCH; btn_gps.disabled = True; page.update()
             try:
-                geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.LOWEST)
+                geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.LOW)
             except Exception as ex:
                 on_gps_error(type('obj', (object,), {'error': str(ex)}))
         
@@ -146,7 +148,7 @@ def create_focus_form_view(page: ft.Page):
         # 3. CONSTRUÇÃO DA INTERFACE (Asteriscos e Modais)
         # =====================================================================
 
-        def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "LOCALIZAR COM GPS"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
+        def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "LOCALIZAR COM GPS"; btn_gps.bgcolor = "#39BFEF"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
         def confirm_gps_fill(e=None): fill_address_fields(gps_address_data); close_gps_modal()
 
         gps_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, bgcolor="white", border_radius=20, padding=25, shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"), content=ft.Column(alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, height=350, controls=[ft.Icon(ft.Icons.MAP_SHARP, color="#39BFEF", size=50), ft.Text("Localização Encontrada!", size=20, weight="bold", color="#39BFEF"), txt_gps_source, ft.Divider(), ft.Text("Confira os dados abaixo:", size=14, color="grey"), ft.Container(bgcolor="#F5F5F5", padding=15, border_radius=10, content=ft.Column([txt_gps_rua, txt_gps_bairro, txt_gps_cidade], spacing=2)), ft.Container(height=10), ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.OutlinedButton("Cancelar", on_click=close_gps_modal), ft.ElevatedButton("Confirmar", bgcolor="#39BFEF", color="white", on_click=confirm_gps_fill)])])))
@@ -209,7 +211,6 @@ def create_focus_form_view(page: ft.Page):
             images_list_container.controls.append(ft.Row([ft.Container(width=60, height=60, bgcolor="#E0E0E0", border_radius=8, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.ADD, size=30), on_click=lambda _: file_picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)), ft.Text("Adicionar imagem", size=16)], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15))
             if page.views: page.update()
 
-        # --- NOVA LÓGICA DO DIÁLOGO DE SUCESSO (Garantido!) ---
         def close_success_dialog(e):
             try: page.close(success_dialog)
             except: pass
@@ -234,7 +235,6 @@ def create_focus_form_view(page: ft.Page):
                 res = requests.post(f"{API_URL}/api/report-focus/", data=data, files=files, headers=headers)
                 
                 if res.status_code == 201: 
-                    # Método blindado para abrir diálogo na versão atual do Flet
                     try: page.open(success_dialog)
                     except: page.dialog = success_dialog; success_dialog.open = True; page.update()
                 else: page.open(ft.SnackBar(ft.Text(f"Erro: {res.text}"), bgcolor="red"))
@@ -247,16 +247,11 @@ def create_focus_form_view(page: ft.Page):
         def back_click(e): page.go("/novo")
         header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Cadastrar Foco", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
         
-        # --- ASTERISCOS VERMELHOS (Obrigatórios) ---
         def create_row(label, field, extra=None, obrigatorio=False): 
             content_list = [ft.Container(content=field, expand=True)]
             if extra: content_list.append(extra)
-            
-            # Adiciona o asterisco vermelho se for obrigatório
             label_controls = [ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))]
-            if obrigatorio:
-                label_controls.append(ft.Text(" *", color="red", weight="bold", size=14))
-                
+            if obrigatorio: label_controls.append(ft.Text(" *", color="red", weight="bold", size=14))
             return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Row(label_controls, spacing=0)), ft.Row(content_list, expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
 
         form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
@@ -270,7 +265,20 @@ def create_focus_form_view(page: ft.Page):
             ft.Container(padding=20, content=ft.Column([ft.Text("IMAGENS", weight="bold", size=12), images_list_container])), ft.Container(padding=20, content=btn_submit),
         ]))
 
-        return ft.View(route="/form-foco", bgcolor="white", padding=0, controls=[system_components, ft.Stack(expand=True, controls=[ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]), gps_overlay, address_overlay])])
+        return ft.View(
+            route="/form-foco", 
+            bgcolor="white", 
+            padding=0, 
+            controls=[
+                geolocator,
+                file_picker,
+                ft.Stack(expand=True, controls=[
+                    ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]), 
+                    gps_overlay, 
+                    address_overlay
+                ])
+            ]
+        )
 
     except Exception as e:
         print(f"Erro ao criar tela: {e}")
