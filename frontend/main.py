@@ -19,13 +19,21 @@ def main(page: ft.Page):
         )
     )
 
+    # =================================================================
+    # A MÁGICA PRO APK: Componentes globais para o compilador achar!
+    # =================================================================
+    geolocator = ft.Geolocator()
+    file_picker = ft.FilePicker()
+    
+    # Injetamos na tela principal de uma vez por todas
+    page.overlay.extend([geolocator, file_picker])
+
     def change_tab(index):
         if index == 0: page.go("/")
         elif index == 1: page.go("/novo")
         elif index == 2: page.go("/explorar")
         elif index == 3: page.go("/perfil")
 
-    # MUDANÇA: Agora criamos uma Barra Nova para cada tela. Adeus bugs de estado!
     def get_nav_bar(index_atual):
         return ft.NavigationBar(
             height=60, 
@@ -74,9 +82,10 @@ def main(page: ft.Page):
             page.navigation_bar = get_nav_bar(3)
             page.views.append(create_main_view(page, aba_inicial=3))
 
-        # Telas que deslizam por cima (Formulários)
         elif page.route == "/form-foco":
-            page.views.append(create_focus_form_view(page))
+            # Passamos as ferramentas globais para a tela usar
+            page.views.append(create_focus_form_view(page, geolocator, file_picker))
+            
         elif page.route == "/change-password":
             page.views.append(create_change_password_view(page))
             

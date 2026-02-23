@@ -5,14 +5,15 @@ from urllib.parse import quote
 import unicodedata
 import threading
 
-def create_focus_form_view(page: ft.Page):
+# MUDANÇA AQUI: Recebe o geolocator e o file_picker prontos do main!
+def create_focus_form_view(page: ft.Page, geolocator: ft.Geolocator, file_picker: ft.FilePicker):
     try:
         API_URL = config.API_URL
         selected_files = []
         gps_address_data = {} 
         
         # =====================================================================
-        # 1. SISTEMA E GPS (No Overlay global)
+        # 1. SISTEMA E GPS (Conectando as funções nas ferramentas globais)
         # =====================================================================
         
         def on_file_result(e):
@@ -20,7 +21,7 @@ def create_focus_form_view(page: ft.Page):
                 selected_files.extend(e.files)
                 update_images_display()
         
-        file_picker = ft.FilePicker(on_result=on_file_result)
+        file_picker.on_result = on_file_result
         
         def on_gps_position(e):
             print(f"GPS SUCESSO: Lat {e.latitude}, Lon {e.longitude}")
@@ -33,7 +34,7 @@ def create_focus_form_view(page: ft.Page):
             if "disabled" in erro_real or "location services" in erro_real:
                 msg = "⚠️ O GPS do celular está desligado! Ligue a 'Localização' na barra superior."
             elif "permission" in erro_real or "denied" in erro_real:
-                msg = "⚠️ O Android ainda está negando a permissão."
+                msg = "⚠️ Permita o acesso ao GPS do celular."
             else:
                 msg = "⚠️ Sinal fraco. Tentando via Internet..."
                 threading.Thread(target=run_ip_location).start()
@@ -41,15 +42,8 @@ def create_focus_form_view(page: ft.Page):
             page.open(ft.SnackBar(ft.Text(msg), bgcolor="red"))
             btn_gps.text = "TENTAR GPS NOVAMENTE"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.bgcolor = "red"; btn_gps.disabled = False; page.update()
 
-        geolocator = ft.Geolocator()
         geolocator.on_position = on_gps_position
         geolocator.on_error = on_gps_error
-
-        for c in page.overlay[:]:
-            if type(c).__name__ in ["FilePicker", "Geolocator"]:
-                page.overlay.remove(c)
-                
-        page.overlay.extend([file_picker, geolocator])
 
         # =====================================================================
         # 2. VARIÁVEIS VISUAIS BÁSICAS
@@ -208,8 +202,13 @@ def create_focus_form_view(page: ft.Page):
 
         def get_gps_click(e):
             btn_gps.text = "Buscando Sinal de GPS..."; btn_gps.icon = ft.Icons.SEARCH; btn_gps.disabled = True; page.update()
-            try: geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.LOW)
-            except Exception as ex: on_gps_error(type('obj', (object,), {'error': str(ex)}))
+            
+            # Chama a requisição de coordenada (O compilador agora colocou a permissão no motor!)
+            try: 
+                geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.LOW)
+            except Exception as ex: 
+                on_gps_error(type('obj', (object,), {'error': str(ex)}))
+                
         btn_gps.on_click = get_gps_click
 
         def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "LOCALIZAR COM GPS"; btn_gps.bgcolor = "#39BFEF"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
@@ -243,7 +242,6 @@ def create_focus_form_view(page: ft.Page):
             images_list_container.controls.append(ft.Row([ft.Container(width=60, height=60, bgcolor="#E0E0E0", border_radius=8, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.ADD, size=30), on_click=lambda _: file_picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)), ft.Text("Adicionar imagem", size=16)], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15))
             if page.views: page.update()
 
-        # MUDANÇA: O botão agora avisa explicitamente para voltar para o /novo
         def close_success_dialog(e):
             try: page.close(success_dialog)
             except: pass
@@ -272,7 +270,6 @@ def create_focus_form_view(page: ft.Page):
         btn_submit.on_click = submit_form
         update_images_display()
 
-        # MUDANÇA: O botão voltar da Navbar agora está blindado!
         def back_click(e): 
             page.go("/novo")
                 
