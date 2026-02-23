@@ -12,23 +12,11 @@ def main(page: ft.Page):
     page.padding = 0 
     page.scroll = ft.ScrollMode.ADAPTIVE
 
-    # --- 1. CRIA A BARRA PRIMEIRO (AGORA AZUL) ---
-    page.navigation_bar = ft.NavigationBar(
-        height=60, 
-        bgcolor="#39BFEF", # CORREÇÃO: Azul do projeto
-        indicator_color="#2898C2", # Azul um pouco mais escuro para o item selecionado
-        surface_tint_color="#39BFEF",
-        shadow_color="black",
-        elevation=10,
-        label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW,
-        destinations=[
-            # Usando NavigationBarDestination compatível com sua versão
-            ft.NavigationBarDestination(icon=ft.Icons.HOME_OUTLINED, selected_icon=ft.Icons.HOME, label="Início"),
-            ft.NavigationBarDestination(icon=ft.Icons.ADD_CIRCLE_OUTLINE, selected_icon=ft.Icons.ADD_CIRCLE, label="Novo"),
-            ft.NavigationBarDestination(icon=ft.Icons.EXPLORE_OUTLINED, selected_icon=ft.Icons.EXPLORE, label="Explorar"),
-            ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINE, selected_icon=ft.Icons.PERSON, label="Perfil"),
-        ],
-        on_change=lambda e: change_tab(e.control.selected_index)
+    page.theme = ft.Theme(
+        page_transitions=ft.PageTransitionsTheme(
+            android=ft.PageTransitionTheme.OPEN_UPWARDS,
+            ios=ft.PageTransitionTheme.CUPERTINO,
+        )
     )
 
     def change_tab(index):
@@ -37,54 +25,75 @@ def main(page: ft.Page):
         elif index == 2: page.go("/explorar")
         elif index == 3: page.go("/perfil")
 
-    # --- 2. GERENCIA AS ROTAS ---
+    # MUDANÇA: Agora criamos uma Barra Nova para cada tela. Adeus bugs de estado!
+    def get_nav_bar(index_atual):
+        return ft.NavigationBar(
+            height=60, 
+            bgcolor="#39BFEF",
+            indicator_color="#2898C2", 
+            surface_tint_color="#39BFEF",
+            shadow_color="black",
+            elevation=10,
+            selected_index=index_atual,
+            label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW,
+            destinations=[
+                ft.NavigationBarDestination(icon=ft.Icons.HOME_OUTLINED, selected_icon=ft.Icons.HOME, label="Início"),
+                ft.NavigationBarDestination(icon=ft.Icons.ADD_CIRCLE_OUTLINE, selected_icon=ft.Icons.ADD_CIRCLE, label="Novo"),
+                ft.NavigationBarDestination(icon=ft.Icons.EXPLORE_OUTLINED, selected_icon=ft.Icons.EXPLORE, label="Explorar"),
+                ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINE, selected_icon=ft.Icons.PERSON, label="Perfil"),
+            ],
+            on_change=lambda e: change_tab(e.control.selected_index)
+        )
+
     def route_change(e):
-        page.views.clear()
+        rotas_base = ["/", "/novo", "/explorar", "/perfil", "/login", "/register"]
+        
+        if page.route in rotas_base:
+            page.views.clear()
         
         if page.route == "/login":
             page.views.append(create_login_view(page))
-        
         elif page.route == "/register":
             page.views.append(create_register_view(page))
-            
         elif page.route == "/forgot-password":
             page.views.append(create_forgot_password_view(page))
             
-        elif page.route == "/change-password":
-            page.views.append(create_change_password_view(page))
-            
-        # Abas
         elif page.route == "/":
-            page.navigation_bar.selected_index = 0
+            page.navigation_bar = get_nav_bar(0)
             page.views.append(create_main_view(page, aba_inicial=0))
             
         elif page.route == "/novo":
-            page.navigation_bar.selected_index = 1
+            page.navigation_bar = get_nav_bar(1)
             page.views.append(create_main_view(page, aba_inicial=1))
             
         elif page.route == "/explorar":
-            page.navigation_bar.selected_index = 2
+            page.navigation_bar = get_nav_bar(2)
             page.views.append(create_main_view(page, aba_inicial=2))
             
         elif page.route == "/perfil":
-            page.navigation_bar.selected_index = 3
+            page.navigation_bar = get_nav_bar(3)
             page.views.append(create_main_view(page, aba_inicial=3))
 
-        # Formulários
+        # Telas que deslizam por cima (Formulários)
         elif page.route == "/form-foco":
             page.views.append(create_focus_form_view(page))
+        elif page.route == "/change-password":
+            page.views.append(create_change_password_view(page))
             
         page.update()
 
     def view_pop(e):
-        page.views.pop()
-        top_view = page.views[-1]
-        page.go(top_view.route)
+        if len(page.views) > 1:
+            page.views.pop()
+            top_view = page.views[-1]
+            page.go(top_view.route)
+        else:
+            if page.route != "/":
+                page.go("/")
 
     page.on_route_change = route_change
     page.on_view_pop = view_pop
 
-    # --- 3. INICIA O APP ---
     token = page.client_storage.get("token")
     if token:
         page.go("/")

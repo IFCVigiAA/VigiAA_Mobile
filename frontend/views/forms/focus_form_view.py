@@ -12,7 +12,7 @@ def create_focus_form_view(page: ft.Page):
         gps_address_data = {} 
         
         # =====================================================================
-        # 1. SISTEMA E GPS (Livres da Capa Invisível)
+        # 1. SISTEMA E GPS (No Overlay global)
         # =====================================================================
         
         def on_file_result(e):
@@ -28,36 +28,31 @@ def create_focus_form_view(page: ft.Page):
 
         def on_gps_error(e):
             erro_real = str(e.error).lower()
-            print(f"Erro GPS Nativo: {erro_real}")
+            print(f"Erro GPS: {erro_real}")
             
-            # --- O RAIO-X DE ERROS ---
             if "disabled" in erro_real or "location services" in erro_real:
-                msg = "⚠️ O GPS do celular está desligado! Ligue a 'Localização' na barra de cima do Android."
+                msg = "⚠️ O GPS do celular está desligado! Ligue a 'Localização' na barra superior."
             elif "permission" in erro_real or "denied" in erro_real:
                 msg = "⚠️ O Android ainda está negando a permissão."
-            elif "timeout" in erro_real:
-                msg = "⚠️ Sinal fraco (Timeout). O celular não achou satélites. Tentando via Internet..."
-                threading.Thread(target=run_ip_location).start()
             else:
-                msg = f"Erro no sensor: {erro_real}"
+                msg = "⚠️ Sinal fraco. Tentando via Internet..."
                 threading.Thread(target=run_ip_location).start()
 
             page.open(ft.SnackBar(ft.Text(msg), bgcolor="red"))
-            
-            # Reseta o botão para o usuário poder tentar de novo
-            btn_gps.text = "TENTAR GPS NOVAMENTE"
-            btn_gps.icon = ft.Icons.REFRESH
-            btn_gps.bgcolor = "red"
-            btn_gps.disabled = False
-            page.update()
+            btn_gps.text = "TENTAR GPS NOVAMENTE"; btn_gps.icon = ft.Icons.REFRESH; btn_gps.bgcolor = "red"; btn_gps.disabled = False; page.update()
 
-        # CORREÇÃO AQUI: Criamos vazio e atribuímos depois!
         geolocator = ft.Geolocator()
         geolocator.on_position = on_gps_position
         geolocator.on_error = on_gps_error
 
+        for c in page.overlay[:]:
+            if type(c).__name__ in ["FilePicker", "Geolocator"]:
+                page.overlay.remove(c)
+                
+        page.overlay.extend([file_picker, geolocator])
+
         # =====================================================================
-        # 2. VARIÁVEIS VISUAIS E LÓGICA DE ENDEREÇO
+        # 2. VARIÁVEIS VISUAIS BÁSICAS
         # =====================================================================
         
         txt_gps_rua = ft.Text(value="Carregando...", weight="bold", color="black", size=14)
@@ -75,12 +70,26 @@ def create_focus_form_view(page: ft.Page):
             if not s: return ""
             return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
 
+        neighborhoods_db = {"Camboriú": ["Areias", "Braço", "Caetés", "Cedro", "Centro", "Conde Vila Verde", "João da Costa", "Lídia Duarte", "Macacos", "Monte Alegre", "Rio do Meio", "Rio Pequeno", "Santa Regina", "São Francisco de Assis", "Tabuleiro", "Várzea do Ranchinho", "Vila Conceição"], "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]}
+
+        tf_cep = ft.TextField(hint_text="Digite o CEP", keyboard_type=ft.KeyboardType.NUMBER, border="none", text_size=14, content_padding=10)
+        dd_municipio = ft.Dropdown(hint_text="Selecione a cidade", options=[ft.dropdown.Option("Camboriú"), ft.dropdown.Option("Balneário Camboriú")], icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
+        dd_bairro = ft.Dropdown(hint_text="Selecione o bairro", disabled=True, icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
+        
+        tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10)
+        tf_descricao = ft.TextField(hint_text="Descreva o local", multiline=True, min_lines=3, border="none", text_size=14, content_padding=10)
+
+        # =====================================================================
+        # 3. LÓGICA DE PREENCHIMENTO E PESQUISA MANUAL RAIZ
+        # =====================================================================
+
         def fill_address_fields(data):
             city_api = data.get("localidade") or ""
             city_clean = normalize_string(city_api)
             target_city = None
             if "balneario" in city_clean and "camboriu" in city_clean: target_city = "Balneário Camboriú"
             elif "camboriu" in city_clean and "balneario" not in city_clean: target_city = "Camboriú"
+            
             if target_city:
                 dd_municipio.value = target_city
                 dd_bairro.disabled = False
@@ -100,6 +109,68 @@ def create_focus_form_view(page: ft.Page):
                 page.open(ft.SnackBar(content=ft.Text(f"Serviço indisponível em {city_api}"), bgcolor="red"))
             page.update()
 
+        def on_city_change(e):
+            if dd_municipio.value in neighborhoods_db: 
+                dd_bairro.options = [ft.dropdown.Option(b) for b in neighborhoods_db[dd_municipio.value]]
+                dd_bairro.disabled = False
+            else: dd_bairro.disabled = True
+            page.update()
+            
+        dd_municipio.on_change = on_city_change
+
+        def search_address_by_name(e=None):
+            city = dd_municipio.value
+            street = tf_rua.value
+            
+            if not city or len(street) < 3:
+                page.open(ft.SnackBar(ft.Text("⚠️ Selecione a cidade e digite 3 letras da rua."), bgcolor="orange"))
+                return
+                
+            tf_rua.suffix = ft.Container(content=ft.ProgressRing(width=20, height=20, stroke_width=2), padding=10)
+            page.update()
+            
+            try:
+                url = f"https://viacep.com.br/ws/SC/{quote(city)}/{quote(street)}/json/"
+                res = requests.get(url, timeout=10)
+                
+                if res.status_code == 200:
+                    data = res.json()
+                    if isinstance(data, list) and len(data) > 0: 
+                        open_manual_modal(data)
+                    else: 
+                        page.open(ft.SnackBar(ft.Text("Nada encontrado."), bgcolor="orange"))
+                else:
+                    page.open(ft.SnackBar(ft.Text(f"Erro do ViaCEP: {res.status_code}"), bgcolor="red"))
+            except Exception as ex: 
+                page.open(ft.SnackBar(ft.Text("Erro na busca da rua."), bgcolor="red"))
+                
+            tf_rua.suffix = btn_search_inline
+            page.update()
+
+        btn_search_inline = ft.IconButton(icon=ft.Icons.SEARCH, icon_color="#39BFEF", tooltip="Pesquisar rua", on_click=search_address_by_name)
+        
+        tf_rua = ft.TextField(
+            hint_text="Digite o nome da rua", 
+            border="none", 
+            text_size=14, 
+            content_padding=10, 
+            suffix=btn_search_inline,
+            on_submit=search_address_by_name 
+        )
+
+        def search_cep(e):
+            cep = tf_cep.value.replace("-", "").replace(".", "").strip()
+            if len(cep) == 8:
+                try:
+                    res = requests.get(f"https://viacep.com.br/ws/{cep}/json/").json()
+                    if "erro" not in res: fill_address_fields(res)
+                except: pass
+        tf_cep.on_change = search_cep
+
+        # =====================================================================
+        # 4. FUNÇÕES DE GPS E MODAIS DE ENDEREÇO
+        # =====================================================================
+        
         def run_ip_location():
             try:
                 res = requests.get("http://ip-api.com/json/", timeout=5)
@@ -137,16 +208,9 @@ def create_focus_form_view(page: ft.Page):
 
         def get_gps_click(e):
             btn_gps.text = "Buscando Sinal de GPS..."; btn_gps.icon = ft.Icons.SEARCH; btn_gps.disabled = True; page.update()
-            try:
-                geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.LOW)
-            except Exception as ex:
-                on_gps_error(type('obj', (object,), {'error': str(ex)}))
-        
+            try: geolocator.get_current_position(accuracy=ft.GeolocatorPositionAccuracy.LOW)
+            except Exception as ex: on_gps_error(type('obj', (object,), {'error': str(ex)}))
         btn_gps.on_click = get_gps_click
-
-        # =====================================================================
-        # 3. CONSTRUÇÃO DA INTERFACE (Asteriscos e Modais)
-        # =====================================================================
 
         def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "LOCALIZAR COM GPS"; btn_gps.bgcolor = "#39BFEF"; btn_gps.icon = ft.Icons.LOCATION_ON; btn_gps.disabled = False; page.update()
         def confirm_gps_fill(e=None): fill_address_fields(gps_address_data); close_gps_modal()
@@ -165,42 +229,10 @@ def create_focus_form_view(page: ft.Page):
             for addr in address_list: overlay_list_content.controls.append(ft.Container(padding=10, content=ft.Row([ft.Icon(ft.Icons.PLACE, size=16), ft.Column([ft.Text(addr.get("logradouro", ""), weight="bold"), ft.Text(f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}", size=12)])]), on_click=lambda e, a=addr: select_address_manual(a), ink=True))
             address_overlay.visible = True; page.update()
 
-        def search_cep(e):
-            cep = tf_cep.value.replace("-", "").replace(".", "").strip()
-            if len(cep) == 8:
-                try:
-                    res = requests.get(f"https://viacep.com.br/ws/{cep}/json/").json()
-                    if "erro" not in res: fill_address_fields(res)
-                except: pass
-        
-        def search_address_by_name(e):
-            city = dd_municipio.value; street = tf_rua.value
-            if not city or len(street) < 3: return
-            btn_search_rua.icon = ft.Icons.HOURGLASS_TOP; btn_search_rua.update()
-            try:
-                res = requests.get(f"https://viacep.com.br/ws/SC/{quote(city)}/{quote(street)}/json/").json()
-                if isinstance(res, list) and len(res) > 0: open_manual_modal(res)
-                else: page.open(ft.SnackBar(ft.Text("Nada encontrado."), bgcolor="red"))
-            except: page.open(ft.SnackBar(ft.Text("Erro na busca."), bgcolor="red"))
-            btn_search_rua.icon = ft.Icons.SEARCH; btn_search_rua.update()
+        # =====================================================================
+        # 5. SUBMIT E FINALIZAÇÃO DA VIEW
+        # =====================================================================
 
-        neighborhoods_db = {"Camboriú": ["Areias", "Braço", "Caetés", "Cedro", "Centro", "Conde Vila Verde", "João da Costa", "Lídia Duarte", "Macacos", "Monte Alegre", "Rio do Meio", "Rio Pequeno", "Santa Regina", "São Francisco de Assis", "Tabuleiro", "Várzea do Ranchinho", "Vila Conceição"], "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]}
-
-        def on_city_change(e):
-            if dd_municipio.value in neighborhoods_db: 
-                dd_bairro.options = [ft.dropdown.Option(b) for b in neighborhoods_db[dd_municipio.value]]
-                dd_bairro.disabled = False
-            else: dd_bairro.disabled = True
-            page.update()
-
-        tf_cep = ft.TextField(hint_text="Digite o CEP", on_change=search_cep, keyboard_type=ft.KeyboardType.NUMBER, border="none", text_size=14, content_padding=10)
-        dd_municipio = ft.Dropdown(hint_text="Selecione a cidade", options=[ft.dropdown.Option("Camboriú"), ft.dropdown.Option("Balneário Camboriú")], on_change=on_city_change, icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
-        dd_bairro = ft.Dropdown(hint_text="Selecione o bairro", disabled=True, icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
-        tf_rua = ft.TextField(hint_text="Digite o nome da rua", on_submit=search_address_by_name, border="none", text_size=14, content_padding=10)
-        btn_search_rua = ft.IconButton(icon=ft.Icons.SEARCH, icon_color="#39BFEF", tooltip="Pesquisar rua", on_click=search_address_by_name)
-        tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10)
-        tf_descricao = ft.TextField(hint_text="Descreva o local", multiline=True, min_lines=3, border="none", text_size=14, content_padding=10)
-        
         images_list_container = ft.Column(spacing=15)
         def remove_image(file_obj):
             if file_obj in selected_files: selected_files.remove(file_obj); update_images_display()
@@ -211,17 +243,13 @@ def create_focus_form_view(page: ft.Page):
             images_list_container.controls.append(ft.Row([ft.Container(width=60, height=60, bgcolor="#E0E0E0", border_radius=8, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.ADD, size=30), on_click=lambda _: file_picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)), ft.Text("Adicionar imagem", size=16)], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15))
             if page.views: page.update()
 
+        # MUDANÇA: O botão agora avisa explicitamente para voltar para o /novo
         def close_success_dialog(e):
             try: page.close(success_dialog)
             except: pass
-            page.go("/novo")
+            page.go("/novo") 
 
-        success_dialog = ft.AlertDialog(
-            modal=True, 
-            title=ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, color="green", size=30), ft.Text("Sucesso!")]), 
-            content=ft.Text("Foco de dengue cadastrado com sucesso!"), 
-            actions=[ft.TextButton("OK", on_click=close_success_dialog)]
-        )
+        success_dialog = ft.AlertDialog(modal=True, title=ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, color="green", size=30), ft.Text("Sucesso!")]), content=ft.Text("Foco de dengue cadastrado com sucesso!"), actions=[ft.TextButton("OK", on_click=close_success_dialog)])
 
         def submit_form(e):
             token = page.client_storage.get("token")
@@ -244,22 +272,23 @@ def create_focus_form_view(page: ft.Page):
         btn_submit.on_click = submit_form
         update_images_display()
 
-        def back_click(e): page.go("/novo")
+        # MUDANÇA: O botão voltar da Navbar agora está blindado!
+        def back_click(e): 
+            page.go("/novo")
+                
         header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Cadastrar Foco", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
         
-        def create_row(label, field, extra=None, obrigatorio=False): 
-            content_list = [ft.Container(content=field, expand=True)]
-            if extra: content_list.append(extra)
+        def create_row(label, field, obrigatorio=False): 
             label_controls = [ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))]
             if obrigatorio: label_controls.append(ft.Text(" *", color="red", weight="bold", size=14))
-            return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Row(label_controls, spacing=0)), ft.Row(content_list, expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
+            return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Row(label_controls, spacing=0)), ft.Row([ft.Container(content=field, expand=True)], expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
 
         form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
             ft.Container(padding=20, content=btn_gps),
             create_row("CEP", tf_cep, obrigatorio=True), 
             create_row("MUNICÍPIO", dd_municipio, obrigatorio=True), 
             create_row("BAIRRO", dd_bairro, obrigatorio=True), 
-            create_row("RUA", tf_rua, btn_search_rua, obrigatorio=True), 
+            create_row("RUA", tf_rua, obrigatorio=True), 
             create_row("NÚMERO", tf_numero, obrigatorio=True), 
             create_row("DESCRIÇÃO", tf_descricao, obrigatorio=False),
             ft.Container(padding=20, content=ft.Column([ft.Text("IMAGENS", weight="bold", size=12), images_list_container])), ft.Container(padding=20, content=btn_submit),
@@ -270,8 +299,6 @@ def create_focus_form_view(page: ft.Page):
             bgcolor="white", 
             padding=0, 
             controls=[
-                geolocator,
-                file_picker,
                 ft.Stack(expand=True, controls=[
                     ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]), 
                     gps_overlay, 
