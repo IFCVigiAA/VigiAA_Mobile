@@ -21,14 +21,14 @@ def main(page: ft.Page):
         )
     )
 
-    # TRAVA DE SEGURANÇA: Só muda de tela se realmente for uma tela diferente
-    def change_tab(index):
+    # 1. Função super simples para trocar de aba sem loop
+    def change_tab(e):
         rotas = ["/", "/novo", "/explorar", "/perfil"]
-        if 0 <= index < len(rotas):
-            if page.route != rotas[index]: 
-                page.go(rotas[index])
+        index_clicado = e.control.selected_index
+        if page.route != rotas[index_clicado]: 
+            page.go(rotas[index_clicado])
 
-    # 1. CRIAMOS A BARRA UMA ÚNICA VEZ GLOBALMENTE! (Mata o clique fantasma)
+    # 2. Barra global única (mata o clique fantasma)
     nav_bar = ft.NavigationBar(
         height=60, 
         bgcolor="#39BFEF",
@@ -44,10 +44,9 @@ def main(page: ft.Page):
             ft.NavigationBarDestination(icon=ft.Icons.EXPLORE_OUTLINED, selected_icon=ft.Icons.EXPLORE, label="Explorar"),
             ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINE, selected_icon=ft.Icons.PERSON, label="Perfil"),
         ],
-        on_change=lambda e: change_tab(e.control.selected_index)
+        on_change=change_tab
     )
 
-    # 2. Fixamos a barra na página para sempre
     page.navigation_bar = nav_bar
 
     def route_change(e):
@@ -56,7 +55,7 @@ def main(page: ft.Page):
         if page.route in rotas_base:
             page.views.clear()
             
-        # 3. Lógica inteligente: Esconde a barra dentro dos formulários para dar espaço!
+        # 3. Lógica para esconder a barra de navegação nos formulários
         telas_sem_barra = ["/login", "/register", "/forgot-password", "/change-password", "/form-foco", "/form-caso", "/form-caso-positivo"]
         if page.route in telas_sem_barra:
             nav_bar.visible = False
@@ -70,21 +69,21 @@ def main(page: ft.Page):
         elif page.route == "/forgot-password":
             page.views.append(create_forgot_password_view(page))
             
-        # 4. Nas telas base, a gente só "pinta" o ícone atualizado
+        # 4. Atualiza o índice da barra sem forçar atualização brusca
         elif page.route == "/":
-            nav_bar.selected_index = 0 
+            if nav_bar.selected_index != 0: nav_bar.selected_index = 0 
             page.views.append(create_main_view(page, aba_inicial=0))
             
         elif page.route == "/novo":
-            nav_bar.selected_index = 1
+            if nav_bar.selected_index != 1: nav_bar.selected_index = 1
             page.views.append(create_main_view(page, aba_inicial=1))
             
         elif page.route == "/explorar":
-            nav_bar.selected_index = 2
+            if nav_bar.selected_index != 2: nav_bar.selected_index = 2
             page.views.append(create_main_view(page, aba_inicial=2))
             
         elif page.route == "/perfil":
-            nav_bar.selected_index = 3
+            if nav_bar.selected_index != 3: nav_bar.selected_index = 3
             page.views.append(create_main_view(page, aba_inicial=3))
 
         # Formulários

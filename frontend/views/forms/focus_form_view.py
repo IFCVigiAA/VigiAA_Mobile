@@ -4,17 +4,12 @@ import config
 from urllib.parse import quote
 import unicodedata
 import threading
-import base64
 
 def create_focus_form_view(page: ft.Page):
     try:
         API_URL = config.API_URL
         selected_files = []
         gps_address_data = {} 
-        
-        # =====================================================================
-        # 1. SISTEMA (Apenas Galeria - SEM GEOLOCATOR NATIVO)
-        # =====================================================================
         
         def on_file_result(e):
             if e.files:
@@ -28,16 +23,12 @@ def create_focus_form_view(page: ft.Page):
                 page.overlay.remove(c)
         page.overlay.append(file_picker)
 
-        # =====================================================================
-        # 2. VARIÁVEIS VISUAIS BÁSICAS
-        # =====================================================================
-        
         txt_gps_rua = ft.Text(value="Carregando...", weight="bold", color="black", size=14)
         txt_gps_bairro = ft.Text(value="...", size=13, color="black")
         txt_gps_cidade = ft.Text(value="...", size=12, color="grey")
         txt_gps_source = ft.Text(value="...", size=10, color="grey")
         
-        btn_gps = ft.ElevatedButton("Capturar localização", icon=ft.Icons.GPS_FIXED, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
+        btn_gps = ft.ElevatedButton("Capturar localização (Rede)", icon=ft.Icons.WIFI, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
         btn_submit = ft.ElevatedButton("CADASTRAR FOCO", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
 
         gps_overlay = ft.Container(visible=False) 
@@ -58,10 +49,6 @@ def create_focus_form_view(page: ft.Page):
         
         tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10)
         tf_descricao = ft.TextField(hint_text="Descreva o local", multiline=True, min_lines=3, border="none", text_size=14, content_padding=10)
-
-        # =====================================================================
-        # 3. LÓGICA DE PREENCHIMENTO E PESQUISA MANUAL RAIZ
-        # =====================================================================
 
         def fill_address_fields(data):
             city_api = data.get("localidade") or ""
@@ -139,10 +126,17 @@ def create_focus_form_view(page: ft.Page):
                 except: pass
         tf_cep.on_change = search_cep
 
-        # =====================================================================
-        # 4. GPS NUCLEAR (JAVASCRIPT BROWSER INJECTION) + REDE COMO BACKUP
-        # =====================================================================
-        
+        def run_ip_location():
+            btn_gps.text = "Buscando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
+            try:
+                res = requests.get("http://ip-api.com/json/", timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
+            except:
+                page.open(ft.SnackBar(ft.Text("Erro de conexão."), bgcolor="red"))
+                btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
+
         def get_address_from_coords(lat, lon, source="Rede"):
             try:
                 headers = {'User-Agent': 'VigiAA/1.0'}
@@ -151,8 +145,8 @@ def create_focus_form_view(page: ft.Page):
                 addr = res.get("address", {})
                 
                 gps_address_data.clear()
-                gps_address_data["lat"] = str(lat) # Salva a latitude real
-                gps_address_data["lon"] = str(lon) # Salva a longitude real
+                gps_address_data["lat"] = str(lat) 
+                gps_address_data["lon"] = str(lon) 
                 gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality")
                 gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood")
                 gps_address_data["logradouro"] = addr.get("road")
@@ -168,72 +162,11 @@ def create_focus_form_view(page: ft.Page):
                 btn_gps.text = "Localização Encontrada!"; btn_gps.icon = ft.Icons.CHECK; btn_gps.disabled = False; page.update()
             except:
                 page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
-                btn_gps.text = "Capturar localização"; btn_gps.icon = ft.Icons.GPS_FIXED; btn_gps.disabled = False; page.update()
+                btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
 
-        def run_ip_location():
-            btn_gps.text = "Buscando pela Rede..."; btn_gps.icon = ft.Icons.WIFI; page.update()
-            try:
-                res = requests.get("http://ip-api.com/json/", timeout=5)
-                if res.status_code == 200:
-                    data = res.json()
-                    get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
-            except:
-                page.open(ft.SnackBar(ft.Text("Erro de conexão total."), bgcolor="red"))
-                btn_gps.text = "Capturar localização"; btn_gps.icon = ft.Icons.GPS_FIXED; btn_gps.disabled = False; page.update()
+        btn_gps.on_click = lambda e: threading.Thread(target=run_ip_location).start()
 
-        # A. A função que "ouve" o grito do JavaScript
-        def processar_msg_console(e):
-            msg = e.data
-            if msg.startswith("GPS_SUCCESS:"):
-                coords = msg.replace("GPS_SUCCESS:", "").split(",")
-                get_address_from_coords(coords[0], coords[1], source="Satélite via JavaScript")
-            elif msg.startswith("GPS_ERROR:"):
-                page.open(ft.SnackBar(ft.Text(f"JS falhou. Tentando Rede... Erro: {msg.replace('GPS_ERROR:', '')}"), bgcolor="orange"))
-                threading.Thread(target=run_ip_location).start()
-
-        # B. O Mini-Navegador invisível
-        webview_gps = ft.WebView(
-            url="about:blank",  # <--- A CORREÇÃO ESTÁ AQUI!
-            visible=True,
-            width=1, 
-            height=1,
-            on_console_message=processar_msg_console
-        )
-        
-        # Injeta o WebView na tela
-        if webview_gps not in page.overlay:
-            page.overlay.append(webview_gps)
-
-        # C. O botão agora dispara o script HTML/JS
-        def run_nuclear_gps(e):
-            btn_gps.text = "Hackeando Satélite (JS)..."; btn_gps.icon = ft.Icons.SATELLITE_ALT; btn_gps.disabled = True; page.update()
-            
-            html_content = """
-            <!DOCTYPE html>
-            <html>
-            <body>
-            <script>
-                navigator.geolocation.getCurrentPosition(
-                    function(pos) { 
-                        console.log("GPS_SUCCESS:" + pos.coords.latitude + "," + pos.coords.longitude); 
-                    },
-                    function(err) { 
-                        console.log("GPS_ERROR:" + err.message); 
-                    },
-                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-                );
-            </script>
-            </body>
-            </html>
-            """
-            
-            b64_html = base64.b64encode(html_content.encode('utf-8')).decode('utf-8')
-            webview_gps.url = f"data:text/html;base64,{b64_html}"
-            page.update()
-
-        btn_gps.on_click = run_nuclear_gps
-
-        def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "Capturar localização"; btn_gps.icon = ft.Icons.GPS_FIXED; btn_gps.disabled = False; page.update()
+        def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
         def confirm_gps_fill(e=None): fill_address_fields(gps_address_data); close_gps_modal()
 
         gps_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, bgcolor="white", border_radius=20, padding=25, shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"), content=ft.Column(alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, height=350, controls=[ft.Icon(ft.Icons.MAP_SHARP, color="#39BFEF", size=50), ft.Text("Localização Encontrada!", size=20, weight="bold", color="#39BFEF"), txt_gps_source, ft.Divider(), ft.Text("Confira os dados abaixo:", size=14, color="grey"), ft.Container(bgcolor="#F5F5F5", padding=15, border_radius=10, content=ft.Column([txt_gps_rua, txt_gps_bairro, txt_gps_cidade], spacing=2)), ft.Container(height=10), ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.OutlinedButton("Cancelar", on_click=close_gps_modal), ft.ElevatedButton("Confirmar", bgcolor="#39BFEF", color="white", on_click=confirm_gps_fill)])])))
@@ -249,10 +182,6 @@ def create_focus_form_view(page: ft.Page):
             overlay_list_content.controls.append(ft.Text(f"{len(address_list)} ruas encontradas:", size=12, color="grey"))
             for addr in address_list: overlay_list_content.controls.append(ft.Container(padding=10, content=ft.Row([ft.Icon(ft.Icons.PLACE, size=16), ft.Column([ft.Text(addr.get("logradouro", ""), weight="bold"), ft.Text(f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}", size=12)])]), on_click=lambda e, a=addr: select_address_manual(a), ink=True))
             address_overlay.visible = True; page.update()
-
-        # =====================================================================
-        # 5. SUBMIT E FINALIZAÇÃO DA VIEW
-        # =====================================================================
 
         images_list_container = ft.Column(spacing=15)
         def remove_image(file_obj):
@@ -278,7 +207,6 @@ def create_focus_form_view(page: ft.Page):
             btn_submit.text = "Enviando..."; btn_submit.disabled = True; page.update()
             
             try:
-                # Modificação: Agora enviamos a latitude e longitude reais capturadas!
                 data = {
                     "cep": tf_cep.value, 
                     "city": dd_municipio.value, 
@@ -293,11 +221,18 @@ def create_focus_form_view(page: ft.Page):
                 headers = {"Authorization": f"Bearer {token}"}
                 res = requests.post(f"{API_URL}/api/report-focus/", data=data, files=files, headers=headers)
                 
-                if res.status_code == 201: 
+                if res.status_code in [200, 201]: 
                     try: page.open(success_dialog)
                     except: page.dialog = success_dialog; success_dialog.open = True; page.update()
-                else: page.open(ft.SnackBar(ft.Text(f"Erro: {res.text}"), bgcolor="red"))
-            except Exception as ex: page.open(ft.SnackBar(ft.Text(f"Erro: {ex}"), bgcolor="red"))
+                
+                # BLINDAGEM CONTRA TELA VERMELHA
+                else: 
+                    page.open(ft.SnackBar(ft.Text(f"Erro no servidor. Código: {res.status_code}"), bgcolor="red"))
+                    
+            except Exception as ex: 
+                # BLINDAGEM CONTRA TELA VERMELHA
+                page.open(ft.SnackBar(ft.Text("Erro de comunicação com o sistema."), bgcolor="red"))
+                
             btn_submit.text = "CADASTRAR FOCO"; btn_submit.disabled = False; page.update()
 
         btn_submit.on_click = submit_form
@@ -339,4 +274,4 @@ def create_focus_form_view(page: ft.Page):
 
     except Exception as e:
         print(f"Erro ao criar tela: {e}")
-        return ft.View(route="/form-foco", controls=[ft.Text(f"Erro crítico: {e}", color="red")])
+        return ft.View(route="/form-foco", controls=[ft.Text(f"Erro crítico da tela.", color="red")])

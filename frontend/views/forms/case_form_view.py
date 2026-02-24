@@ -5,7 +5,6 @@ from urllib.parse import quote
 import unicodedata
 import datetime
 import threading
-import base64
 
 def create_case_form_view(page: ft.Page):
     try:
@@ -17,7 +16,7 @@ def create_case_form_view(page: ft.Page):
         txt_gps_cidade = ft.Text(value="...", size=12, color="grey")
         txt_gps_source = ft.Text(value="...", size=10, color="grey")
         
-        btn_gps = ft.ElevatedButton("Capturar localização", icon=ft.Icons.GPS_FIXED, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
+        btn_gps = ft.ElevatedButton("Capturar localização (Rede)", icon=ft.Icons.WIFI, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
         btn_submit = ft.ElevatedButton("CADASTRAR", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
 
         gps_overlay = ft.Container(visible=False) 
@@ -36,7 +35,6 @@ def create_case_form_view(page: ft.Page):
         tf_rua = ft.TextField(hint_text="Selecione a rua", border="none", text_size=14, content_padding=10, suffix=btn_search_inline)
         tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10, keyboard_type=ft.KeyboardType.NUMBER)
 
-        # MUDANÇA: Caixas de data maiores para não cortar os meses!
         dias = [ft.dropdown.Option(str(i)) for i in range(1, 32)]
         meses = [ft.dropdown.Option(m) for m in ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]]
         anos_nasc = [ft.dropdown.Option(str(i)) for i in range(datetime.date.today().year, 1920, -1)]
@@ -106,9 +104,16 @@ def create_case_form_view(page: ft.Page):
         btn_search_inline.on_click = search_address_by_name
         tf_rua.on_submit = search_address_by_name
 
-        # =====================================================================
-        # 3. GPS NUCLEAR (JAVASCRIPT BROWSER INJECTION) + REDE COMO BACKUP
-        # =====================================================================
+        def run_ip_location():
+            btn_gps.text = "Buscando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
+            try:
+                res = requests.get("http://ip-api.com/json/", timeout=5)
+                if res.status_code == 200:
+                    data = res.json()
+                    get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
+            except: 
+                page.open(ft.SnackBar(ft.Text("Erro de conexão."), bgcolor="red"))
+                btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
 
         def get_address_from_coords(lat, lon, source="Rede"):
             try:
@@ -131,76 +136,11 @@ def create_case_form_view(page: ft.Page):
                 btn_gps.text = "Localização Encontrada!"; btn_gps.icon = ft.Icons.CHECK; btn_gps.disabled = False; page.update()
             except:
                 page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
-                btn_gps.text = "Capturar localização"; btn_gps.icon = ft.Icons.GPS_FIXED; btn_gps.disabled = False; page.update()
+                btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
 
-        def run_ip_location():
-            btn_gps.text = "Buscando pela Rede..."; btn_gps.icon = ft.Icons.WIFI; page.update()
-            try:
-                res = requests.get("http://ip-api.com/json/", timeout=5)
-                if res.status_code == 200:
-                    data = res.json()
-                    get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
-            except: 
-                page.open(ft.SnackBar(ft.Text("Erro de conexão total."), bgcolor="red"))
-                btn_gps.text = "Capturar localização"; btn_gps.icon = ft.Icons.GPS_FIXED; btn_gps.disabled = False; page.update()
+        btn_gps.on_click = lambda e: threading.Thread(target=run_ip_location).start()
 
-        # A. A função que "ouve" o grito do JavaScript
-        def processar_msg_console(e):
-            msg = e.data
-            if msg.startswith("GPS_SUCCESS:"):
-                # Deu certo! Vamos quebrar a string e pegar a lat/lon
-                coords = msg.replace("GPS_SUCCESS:", "").split(",")
-                get_address_from_coords(coords[0], coords[1], source="Satélite via JavaScript")
-            elif msg.startswith("GPS_ERROR:"):
-                page.open(ft.SnackBar(ft.Text(f"JS falhou. Tentando Rede... Erro: {msg.replace('GPS_ERROR:', '')}"), bgcolor="orange"))
-                threading.Thread(target=run_ip_location).start()
-
-        # B. O Mini-Navegador invisível
-        webview_gps = ft.WebView(
-            url="about:blank",  # <--- A CORREÇÃO ESTÁ AQUI!
-            visible=True,
-            width=1, 
-            height=1,
-            on_console_message=processar_msg_console
-        )
-        
-        # Colocamos ele no fundo da página silenciosamente
-        if webview_gps not in page.overlay:
-            page.overlay.append(webview_gps)
-
-        # C. O botão agora dispara o script HTML/JS
-        def run_nuclear_gps(e):
-            btn_gps.text = "Hackeando Satélite (JS)..."; btn_gps.icon = ft.Icons.SATELLITE_ALT; btn_gps.disabled = True; page.update()
-            
-            # O Código JavaScript puro que força o Android a entregar a localização
-            html_content = """
-            <!DOCTYPE html>
-            <html>
-            <body>
-            <script>
-                navigator.geolocation.getCurrentPosition(
-                    function(pos) { 
-                        console.log("GPS_SUCCESS:" + pos.coords.latitude + "," + pos.coords.longitude); 
-                    },
-                    function(err) { 
-                        console.log("GPS_ERROR:" + err.message); 
-                    },
-                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-                );
-            </script>
-            </body>
-            </html>
-            """
-            
-            # Convertemos para Base64 para rodar localmente sem precisar hospedar página
-            b64_html = base64.b64encode(html_content.encode('utf-8')).decode('utf-8')
-            webview_gps.url = f"data:text/html;base64,{b64_html}"
-            page.update()
-
-        # O botão chama a nossa função nuclear
-        btn_gps.on_click = run_nuclear_gps
-
-        def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "Capturar localização"; btn_gps.icon = ft.Icons.GPS_FIXED; btn_gps.disabled = False; page.update()
+        def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
         def confirm_gps_fill(e=None): fill_address_fields(gps_address_data); close_gps_modal()
 
         gps_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, bgcolor="white", border_radius=20, padding=25, shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"), content=ft.Column(alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, height=350, controls=[ft.Icon(ft.Icons.MAP_SHARP, color="#39BFEF", size=50), ft.Text("Localização Encontrada!", size=20, weight="bold", color="#39BFEF"), txt_gps_source, ft.Divider(), ft.Text("Confira os dados abaixo:", size=14, color="grey"), ft.Container(bgcolor="#F5F5F5", padding=15, border_radius=10, content=ft.Column([txt_gps_rua, txt_gps_bairro, txt_gps_cidade], spacing=2)), ft.Container(height=10), ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.OutlinedButton("Cancelar", on_click=close_gps_modal), ft.ElevatedButton("Confirmar", bgcolor="#39BFEF", color="white", on_click=confirm_gps_fill)])])))
@@ -266,8 +206,7 @@ def create_case_form_view(page: ft.Page):
                     "positive_test": is_positive
                 }
                 headers = {"Authorization": f"Bearer {token}"}
-                URL_DO_BACKEND = f"{API_URL}/api/report-case/" 
-                res = requests.post(URL_DO_BACKEND, json=data, headers=headers)
+                res = requests.post(f"{API_URL}/api/report-case/", json=data, headers=headers)
                 
                 if res.status_code in [200, 201]: 
                     case_data = res.json()
@@ -280,21 +219,20 @@ def create_case_form_view(page: ft.Page):
                         try: page.open(success_dialog)
                         except: page.dialog = success_dialog; success_dialog.open = True; page.update()
                 
-                elif res.status_code == 404:
-                    page.open(ft.SnackBar(ft.Text("Erro 404: Rota não encontrada no backend."), bgcolor="red"))
+                # BLINDAGEM CONTRA TELA VERMELHA
                 else: 
-                    msg_erro = res.text[:80] + "..." if len(res.text) > 80 else res.text
-                    page.open(ft.SnackBar(ft.Text(f"Erro {res.status_code}: {msg_erro}"), bgcolor="red"))
+                    page.open(ft.SnackBar(ft.Text(f"Erro no servidor. Código: {res.status_code}"), bgcolor="red"))
                     
             except Exception as ex: 
-                msg_ex = str(ex)[:80] + "..." if len(str(ex)) > 80 else str(ex)
-                page.open(ft.SnackBar(ft.Text(f"Erro no app: {msg_ex}"), bgcolor="red"))
+                # BLINDAGEM CONTRA TELA VERMELHA
+                page.open(ft.SnackBar(ft.Text("Erro de comunicação com o sistema."), bgcolor="red"))
                 
             btn_submit.text = "CADASTRAR"; btn_submit.disabled = False; page.update()
 
         btn_submit.on_click = pre_submit_check
 
-        def back_click(e): page.go("/novo")
+        def back_click(e): 
+            page.go("/novo")
                 
         header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Casos de dengue", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
         
@@ -349,4 +287,4 @@ def create_case_form_view(page: ft.Page):
 
     except Exception as e:
         print(f"Erro ao criar tela: {e}")
-        return ft.View(route="/form-caso", controls=[ft.Text(f"Erro crítico: {e}", color="red")])
+        return ft.View(route="/form-caso", controls=[ft.Text(f"Erro crítico da tela.", color="red")])
