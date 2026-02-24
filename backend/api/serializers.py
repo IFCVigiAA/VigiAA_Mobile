@@ -5,7 +5,7 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import DengueFocus, FocusImage, Profile
+from .models import DengueFocus, FocusImage, Profile, DengueCase, PositiveDengueCase
 
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -115,3 +115,18 @@ class DengueFocusSerializer(serializers.ModelSerializer):
             FocusImage.objects.create(focus=focus, image=image)
             
         return focus
+    
+class DengueCaseSerializer(serializers.ModelSerializer):
+    # Forçando o formato brasileiro (Dia/Mês/Ano)
+    notification_date = serializers.DateField(format="%d/%m/%Y", input_formats=["%d/%m/%Y", "%Y-%m-%d"])
+    birth_date = serializers.DateField(format="%d/%m/%Y", input_formats=["%d/%m/%Y", "%Y-%m-%d"])
+
+    class Meta:
+        model = DengueCase
+        fields = ['id', 'notification_date', 'cep', 'city', 'neighborhood', 'street', 'number', 'birth_date', 'positive_test']
+
+# Adicione isso no final do arquivo serializers.py
+class PositiveDengueCaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PositiveDengueCase
+        fields = ['id', 'dengue_case', 'patient_name', 'cpf', 'phone', 'test_location']

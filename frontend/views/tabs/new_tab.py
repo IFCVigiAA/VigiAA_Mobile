@@ -82,7 +82,7 @@ def get_new_tab(page: ft.Page):
                     "Cadastrar novo paciente",
                     "Forneça informações necessárias para o cadastro de um paciente.",
                     "paciente.jpg", 
-                    "/form-paciente"
+                    "/form-caso" # CORREÇÃO: Mudei para /form-caso para bater com o main.py!
                 ),
                 
                 ft.Container(height=50)

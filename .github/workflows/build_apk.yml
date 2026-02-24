@@ -22,65 +22,29 @@ jobs:
       with:
         flutter-version: '3.24.0'
 
-    - name: Build APK (V7 - Direto ao Ponto)
+    - name: Build APK (Oficial Flet)
       run: |
-        echo "🚀 INICIANDO BUILD V7 (SEM BUSCA AUTOMÁTICA)"
+        echo "🚀 INICIANDO BUILD LISO E DIRETO"
 
         # 1. Configura Ambiente
-        # Vamos criar o venv na raiz mesmo para garantir
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install flet==0.28.3
 
-        # 2. OBRIGAR a entrada na pasta frontend
-        # Se der erro aqui, é porque a pasta não chama 'frontend'
+        # 2. Entrando na pasta do app
         echo "📂 Entrando na pasta frontend..."
         cd frontend 
 
-        # 3. Prepara o Caçador (Hunter Script) AQUI DENTRO
-        cat <<EOF > hunter.sh
-        #!/bin/bash
-        echo "🏹 CAÇADOR V7: Procurando AndroidManifest..."
-        for i in {1..300}; do
-            # Procura apenas aqui dentro
-            TARGET=\$(find . -name "AndroidManifest.xml" | grep "src/main/AndroidManifest.xml" | head -n 1)
-            
-            if [ -n "\$TARGET" ]; then
-                echo "🎯 ALVO: \$TARGET"
-                if grep -q "ACCESS_FINE_LOCATION" "\$TARGET"; then
-                    echo "⚠️ Já possui permissão."
-                else
-                    echo "💉 INJETANDO PERMISSÕES..."
-                    PERMS='<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n<uses-permission android:name="android.permission.INTERNET" />'
-                    sed -i "s|<application|\$PERMS\n    <application|g" "\$TARGET"
-                    echo "✅ SUCESSO!"
-                fi
-            fi
-            sleep 1
-        done
-        EOF
-        
-        chmod +x hunter.sh
-        
-        # 4. Dispara o Caçador em Background
-        ./hunter.sh &
-        HUNTER_PID=$!
-        
-        # 5. Gera requirements e Roda o Build
-        # O Flet precisa saber o que instalar
+        # 3. Gera requirements e Roda o Build
         printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
         
-        echo "🚀 Flet Build Iniciado na pasta FRONTEND..."
-        flet build apk --verbose
-        
-        # Mata o caçador
-        kill $HUNTER_PID || true
+        echo "🚀 Flet Build Iniciado com Permissões Nativas..."
+        # É esta linha mágica que avisa o Android para liberar o GPS!
+        flet build apk --permissions location 
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        # Nome único para garantir download novo
         name: vigiaa-release-FINAL-${{ github.run_number }}
-        # O caminho agora é direto dentro de frontend
         path: frontend/build/apk/app-release.apk

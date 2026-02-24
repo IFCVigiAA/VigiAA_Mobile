@@ -30,10 +30,11 @@ import os
 
 # Seus Serializers
 from .serializers import MyTokenObtainPairSerializer
-from rest_framework.permissions import IsAuthenticated
 
-from .models import DengueFocus
-from .serializers import DengueFocusSerializer
+# --- MUDANÇA 1: Importe o Modelo e o Serializer de Casos aqui! ---
+# (Verifique se o nome do seu modelo no models.py é exatamente DengueCase)
+from .models import DengueFocus, DengueCase, PositiveDengueCase
+from .serializers import DengueFocusSerializer, DengueCaseSerializer, PositiveDengueCaseSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 
 # ==============================================================================
@@ -142,7 +143,7 @@ def google_callback_manual(request):
     if not email:
         return HttpResponse("<h1>Google não forneceu o email.</h1>")
 
-# --- PASSO C: A MÁGICA DO PROFESSOR (Só usa auth_user) ---
+    # --- PASSO C: A MÁGICA DO PROFESSOR (Só usa auth_user) ---
     try:
         # Tenta achar o usuário pelo email na tabela padrão
         user = User.objects.get(email=email)
@@ -274,9 +275,6 @@ class RequestPasswordResetEmail(APIView):
                 token = PasswordResetTokenGenerator().make_token(user)
                 
                 # --- AQUI ESTÁ A MÁGICA DO LINK ---
-                # Pegamos o domínio atual (ex: ngrok) dinamicamente ou fixo
-                # Para simplificar, vamos pegar o que veio na requisição ou defina manualmente
-                # Vamos assumir que você vai configurar o DOMINIO no settings ou usar o host atual
                 current_site = request.META.get('HTTP_HOST') # Pega o ngrok atual
                 
                 # Monta o link clicável
@@ -305,10 +303,7 @@ class PasswordTokenCheckAPI(APIView):
             return Response({'message': 'Senha redefinida com sucesso!'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-# No arquivo backend/api/views.py
-
 class PasswordResetWebConfirm(APIView):
-    # CORREÇÃO 1: Liberar acesso para quem não está logado
     permission_classes = [AllowAny] 
     
     renderer_classes = [TemplateHTMLRenderer]
@@ -321,7 +316,6 @@ class PasswordResetWebConfirm(APIView):
         password = request.data.get('password')
         confirm_password = request.data.get('confirm_password')
 
-        # 1. Conferência manual
         if password != confirm_password:
             return Response({
                 'error': 'As senhas não conferem.',
@@ -329,7 +323,6 @@ class PasswordResetWebConfirm(APIView):
                 'token': token
             })
 
-        # 2. Prepara o serializer
         serializer = SetNewPasswordSerializer(data={
             'uidb64': uidb64, 
             'token': token, 
@@ -337,12 +330,10 @@ class PasswordResetWebConfirm(APIView):
         })
 
         if serializer.is_valid():
-            # CORREÇÃO 2: SALVAR A SENHA NO BANCO!
             serializer.save() 
             
             return Response({'success': True})
         else:
-            # Pega o primeiro erro da lista para mostrar no HTML
             try:
                 error_msg = list(serializer.errors.values())[0][0]
             except:
@@ -351,16 +342,14 @@ class PasswordResetWebConfirm(APIView):
             return Response({'error': error_msg, 'uidb64': uidb64, 'token': token})
 
 class UserProfileView(APIView):
-    permission_classes = [IsAuthenticated] # Só quem tem Token entra aqui
+    permission_classes = [IsAuthenticated] 
 
     def get(self, request):
-        # O 'request.user' já é o usuário logado (graças ao Token)
         serializer = UserProfileSerializer(request.user)
         return Response(serializer.data)
     
     def patch(self, request):
         user = request.user
-        # partial=True significa: "Não preciso de todos os campos, só os que mudaram"
         serializer = UserProfileSerializer(user, data=request.data, partial=True)
         
         if serializer.is_valid():
@@ -378,16 +367,19 @@ class ChangePasswordView(APIView):
         serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
         
         if serializer.is_valid():
-            # Define a nova senha
             request.user.set_password(serializer.data['new_password'])
             request.user.save()
             
-            # Opcional: Atualizar o login para não desconectar o usuário
             update_last_login(None, request.user)
             
             return Response({"message": "Senha atualizada com sucesso!"}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ==============================================================================
+# VIEWS DE CADASTRO DO APP (FOCOS E CASOS)
+# ==============================================================================
 
 class DengueFocusCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -395,6 +387,28 @@ class DengueFocusCreateView(APIView):
 
     def post(self, request, *args, **kwargs):
         serializer = DengueFocusSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DengueCaseCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = DengueCaseSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Adicione isso no final do arquivo views.py
+class PositiveDengueCaseCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = PositiveDengueCaseSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)

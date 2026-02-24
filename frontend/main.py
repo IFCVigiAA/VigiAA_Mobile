@@ -5,6 +5,8 @@ from views.forgot_password_view import create_forgot_password_view
 from views.change_password_view import create_change_password_view
 from views.home_view import create_main_view
 from views.forms.focus_form_view import create_focus_form_view
+from views.forms.case_form_view import create_case_form_view
+from views.forms.positive_case_form_view import create_positive_case_form_view
 
 def main(page: ft.Page):
     page.title = "VigiAA Mobile"
@@ -19,45 +21,47 @@ def main(page: ft.Page):
         )
     )
 
-    # =================================================================
-    # A MÁGICA PRO APK: Componentes globais para o compilador achar!
-    # =================================================================
-    geolocator = ft.Geolocator()
-    file_picker = ft.FilePicker()
-    
-    # Injetamos na tela principal de uma vez por todas
-    page.overlay.extend([geolocator, file_picker])
-
+    # TRAVA DE SEGURANÇA: Só muda de tela se realmente for uma tela diferente
     def change_tab(index):
-        if index == 0: page.go("/")
-        elif index == 1: page.go("/novo")
-        elif index == 2: page.go("/explorar")
-        elif index == 3: page.go("/perfil")
+        rotas = ["/", "/novo", "/explorar", "/perfil"]
+        if 0 <= index < len(rotas):
+            if page.route != rotas[index]: 
+                page.go(rotas[index])
 
-    def get_nav_bar(index_atual):
-        return ft.NavigationBar(
-            height=60, 
-            bgcolor="#39BFEF",
-            indicator_color="#2898C2", 
-            surface_tint_color="#39BFEF",
-            shadow_color="black",
-            elevation=10,
-            selected_index=index_atual,
-            label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW,
-            destinations=[
-                ft.NavigationBarDestination(icon=ft.Icons.HOME_OUTLINED, selected_icon=ft.Icons.HOME, label="Início"),
-                ft.NavigationBarDestination(icon=ft.Icons.ADD_CIRCLE_OUTLINE, selected_icon=ft.Icons.ADD_CIRCLE, label="Novo"),
-                ft.NavigationBarDestination(icon=ft.Icons.EXPLORE_OUTLINED, selected_icon=ft.Icons.EXPLORE, label="Explorar"),
-                ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINE, selected_icon=ft.Icons.PERSON, label="Perfil"),
-            ],
-            on_change=lambda e: change_tab(e.control.selected_index)
-        )
+    # 1. CRIAMOS A BARRA UMA ÚNICA VEZ GLOBALMENTE! (Mata o clique fantasma)
+    nav_bar = ft.NavigationBar(
+        height=60, 
+        bgcolor="#39BFEF",
+        indicator_color="#2898C2", 
+        surface_tint_color="#39BFEF",
+        shadow_color="black",
+        elevation=10,
+        selected_index=0,
+        label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW,
+        destinations=[
+            ft.NavigationBarDestination(icon=ft.Icons.HOME_OUTLINED, selected_icon=ft.Icons.HOME, label="Início"),
+            ft.NavigationBarDestination(icon=ft.Icons.ADD_CIRCLE_OUTLINE, selected_icon=ft.Icons.ADD_CIRCLE, label="Novo"),
+            ft.NavigationBarDestination(icon=ft.Icons.EXPLORE_OUTLINED, selected_icon=ft.Icons.EXPLORE, label="Explorar"),
+            ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINE, selected_icon=ft.Icons.PERSON, label="Perfil"),
+        ],
+        on_change=lambda e: change_tab(e.control.selected_index)
+    )
+
+    # 2. Fixamos a barra na página para sempre
+    page.navigation_bar = nav_bar
 
     def route_change(e):
         rotas_base = ["/", "/novo", "/explorar", "/perfil", "/login", "/register"]
         
         if page.route in rotas_base:
             page.views.clear()
+            
+        # 3. Lógica inteligente: Esconde a barra dentro dos formulários para dar espaço!
+        telas_sem_barra = ["/login", "/register", "/forgot-password", "/change-password", "/form-foco", "/form-caso", "/form-caso-positivo"]
+        if page.route in telas_sem_barra:
+            nav_bar.visible = False
+        else:
+            nav_bar.visible = True
         
         if page.route == "/login":
             page.views.append(create_login_view(page))
@@ -66,25 +70,30 @@ def main(page: ft.Page):
         elif page.route == "/forgot-password":
             page.views.append(create_forgot_password_view(page))
             
+        # 4. Nas telas base, a gente só "pinta" o ícone atualizado
         elif page.route == "/":
-            page.navigation_bar = get_nav_bar(0)
+            nav_bar.selected_index = 0 
             page.views.append(create_main_view(page, aba_inicial=0))
             
         elif page.route == "/novo":
-            page.navigation_bar = get_nav_bar(1)
+            nav_bar.selected_index = 1
             page.views.append(create_main_view(page, aba_inicial=1))
             
         elif page.route == "/explorar":
-            page.navigation_bar = get_nav_bar(2)
+            nav_bar.selected_index = 2
             page.views.append(create_main_view(page, aba_inicial=2))
             
         elif page.route == "/perfil":
-            page.navigation_bar = get_nav_bar(3)
+            nav_bar.selected_index = 3
             page.views.append(create_main_view(page, aba_inicial=3))
 
+        # Formulários
         elif page.route == "/form-foco":
-            # Passamos as ferramentas globais para a tela usar
-            page.views.append(create_focus_form_view(page, geolocator, file_picker))
+            page.views.append(create_focus_form_view(page))
+        elif page.route == "/form-caso":
+            page.views.append(create_case_form_view(page))
+        elif page.route == "/form-caso-positivo":
+            page.views.append(create_positive_case_form_view(page))
             
         elif page.route == "/change-password":
             page.views.append(create_change_password_view(page))

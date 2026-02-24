@@ -52,3 +52,34 @@ def save_user_profile(sender, instance, **kwargs):
         instance.profile.save()
     except Profile.DoesNotExist:
         Profile.objects.create(user=instance)
+
+# --- ADICIONE ISTO NO FINAL DO SEU models.py ---
+
+class DengueCase(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE) # Quem registrou
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Dados do Formulário
+    notification_date = models.DateField()
+    cep = models.CharField(max_length=20)
+    city = models.CharField(max_length=100)
+    neighborhood = models.CharField(max_length=100)
+    street = models.CharField(max_length=100)
+    number = models.CharField(max_length=20)
+    birth_date = models.DateField()
+    positive_test = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"Caso em {self.city} ({self.notification_date})"
+    
+class PositiveDengueCase(models.Model):
+    # Liga este paciente ao caso de dengue base que acabamos de criar
+    dengue_case = models.OneToOneField(DengueCase, on_delete=models.CASCADE, related_name='positive_details')
+    patient_name = models.CharField(max_length=150)
+    cpf = models.CharField(max_length=20, blank=True, null=True)
+    phone = models.CharField(max_length=20)
+    test_location = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Paciente Positivo: {self.patient_name}"
