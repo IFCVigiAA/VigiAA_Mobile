@@ -21,12 +21,11 @@ def main(page: ft.Page):
         )
     )
 
-    # 1. Função super simples para trocar de aba sem loop
     def change_tab(e):
         rotas = ["/", "/novo", "/explorar", "/perfil"]
-        index_clicado = e.control.selected_index
-        if page.route != rotas[index_clicado]: 
-            page.go(rotas[index_clicado])
+        idx = int(e.data) # Essa é a forma mais segura do Flet mobile não bugar o clique
+        if page.route != rotas[idx]: 
+            page.go(rotas[idx])
 
     # 2. Barra global única (mata o clique fantasma)
     nav_bar = ft.NavigationBar(

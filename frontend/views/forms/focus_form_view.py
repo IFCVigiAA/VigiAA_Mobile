@@ -250,6 +250,7 @@ def create_focus_form_view(page: ft.Page):
 
         form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
             ft.Container(padding=20, content=btn_gps),
+            ft.Container(padding=ft.padding.only(left=20, bottom=10), content=ft.Text("Campos marcados com * são obrigatórios", size=10, color="black")),
             create_row("CEP", tf_cep, obrigatorio=True), 
             create_row("MUNICÍPIO", dd_municipio, obrigatorio=True), 
             create_row("BAIRRO", dd_bairro, obrigatorio=True), 

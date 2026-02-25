@@ -40,15 +40,17 @@ def create_case_form_view(page: ft.Page):
         anos_nasc = [ft.dropdown.Option(str(i)) for i in range(datetime.date.today().year, 1920, -1)]
         anos_notif = [ft.dropdown.Option(str(datetime.date.today().year)), ft.dropdown.Option(str(datetime.date.today().year - 1))]
 
-        estilo_data = {"border_color": "#E0E0E0", "border_radius": 12, "content_padding": 5, "text_size": 13}
-        dd_notif_dia = ft.Dropdown(options=dias, width=75, **estilo_data)
-        dd_notif_mes = ft.Dropdown(options=meses, width=85, **estilo_data)
-        dd_notif_ano = ft.Dropdown(options=anos_notif, width=95, **estilo_data)
+        # Trocamos o Width pelo Expand
+        estilo_data = {"border_color": "#E0E0E0", "border_radius": 12, "content_padding": 5, "text_size": 13, "expand": 1}
+        
+        dd_notif_dia = ft.Dropdown(options=dias, hint_text="Dia", **estilo_data)
+        dd_notif_mes = ft.Dropdown(options=meses, hint_text="Mês", **estilo_data)
+        dd_notif_ano = ft.Dropdown(options=anos_notif, hint_text="Ano", **estilo_data)
         row_data_notif = ft.Row([dd_notif_dia, dd_notif_mes, dd_notif_ano], spacing=5)
 
-        dd_nasc_dia = ft.Dropdown(options=dias, width=75, **estilo_data)
-        dd_nasc_mes = ft.Dropdown(options=meses, width=85, **estilo_data)
-        dd_nasc_ano = ft.Dropdown(options=anos_nasc, width=95, **estilo_data)
+        dd_nasc_dia = ft.Dropdown(options=dias, hint_text="Dia", **estilo_data)
+        dd_nasc_mes = ft.Dropdown(options=meses, hint_text="Mês", **estilo_data)
+        dd_nasc_ano = ft.Dropdown(options=anos_nasc, hint_text="Ano", **estilo_data)
         row_data_nasc = ft.Row([dd_nasc_dia, dd_nasc_mes, dd_nasc_ano], spacing=5)
 
         rg_teste = ft.RadioGroup(content=ft.Row([ft.Radio(value="sim", label="Sim", active_color="black"), ft.Radio(value="nao", label="Não", active_color="black")]))
@@ -61,7 +63,7 @@ def create_case_form_view(page: ft.Page):
                 dd_municipio.value = target_city
                 dd_bairro.disabled = False
                 if target_city in neighborhoods_db:
-                    opts = neighborhoods_db[target_city]
+                    opts = neighborhoods_db[target_city] 
                     b = data.get("bairro")
                     if b and b not in opts: opts.append(b); opts.sort()
                     if b: dd_bairro.value = b
