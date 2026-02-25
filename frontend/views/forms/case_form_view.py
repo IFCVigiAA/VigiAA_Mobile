@@ -35,23 +35,53 @@ def create_case_form_view(page: ft.Page):
         tf_rua = ft.TextField(hint_text="Selecione a rua", border="none", text_size=14, content_padding=10, suffix=btn_search_inline)
         tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10, keyboard_type=ft.KeyboardType.NUMBER)
 
-        dias = [ft.dropdown.Option(str(i)) for i in range(1, 32)]
-        meses = [ft.dropdown.Option(m) for m in ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]]
-        anos_nasc = [ft.dropdown.Option(str(i)) for i in range(datetime.date.today().year, 1920, -1)]
-        anos_notif = [ft.dropdown.Option(str(datetime.date.today().year)), ft.dropdown.Option(str(datetime.date.today().year - 1))]
-
-        # Trocamos o Width pelo Expand
-        estilo_data = {"border_color": "#E0E0E0", "border_radius": 12, "content_padding": 5, "text_size": 13, "expand": 1}
+        # =========================================================
+        # CALENDÁRIOS NATIVOS (DATEPICKER) - ADEUS LISTAS GIGANTES!
+        # =========================================================
         
-        dd_notif_dia = ft.Dropdown(options=dias, hint_text="Dia", **estilo_data)
-        dd_notif_mes = ft.Dropdown(options=meses, hint_text="Mês", **estilo_data)
-        dd_notif_ano = ft.Dropdown(options=anos_notif, hint_text="Ano", **estilo_data)
-        row_data_notif = ft.Row([dd_notif_dia, dd_notif_mes, dd_notif_ano], spacing=5)
+        def change_notif_date(e):
+            if dp_notif.value:
+                btn_notif.text = dp_notif.value.strftime("%d/%m/%Y")
+                page.update()
 
-        dd_nasc_dia = ft.Dropdown(options=dias, hint_text="Dia", **estilo_data)
-        dd_nasc_mes = ft.Dropdown(options=meses, hint_text="Mês", **estilo_data)
-        dd_nasc_ano = ft.Dropdown(options=anos_nasc, hint_text="Ano", **estilo_data)
-        row_data_nasc = ft.Row([dd_nasc_dia, dd_nasc_mes, dd_nasc_ano], spacing=5)
+        def change_nasc_date(e):
+            if dp_nasc.value:
+                btn_nasc.text = dp_nasc.value.strftime("%d/%m/%Y")
+                page.update()
+
+        dp_notif = ft.DatePicker(
+            first_date=datetime.datetime(2020, 1, 1),
+            last_date=datetime.datetime.now(),
+            on_change=change_notif_date,
+            help_text="Data da notificação"
+        )
+        
+        dp_nasc = ft.DatePicker(
+            first_date=datetime.datetime(1920, 1, 1),
+            last_date=datetime.datetime.now(),
+            on_change=change_nasc_date,
+            help_text="Data de nascimento"
+        )
+        
+        # Adiciona os pop-ups de calendário na memória da página
+        page.overlay.extend([dp_notif, dp_nasc])
+
+        # Os botões bonitões que o usuário vai clicar
+        btn_notif = ft.OutlinedButton(
+            text="Selecionar Data",
+            icon=ft.Icons.CALENDAR_MONTH,
+            on_click=lambda _: page.open(dp_notif), # CORRIGIDO!
+            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), color="black", side=ft.BorderSide(1, "#E0E0E0"))
+        )
+
+        btn_nasc = ft.OutlinedButton(
+            text="Selecionar Data",
+            icon=ft.Icons.CALENDAR_MONTH,
+            on_click=lambda _: page.open(dp_nasc), # CORRIGIDO!
+            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), color="black", side=ft.BorderSide(1, "#E0E0E0"))
+        )
+
+        # =========================================================
 
         rg_teste = ft.RadioGroup(content=ft.Row([ft.Radio(value="sim", label="Sim", active_color="black"), ft.Radio(value="nao", label="Não", active_color="black")]))
 
@@ -63,7 +93,7 @@ def create_case_form_view(page: ft.Page):
                 dd_municipio.value = target_city
                 dd_bairro.disabled = False
                 if target_city in neighborhoods_db:
-                    opts = neighborhoods_db[target_city] 
+                    opts = neighborhoods_db[target_city]
                     b = data.get("bairro")
                     if b and b not in opts: opts.append(b); opts.sort()
                     if b: dd_bairro.value = b
@@ -153,12 +183,6 @@ def create_case_form_view(page: ft.Page):
 
         address_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, height=500, bgcolor="white", border_radius=20, padding=20, content=ft.Column(controls=[ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.Text("Selecione a Rua", size=18, weight="bold", color="#39BFEF"), ft.Icon(ft.Icons.LOCATION_CITY, color="#39BFEF")]), ft.Divider(height=1, color="#EEEEEE"), ft.Container(content=overlay_list_content, expand=True), ft.ElevatedButton("Fechar", bgcolor="#39BFEF", color="white", width=float("inf"), on_click=close_manual_modal)])))
 
-        def open_manual_modal(address_list):
-            overlay_list_content.controls.clear()
-            overlay_list_content.controls.append(ft.Text(f"{len(address_list)} ruas encontradas:", size=12, color="grey"))
-            for addr in address_list: overlay_list_content.controls.append(ft.Container(padding=10, content=ft.Row([ft.Icon(ft.Icons.PLACE, size=16), ft.Column([ft.Text(addr.get("logradouro", ""), weight="bold"), ft.Text(f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}", size=12)])]), on_click=lambda e, a=addr: select_address_manual(a), ink=True))
-            address_overlay.visible = True; page.update()
-
         def close_success_dialog(e):
             try: page.close(success_dialog)
             except: pass
@@ -180,7 +204,8 @@ def create_case_form_view(page: ft.Page):
         )
 
         def pre_submit_check(e):
-            if not all([tf_cep.value, dd_municipio.value, dd_bairro.value, tf_rua.value, tf_numero.value, rg_teste.value, dd_notif_dia.value, dd_nasc_dia.value]): 
+            # Validação agora checa se as datas foram escolhidas (se dp_notif.value tem conteúdo)
+            if not all([tf_cep.value, dd_municipio.value, dd_bairro.value, tf_rua.value, tf_numero.value, rg_teste.value, dp_notif.value, dp_nasc.value]): 
                 page.open(ft.SnackBar(ft.Text("Preencha todos os campos obrigatórios (*)!"), bgcolor="red"))
                 return
             
@@ -193,8 +218,9 @@ def create_case_form_view(page: ft.Page):
             token = page.client_storage.get("token")
             btn_submit.text = "Enviando..."; btn_submit.disabled = True; page.update()
             
-            data_notif = f"{int(dd_notif_dia.value):02d}/{meses.index(next(m for m in meses if m.key == dd_notif_mes.value))+1:02d}/{dd_notif_ano.value}"
-            data_nasc = f"{int(dd_nasc_dia.value):02d}/{meses.index(next(m for m in meses if m.key == dd_nasc_mes.value))+1:02d}/{dd_nasc_ano.value}"
+            # Pega as datas bonitinhas do calendário
+            data_notif = dp_notif.value.strftime("%d/%m/%Y")
+            data_nasc = dp_nasc.value.strftime("%d/%m/%Y")
             
             try:
                 data = {
@@ -221,12 +247,10 @@ def create_case_form_view(page: ft.Page):
                         try: page.open(success_dialog)
                         except: page.dialog = success_dialog; success_dialog.open = True; page.update()
                 
-                # BLINDAGEM CONTRA TELA VERMELHA
                 else: 
-                    page.open(ft.SnackBar(ft.Text(f"Erro no servidor. Código: {res.status_code}"), bgcolor="red"))
+                    page.open(ft.SnackBar(ft.Text("Erro no servidor. Verifique a conexão."), bgcolor="red"))
                     
             except Exception as ex: 
-                # BLINDAGEM CONTRA TELA VERMELHA
                 page.open(ft.SnackBar(ft.Text("Erro de comunicação com o sistema."), bgcolor="red"))
                 
             btn_submit.text = "CADASTRAR"; btn_submit.disabled = False; page.update()
@@ -262,14 +286,17 @@ def create_case_form_view(page: ft.Page):
         form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
             ft.Container(padding=20, content=btn_gps),
             ft.Container(padding=ft.padding.only(left=20, bottom=10), content=ft.Text("Campos marcados com * são obrigatórios", size=10, color="black")),
-            create_row("Data da notificação", row_data_notif), 
+            
+            # Aqui entraram os botões novos que abrem o calendário!
+            create_row("Data da notificação", btn_notif), 
             create_row("CEP", tf_cep), 
             create_row("MUNICÍPIO", dd_municipio), 
             create_row("BAIRRO", dd_bairro), 
             create_row("RUA", tf_rua), 
             create_row("NÚMERO", tf_numero), 
-            create_row("Data de nascimento", row_data_nasc),
+            create_row("Data de nascimento", btn_nasc),
             create_row("Teste positivo", rg_teste),
+            
             caixa_aviso,
             ft.Container(padding=20, content=btn_submit),
         ]))
