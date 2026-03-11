@@ -11,10 +11,15 @@ class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    tem_senha = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
-        read_only_fields = ['email']
+        # OLHA O 'tem_senha' AQUI NO FINAL DA LISTA:
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'tem_senha'] 
+
+    def get_tem_senha(self, obj):
+        return obj.has_usable_password()
 
 class SetNewPasswordSerializer(serializers.Serializer):
     password = serializers.CharField(min_length=6, write_only=True)

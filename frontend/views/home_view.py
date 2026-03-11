@@ -1,75 +1,100 @@
-import flet as ft
-from views.tabs.home_tab import get_home_tab
-from views.tabs.new_tab import get_new_tab
-from views.tabs.explore_tab import get_explore_tab
-from views.tabs.profile_tab import get_profile_tab 
+from kivymd.uix.screen import MDScreen
+from kivy.lang import Builder
+# Importamos a classe para o Python conhecer, e pro KV importar
+from views.tabs.home_tab import HomeTabContent
+from views.tabs.new_tab import NewTabContent
+from views.tabs.explore_tab import ExploreTabContent
 
-def create_main_view(page: ft.Page, aba_inicial=0):
-    
-    # 1. A SOLUÇÃO DO PERFIL (Lazy Loading)
-    # Trocamos para as FUNÇÕES sem os parênteses. 
-    # Assim elas não executam todas de uma vez, só guardamos os nomes delas!
-    modulos_funcs = [
-        get_home_tab,      # 0
-        get_new_tab,       # 1
-        get_explore_tab,   # 2
-        get_profile_tab    # 3
-    ]
+KV_HOME_VIEW = '''
+# A MAGIA DO KIVY PARA MODULARIZAÇÃO:
+#:import HomeTabContent views.tabs.home_tab.HomeTabContent
+#:import ProfileTabContent views.tabs.profile_tab.ProfileTabContent
 
-    if aba_inicial >= len(modulos_funcs):
-        aba_inicial = 0
+<HomeScreen>:
+    md_bg_color: 0.96, 0.96, 0.96, 1
 
-    # Agora sim, a gente executa APENAS a tela que o usuário realmente clicou:
-    aba_atual = modulos_funcs[aba_inicial](page)
+    MDBoxLayout:
+        orientation: "vertical"
 
-    header = ft.Container(
-        height=60,
-        padding=ft.padding.symmetric(horizontal=15),
-        gradient=ft.LinearGradient(
-            begin=ft.alignment.center_left,
-            end=ft.alignment.center_right,
-            colors=["#39BFEF", "#69F0AE"] 
-        ),
-        content=ft.Row(
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            controls=[
-                ft.Container(
-                    content=ft.Image(
-                        src="/images/logo-sem-fundo.png", 
-                        width=40, height=40, 
-                        fit=ft.ImageFit.CONTAIN,
-                        error_content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, color="white")
-                    ),
-                    alignment=ft.alignment.center
-                ),
-                ft.Text("VigiAA", size=22, weight="bold", color="black"),
-                ft.IconButton(ft.Icons.NOTIFICATIONS_NONE, icon_color="black")
-            ]
-        ),
-        shadow=ft.BoxShadow(blur_radius=5, color="#1A000000")
-    )
+        # 1. O HEADER (Cabeçalho superior)
+        MDBoxLayout:
+            size_hint_y: None   
+            height: "60dp"
+            padding: ["15dp", "0dp", "15dp", "0dp"]
+            md_bg_color: 0.22, 0.75, 0.94, 1  # Cor #39BFEF
+            elevation: 2
 
-    # 2. A SOLUÇÃO DA TELA PISCANDO (Rotas Dinâmicas)
-    rotas = ["/", "/novo", "/explorar", "/perfil"]
-    rota_correta = rotas[aba_inicial]
+            Image:
+                source: "assets/images/logo-sem-fundo.png"
+                size_hint: None, None
+                size: "40dp", "40dp"
+                pos_hint: {"center_y": .5}
 
-    return ft.View(
-        route=rota_correta, # Agora a rota acompanha a aba certinho!
-        padding=0,
-        bgcolor="#F5F5F5",
-        controls=[
-            ft.Column(
-                spacing=0,
-                expand=True,
-                controls=[
-                    header,
-                    ft.Container(
-                        content=aba_atual,
-                        expand=True
-                    )
-                ]
-            )
-        ],
-        navigation_bar=page.navigation_bar
-    )
+            MDLabel:
+                text: "VigiAA"
+                font_size: "22sp"
+                bold: True
+                theme_text_color: "Custom"
+                text_color: 0, 0, 0, 1
+                valign: "center"
+                padding_x: "10dp"
+
+            MDIconButton:
+                icon: "bell-outline"
+                theme_text_color: "Custom"
+                text_color: 0, 0, 0, 1
+                pos_hint: {"center_y": .5}
+
+        # 2. A NAVEGAÇÃO INFERIOR
+        MDBottomNavigation:
+            id: bottom_nav
+            selected_color_background: 0, 0, 0, 0
+            text_color_active: 0.22, 0.75, 0.94, 1  # Azul ciano quando selecionado
+
+            # ABA 1: INÍCIO
+            MDBottomNavigationItem:
+                name: 'tab_home'
+                text: 'Início'
+                icon: 'home'
+                
+                # INJETAMOS O ARQUIVO EXTERNO AQUI (Lego)
+                HomeTabContent:
+
+            # ABA 2: NOVO
+            MDBottomNavigationItem:
+                name: 'tab_new'
+                text: 'Novo'
+                icon: 'plus-circle-outline'
+                
+                # INJETAMOS OS NOSSOS CARTÕES AQUI
+                NewTabContent:
+
+            # ABA EXPLORAR (Pode ser a Aba 3 no seu código)
+            MDBottomNavigationItem:
+                name: 'tab_explore'
+                text: 'Explorar'
+                icon: 'compass'
+
+                # INJETAMOS A NOSSA ABA NOVA AQUI
+                ExploreTabContent:
+
+            # ABA 4: PERFIL
+            MDBottomNavigationItem:
+                name: 'tab_profile'
+                text: 'Perfil'
+                icon: 'account'
+                on_tab_release: profile_tab.refresh_data()
+
+                ProfileTabContent:
+                    id: profile_tab
+'''
+Builder.load_string(KV_HOME_VIEW)
+
+class HomeScreen(MDScreen):
+    def on_pre_enter(self, *args):
+        # 1. Força o aplicativo a voltar para a primeira aba (Início)
+        self.ids.bottom_nav.switch_tab('tab_home')
+        
+        # 2. Manda a aba de perfil carregar os dados silenciosamente no fundo
+        if 'profile_tab' in self.ids:
+            self.ids.profile_tab.refresh_data()

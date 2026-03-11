@@ -1,248 +1,258 @@
-import flet as ft
+from kivymd.uix.screen import MDScreen
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivy.graphics.texture import Texture
+from kivy.graphics import Color, RoundedRectangle, Rectangle, StencilPush, StencilUse, StencilUnUse, StencilPop
+from kivy.lang import Builder
+from kivy.clock import mainthread, Clock
+from kivy.storage.jsonstore import JsonStore
 import requests
-import config
 import threading
 import time
 import uuid
+import webbrowser
+import config  # Garanta que o config.py está acessível
 
-def create_login_view(page: ft.Page):
-    API_URL = config.API_URL
-    HEADERS = {"ngrok-skip-browser-warning": "true"}
+store = JsonStore('vigiaa_storage.json')
+HEADERS = {"ngrok-skip-browser-warning": "true"}
 
-    # --- DEFINIÇÃO DOS CAMPOS (Nomes Corrigidos) ---
-    email_field = ft.TextField(
-        hint_text="email@domain.com", 
-        bgcolor="white", 
-        border_radius=10, 
-        border_width=0, 
-        text_size=14, 
-        content_padding=15, 
-        color="black", 
-        cursor_color="black"
-    )
+# --- A MÁGICA DO DEGRADÊ NATIVO (COM MÁSCARA DE RECORTE) ---
+class GradientRoundedLayout(MDBoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Textura simples de 2 pixels. O Kivy interpola o resto perfeitamente!
+        self.texture = Texture.create(size=(1, 2), colorfmt='rgba')
+        
+        # Base: Verde (#72FC90) -> RGB(114, 252, 144)
+        # Topo: Azul Ciano (#3AC0ED) -> RGB(58, 192, 237)
+        buf = bytes([
+            114, 252, 144, 255,  # Pixel de baixo
+            58, 192, 237, 255    # Pixel de cima
+        ])
+        self.texture.blit_buffer(buf, colorfmt='rgba', bufferfmt='ubyte')
+        
+        with self.canvas.before:
+            # 1. Inicia a "Tesoura" (Máscara)
+            StencilPush()
+            self.mask = RoundedRectangle(radius=[0, 0, 50, 50])
+            StencilUse()
+            
+            # 2. Desenha o Degradê perfeito por cima (ele vai respeitar o corte)
+            Color(1, 1, 1, 1) 
+            self.rect = Rectangle(texture=self.texture)
+            
+            # 3. Limpa a "Tesoura" da memória
+            StencilUnUse()
+            self.mask_clear = RoundedRectangle(radius=[0, 0, 50, 50])
+            StencilPop()
+            
+        # Garante que o recorte e o degradê acompanhem o tamanho da tela
+        self.bind(pos=self._update_rect, size=self._update_rect)
+        
+    def _update_rect(self, *args):
+        self.mask.pos = self.pos
+        self.mask.size = self.size
+        self.rect.pos = self.pos
+        self.rect.size = self.size
+        self.mask_clear.pos = self.pos
+        self.mask_clear.size = self.size
 
-    # AQUI ESTAVA O ERRO: Agora garantimos que o nome é password_field
-    password_field = ft.TextField(
-        hint_text="senha", 
-        password=True, 
-        can_reveal_password=True, 
-        bgcolor="white", 
-        border_radius=10, 
-        border_width=0, 
-        text_size=14, 
-        content_padding=15, 
-        color="black", 
-        cursor_color="black"
-    )
-    
-    error_text = ft.Text(color="red", size=14, weight="bold", text_align=ft.TextAlign.CENTER)
+# A INTERFACE VISUAL EXATA DO LOGIN
+KV_LOGIN = '''
+<LoginScreen>:
+    md_bg_color: 1, 1, 1, 1
 
-    # --- LÓGICA DE LOGIN MANUAL ---
-    def login_click(e):
-        if not email_field.value or not password_field.value:
-            error_text.value = "Preencha todos os campos"
-            error_text.update()
+    MDBoxLayout:
+        orientation: "vertical"
+
+        # PARTE SUPERIOR (Arredondada COM DEGRADÊ NATIVO)
+        GradientRoundedLayout:
+            orientation: "vertical"
+            size_hint_y: 0.65
+            padding: "30dp"
+            spacing: "15dp"
+
+            Image:
+                source: "assets/images/logo-sem-fundo.png"
+                size_hint: None, None
+                size: "140dp", "140dp"
+                pos_hint: {"center_x": .5}
+
+            MDLabel:
+                text: "VigiAA"
+                font_style: "H4"
+                bold: True
+                halign: "center"
+
+            MDLabel:
+                text: "Entre na sua conta"
+                font_style: "Subtitle1"
+                bold: True
+                halign: "center"
+
+            MDTextField:
+                id: email_field
+                hint_text: "email@domain.com"
+                mode: "round"
+                fill_color_normal: 1, 1, 1, 1
+
+            MDTextField:
+                id: password_field
+                hint_text: "senha"
+                password: True
+                mode: "round"
+                fill_color_normal: 1, 1, 1, 1
+
+            MDLabel:
+                id: error_text
+                text: ""
+                halign: "center"
+                font_style: "Caption"
+                theme_text_color: "Custom"
+                text_color: 1, 0, 0, 1
+
+            MDRaisedButton:
+                text: "Continue"
+                md_bg_color: 0, 0, 0, 1
+                text_color: 1, 1, 1, 1
+                size_hint_x: 1
+                elevation: 0
+                on_release: root.login_click()
+
+        # PARTE INFERIOR
+        MDBoxLayout:
+            orientation: "vertical"
+            size_hint_y: 0.35
+            padding: ["20dp", "10dp", "20dp", "20dp"]
+            spacing: "10dp"
+            md_bg_color: 1, 1, 1, 1
+
+            MDTextButton:
+                text: "Esqueci minha senha"
+                theme_text_color: "Custom"
+                text_color: 0.1, 0.46, 0.82, 1
+                pos_hint: {"center_x": .5}
+                on_release: root.go_forgot()
+
+            MDLabel:
+                text: "ou"
+                halign: "center"
+                theme_text_color: "Hint"
+
+            MDRectangleFlatIconButton:
+                icon: "google"
+                text: "Continue com Google"
+                theme_text_color: "Custom"
+                text_color: 0, 0, 0, 1
+                line_color: 0.96, 0.96, 0.96, 1
+                md_bg_color: 0.96, 0.96, 0.96, 1
+                size_hint_x: 1
+                on_release: root.login_google()
+
+            MDLabel:
+                text: "Ao clicar em continuar, você aceita nossos\\nTermos de Serviço e Política de Privacidade"
+                halign: "center"
+                font_style: "Caption"
+                theme_text_color: "Hint"
+                font_size: "10sp"
+
+            MDBoxLayout:
+                orientation: "horizontal"
+                adaptive_width: True
+                spacing: "5dp"
+                pos_hint: {"center_x": .5}
+
+                MDLabel:
+                    text: "Não possui uma conta?"
+                    theme_text_color: "Hint"
+                    font_size: "12sp"
+                    adaptive_width: True
+
+                MDTextButton:
+                    text: "Crie sua conta aqui"
+                    theme_text_color: "Custom"
+                    text_color: 0.1, 0.46, 0.82, 1
+                    font_size: "12sp"
+                    on_release: root.go_register()
+'''
+# O Builder carrega o visual para a memória
+Builder.load_string(KV_LOGIN)
+
+# A Lógica da Tela
+class LoginScreen(MDScreen):
+    def on_pre_enter(self, *args):
+        # 1. Limpa os campos de texto
+        if 'email_field' in self.ids:
+            self.ids.email_field.text = ""
+        if 'password_field' in self.ids:
+            self.ids.password_field.text = ""
+            
+        # 2. Apaga a mensagem estática
+        if 'error_text' in self.ids:
+            self.ids.error_text.text = ""
+
+    def login_click(self):
+        email = self.ids.email_field.text
+        senha = self.ids.password_field.text
+
+        if not email or not senha:
+            self.mostrar_erro("Preencha todos os campos", "red")
             return
 
-        error_text.value = "Conectando..."
-        error_text.color = "blue"
-        error_text.update()
+        self.mostrar_erro("Conectando...", "blue")
+        threading.Thread(target=self.fazer_requisicao_login, args=(email, senha)).start()
 
+    def fazer_requisicao_login(self, email, senha):
         try:
             response = requests.post(
-                f"{API_URL}/api/token/", 
-                data={
-                    "username": email_field.value, 
-                    "password": password_field.value
-                }, 
+                f"{config.API_URL}/api/token/", 
+                data={"username": email, "password": senha}, 
                 headers=HEADERS
             )
-            
             if response.status_code == 200:
                 data = response.json()
-                token = data.get("access")
-                page.client_storage.set("token", token)
-                page.go("/")
+                store.put("session", token=data.get("access"))
+                self.mostrar_erro("Login efetuado! Redirecionando...", "green")
+
+                Clock.schedule_once(lambda dt: self.ir_para_home(), 1)
             else:
-                error_text.value = "Email ou senha incorretos."
-                error_text.color = "red"
-                error_text.update()
+                self.mostrar_erro("Email ou senha incorretos.", "red")
         except Exception as ex:
-            error_text.value = f"Erro: {ex}"
-            error_text.color = "red"
-            error_text.update()
+            self.mostrar_erro(f"Erro: {ex}", "red")
 
-    def go_register(e):
-        page.go("/register")
-    
-    # --- LÓGICA DO GOOGLE (POLLING) ---
-    def check_google_status(login_id):
-        # Tenta verificar se logou por 60 segundos
-        for _ in range(60):
-            time.sleep(2) # Espera 2s
-            try:
-                res = requests.get(f"{API_URL}/api/check-login/?login_id={login_id}", headers=HEADERS)
-                if res.status_code == 200:
-                    data = res.json()
-                    # Verifica se o backend retornou sucesso e o token
-                    if data.get('status') == 'success':
-                        token = data.get('access_token')
-                        
-                        # Mágica para atualizar a tela principal
-                        page.client_storage.set("token", token)
-                        page.go("/")
-                        page.update()
-                        return
-            except:
-                pass
-        
-        # Se passar 1 minuto e não logar
-        error_text.value = "Tempo limite do Google esgotado."
-        error_text.color = "red"
-        error_text.update()
-
-    def login_google(e):
+    def login_google(self):
         try:
-            # 1. Gera ID único
             my_login_id = str(uuid.uuid4())
-            
-            # 2. Abre navegador com esse ID
-            page.launch_url(f"{API_URL}/api/start-login/?login_id={my_login_id}")
-            
-            error_text.value = "Aguardando confirmação no navegador..."
-            error_text.color = "blue"
-            error_text.update()
-
-            # 3. Inicia verificação em segundo plano
-            t = threading.Thread(target=check_google_status, args=(my_login_id,), daemon=True)
-            t.start()
-            
+            webbrowser.open(f"{config.API_URL}/api/start-login/?login_id={my_login_id}")
+            self.mostrar_erro("Aguardando navegador...", "blue")
+            threading.Thread(target=self.check_google_status, args=(my_login_id,), daemon=True).start()
         except Exception as ex:
-            error_text.value = f"Erro ao abrir Google: {ex}"
-            error_text.update()
+            self.mostrar_erro("Erro ao abrir Google", "red")
 
-    # --- LAYOUT FINAL ---
-    return ft.View(
-        route="/login", 
-        padding=0, 
-        bgcolor="white",
-        controls=[
-            ft.Column(
-                spacing=0, 
-                controls=[
-                    # PARTE SUPERIOR (Degradê)
-                    ft.Container(
-                        width=float("inf"), 
-                        padding=ft.padding.only(left=30, right=30, top=50, bottom=30),
-                        border_radius=ft.border_radius.only(bottom_left=50, bottom_right=50),
-                        gradient=ft.LinearGradient(
-                            colors=["#4DD0E1", "#69F0AE"], 
-                            begin=ft.alignment.top_center, 
-                            end=ft.alignment.bottom_center
-                        ),
-                        content=ft.Column(
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER, 
-                            spacing=15, 
-                            controls=[
-                                ft.Image(
-                                    src="images/logo-sem-fundo.png", 
-                                    width=160, 
-                                    height=160, 
-                                    error_content=ft.Icon(ft.Icons.BUG_REPORT, size=80, color="#1B5E20")
-                                ),
-                                ft.Text("VigiAA", size=28, weight="bold", color="black"),
-                                ft.Text("Entre na sua conta", size=16, weight="bold", color="black"),
-                                
-                                ft.Container(height=5),
-                                
-                                # CAMPOS (Dentro de containers para garantir largura total)
-                                ft.Container(content=email_field, width=float("inf")),
-                                ft.Container(content=password_field, width=float("inf")),
-                                
-                                error_text,
-                                
-                                ft.Container(
-                                    width=float("inf"), 
-                                    height=50, 
-                                    content=ft.ElevatedButton(
-                                        "Continue", 
-                                        on_click=login_click, 
-                                        bgcolor="black", 
-                                        color="white", 
-                                        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10))
-                                    )
-                                ),
-                            ]
-                        )
-                    ),
-                    
-                    # PARTE INFERIOR (Branca)
-                    ft.Container(
-                        padding=20, 
-                        bgcolor="white",
-                        content=ft.Column(
-                            horizontal_alignment=ft.CrossAxisAlignment.CENTER, 
-                            spacing=5, 
-                            controls=[
-                                ft.Container(height=5),
-                                ft.TextButton(
-                                    "Esqueci minha senha", 
-                                    style=ft.ButtonStyle(color="#1976D2"), 
-                                    on_click=lambda e: page.go("/forgot-password")
-                                ),
-                                ft.Text("ou", color="grey", size=12),
-                                
-                                # Botão Google
-                                ft.Container(
-                                    width=float("inf"), 
-                                    height=50, 
-                                    content=ft.ElevatedButton(
-                                        on_click=login_google, 
-                                        bgcolor="#F5F5F5", 
-                                        color="black", 
-                                        elevation=0, 
-                                        style=ft.ButtonStyle(
-                                            shape=ft.RoundedRectangleBorder(radius=10), 
-                                            padding=ft.padding.symmetric(horizontal=10)
-                                        ), 
-                                        content=ft.Row(
-                                            alignment=ft.MainAxisAlignment.CENTER, 
-                                            controls=[
-                                                ft.Image(
-                                                    src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg", 
-                                                    width=24, 
-                                                    height=24, 
-                                                    error_content=ft.Icon(ft.Icons.G_TRANSLATE, color="grey")
-                                                ), 
-                                                ft.Text("Continue com Google")
-                                            ]
-                                        )
-                                    )
-                                ),
-                                
-                                ft.Container(height=10),
-                                ft.Text(
-                                    "Ao clicar em continuar, você aceita nossos\nTermos de Serviço e Política de Privacidade", 
-                                    size=10, 
-                                    color="grey", 
-                                    text_align=ft.TextAlign.CENTER
-                                ),
-                                
-                                ft.Row(
-                                    alignment=ft.MainAxisAlignment.CENTER, 
-                                    controls=[
-                                        ft.Text("Não possui uma conta?", color="grey", size=12), 
-                                        ft.TextButton(
-                                            "Crie sua conta aqui", 
-                                            on_click=go_register, 
-                                            style=ft.ButtonStyle(color="#1976D2")
-                                        )
-                                    ]
-                                ),
-                            ]
-                        )
-                    )
-                ]
-            )
-        ]
-    )
+    def check_google_status(self, login_id):
+        for _ in range(30):
+            time.sleep(2)
+            try:
+                res = requests.get(f"{config.API_URL}/api/check-login/?login_id={login_id}", headers=HEADERS)
+                if res.status_code == 200 and res.json().get('status') == 'success':
+                    store.put("session", token=res.json().get('access_token'))
+                    self.mostrar_erro("Conectado! Redirecionando...", "green")
+                    Clock.schedule_once(lambda dt: self.ir_para_home(), 1)
+                    return
+            except: pass
+        self.mostrar_erro("Tempo limite esgotado.", "red")
+
+    @mainthread
+    def mostrar_erro(self, texto, cor):
+        self.ids.error_text.text = texto
+        cores = {"red": (1,0,0,1), "blue": (0,0,1,1), "green": (0,0.5,0,1)}
+        self.ids.error_text.text_color = cores.get(cor, (0,0,0,1))
+
+    # --- NAVEGAÇÃO ---
+    def go_register(self):
+        self.manager.current = 'register'
+
+    def go_forgot(self):
+        self.manager.current = 'forgot_password'
+        
+    def ir_para_home(self):
+        self.manager.current = 'home'

@@ -1,131 +1,172 @@
-import flet as ft
+from kivymd.uix.card import MDCard
+from kivy.uix.scrollview import ScrollView
+from kivy.lang import Builder
+from kivy.properties import StringProperty, BooleanProperty, ObjectProperty
+from kivy.clock import Clock
 
-def get_home_tab(page: ft.Page = None):
-
-    # Lista para guardar as referências dos botões
-    year_buttons_refs = []
-
-    # --- Lógica de Troca de Ano ---
-    def toggle_year(e):
-        clicked_year = e.control.data
-        print(f"Ano selecionado: {clicked_year}") 
+# O visual exclusivo do conteúdo da Aba Início
+KV_HOME_TAB = '''
+<StatCard@MDCard>:
+    orientation: "vertical"
+    padding: "15dp"
+    spacing: "2dp"
+    radius: [10, 10, 10, 10]
+    elevation: 1
+    shadow_color: 0, 0, 0, 0.1  # <-- SOMBRA SUAVE
+    md_bg_color: 1, 1, 1, 1
+    title: ""
+    value: ""
+    subtext: ""
+    
+    MDLabel:
+        text: root.title
+        font_size: "13sp"
+        bold: True
+        theme_text_color: "Custom"
+        text_color: 0, 0, 0, 1
+        halign: "left"  # <-- ALINHADO À ESQUERDA
         
-        for btn in year_buttons_refs:
-            if btn.data == clicked_year:
-                btn.bgcolor = "black"
-                btn.content.color = "white"
-                btn.shadow = None
-            else:
-                btn.bgcolor = "white"
-                btn.content.color = "black"
-                # CORREÇÃO: Uso de hexadecimal direto para evitar erro de ft.colors
-                btn.shadow = ft.BoxShadow(blur_radius=2, color="#1A000000")
+    MDLabel:
+        text: root.value
+        font_size: "26sp"
+        bold: True
+        theme_text_color: "Custom"
+        text_color: 0, 0, 0, 1
+        halign: "left"  # <-- ALINHADO À ESQUERDA
+        
+    MDLabel:
+        text: root.subtext
+        font_size: "11sp"
+        theme_text_color: "Custom"
+        text_color: 0.5, 0.5, 0.5, 1
+        halign: "left"  # <-- ALINHADO À ESQUERDA
+
+<ChartCard@MDCard>:
+    orientation: "vertical"
+    padding: "20dp"
+    spacing: "10dp"
+    radius: [10, 10, 10, 10]
+    elevation: 1
+    shadow_color: 0, 0, 0, 0.1  # <-- SOMBRA SUAVE
+    md_bg_color: 1, 1, 1, 1
+    title: ""
+    image_src: ""
+    size_hint_y: None
+    height: "280dp"
+
+    MDLabel:
+        text: root.title
+        font_size: "16sp"
+        bold: True
+        adaptive_height: True
+        theme_text_color: "Custom"
+        text_color: 0, 0, 0, 1
+
+    Image:
+        source: root.image_src
+        allow_stretch: True
+        keep_ratio: True
+
+<YearButton>:
+    size_hint: None, None
+    size: "80dp", "40dp"
+    radius: [20, 20, 20, 20]
+    elevation: 1 if not root.is_selected else 0
+    shadow_color: 0, 0, 0, 0.1  # <-- SOMBRA SUAVE
+    md_bg_color: (0, 0, 0, 1) if root.is_selected else (1, 1, 1, 1)
+    
+    MDLabel:
+        text: root.year_text
+        halign: "center"
+        valign: "center"
+        bold: True
+        theme_text_color: "Custom"
+        text_color: (1, 1, 1, 1) if root.is_selected else (0, 0, 0, 1)
+
+<HomeTabContent>:
+    do_scroll_x: False
+    do_scroll_y: True
+
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: "15dp"
+        spacing: "15dp"
+        adaptive_height: True
+
+        # Filtro de Anos (Scroll Horizontal)
+        ScrollView:
+            size_hint_y: None
+            height: "50dp"
+            do_scroll_x: True
+            do_scroll_y: False
+            bar_width: 0
             
-            btn.update()
+            MDBoxLayout:
+                id: year_container
+                orientation: "horizontal"
+                adaptive_width: True
+                spacing: "10dp"
+                padding: ["0dp", "5dp", "0dp", "5dp"]
 
-    # --- Fábrica de Botões ---
-    def create_year_button(year, is_selected=False):
-        btn = ft.Container(
-            content=ft.Text(year, color="white" if is_selected else "black", weight="bold"),
-            bgcolor="black" if is_selected else "white",
-            padding=ft.padding.symmetric(horizontal=20, vertical=10),
-            border_radius=20,
-            data=year,
-            on_click=toggle_year,
-            animate=ft.Animation(300, ft.AnimationCurve.EASE_OUT), 
-            shadow=ft.BoxShadow(blur_radius=2, color="#1A000000") if not is_selected else None
-        )
-        year_buttons_refs.append(btn)
-        return btn
+        # Cards de Estatísticas
+        MDBoxLayout:
+            orientation: "horizontal"
+            size_hint_y: None
+            height: "100dp"
+            spacing: "10dp"
 
-    year_filter = ft.Row(
-        controls=[
-            create_year_button("2025", is_selected=True),
-            create_year_button("2024"),
-            create_year_button("2023"),
-        ],
-        spacing=10,
-        scroll=ft.ScrollMode.HIDDEN 
-    )
+            StatCard:
+                title: "Casos confirmados"
+                value: "457"
+                subtext: "+20 este mês"
 
-    # --- Cards de Estatística ---
-    def stat_card(title, value, subtext):
-        return ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text(title, size=13, weight="w600", color="black"), 
-                    ft.Text(value, size=26, weight="bold", color="black"),
-                    ft.Text(subtext, size=11, color="grey"),
-                ],
-                spacing=2, 
-                alignment=ft.MainAxisAlignment.CENTER
-            ),
-            bgcolor="white",
-            padding=15, 
-            border_radius=10,
-            expand=True,
-            shadow=ft.BoxShadow(blur_radius=10, color="#0D000000")
-        )
+            StatCard:
+                title: "Suspeitas de dengue"
+                value: "2,405"
+                subtext: "+300 este mês"
 
-    stats_row = ft.Row(
-        controls=[
-            stat_card("Casos confirmados", "457", "+20 este mês"), 
-            stat_card("Suspeitas de dengue", "2,405", "+300 este mês"),
-        ],
-        spacing=10 
-    )
+        # Gráficos
+        ChartCard:
+            title: "Casos confirmados por mês"
+            image_src: "assets/images/grafico1.png" 
 
-    # --- Cards de Gráfico (COM CAMINHO ASSETS/IMAGES) ---
-    def chart_card(title, img_filename):
-        # MUDANÇA AQUI: Adiciona o prefixo correto /images/
-        # O Flet mapeia a pasta assets para a raiz /, então assets/images vira /images/
-        img_src = f"/images/{img_filename}"
+        ChartCard:
+            title: "Proporção de focos por tipo"
+            image_src: "assets/images/grafico2.png"
+'''
+Builder.load_string(KV_HOME_TAB)
+
+class YearButton(MDCard):
+    is_selected = BooleanProperty(False)
+    year_text = StringProperty("")
+    callback = ObjectProperty(None) # Guarda a função que deve ser ativada ao clicar
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.bind(on_release=self.on_click)
         
-        return ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text(title, size=16, weight="bold", color="black"),
-                    ft.Container(height=10),
-                    
-                    ft.Container(
-                        content=ft.Image(
-                            src=img_src,
-                            fit=ft.ImageFit.CONTAIN,
-                            error_content=ft.Container(bgcolor="#F0F0F0", alignment=ft.alignment.center, content=ft.Text("Imagem não encontrada", size=10, color="grey"))
-                        ),
-                        height=200, 
-                        alignment=ft.alignment.center,
-                        bgcolor="white",
-                        border_radius=10
-                    )
-                ]
-            ),
-            bgcolor="white",
-            padding=20,
-            border_radius=10,
-            shadow=ft.BoxShadow(blur_radius=10, color="#0D000000"),
-            margin=ft.margin.only(bottom=10)
-        )
+    def on_click(self, *args):
+        if self.callback:
+            self.callback(self)
 
-    # Montagem Final
-    content = ft.Container(
-        content=ft.Column(
-            controls=[
-                year_filter,
-                ft.Container(height=10),
-                stats_row,
-                ft.Container(height=10),
-                # Passamos apenas o nome do arquivo, a função adiciona /images/
-                chart_card("Casos confirmados por mês", "grafico1.png"),
-                chart_card("Proporção de focos por tipo", "grafico2.png"),
-                ft.Container(height=20),
-            ],
-            scroll=ft.ScrollMode.AUTO,
-            spacing=15
-        ),
-        padding=15, 
-        alignment=ft.alignment.top_center,
-        expand=True
-    )
+# Este é o container principal que a HomeView vai importar
+class HomeTabContent(ScrollView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.year_buttons = []
+        # Espera o visual carregar e preenche os botões
+        Clock.schedule_once(self.populate_years, 0)
 
-    return content
+    def populate_years(self, dt):
+        anos = ["2025", "2024", "2023"]
+        for i, ano in enumerate(anos):
+            # Passa a função 'change_year' de forma limpa, sem usar 'parent.parent...'
+            btn = YearButton(year_text=ano, is_selected=(i == 0), callback=self.change_year)
+            self.year_buttons.append(btn)
+            self.ids.year_container.add_widget(btn)
+
+    def change_year(self, clicked_btn):
+        for btn in self.year_buttons:
+            btn.is_selected = False
+        clicked_btn.is_selected = True
+        print(f"Ano selecionado: {clicked_btn.year_text}")

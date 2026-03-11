@@ -1,285 +1,388 @@
-import flet as ft
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivy.uix.scrollview import ScrollView
+from kivy.lang import Builder
+from kivy.properties import StringProperty, BooleanProperty, ObjectProperty
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDFlatButton
+from kivymd.uix.snackbar import MDSnackbar
+from kivymd.uix.label import MDLabel
+from kivymd.app import MDApp
+from kivy.clock import mainthread, Clock
+from kivy.storage.jsonstore import JsonStore
 import requests
+import threading
 import config
 
-def get_profile_tab(page: ft.Page):
-    API_URL = config.API_URL
-    fields_refs = {}
+store = JsonStore('vigiaa_storage.json')
 
-    def logout(e):
-        page.client_storage.remove("token")
-        page.go("/login")
-
-    # --- LÓGICA DE EXCLUIR CONTA ---
-    def delete_account_action(e):
-        page.close(confirm_dialog)
-        token = page.client_storage.get("token")
+KV_PROFILE_TAB = '''
+<ProfileField>:
+    orientation: "horizontal"
+    adaptive_height: True
+    padding: ["0dp", "5dp", "0dp", "5dp"]
+    
+    MDLabel:
+        text: root.label_text
+        bold: True
+        size_hint_x: 0.35
+        font_size: "14sp"
+        theme_text_color: "Custom"
+        text_color: 0, 0, 0, 1
         
-        if not token: return
+    MDTextField:
+        id: field_input
+        text: root.text_value
+        readonly: True
+        size_hint_x: 0.45
+        font_size: "14sp"
+        text_color_normal: 0.5, 0.5, 0.5, 1  # Cinza quando bloqueado
+        line_color_normal: 0, 0, 0, 0        # Sem linha quando bloqueado
+        
+    MDBoxLayout:
+        size_hint_x: 0.2
+        adaptive_width: True
+        spacing: "2dp"
+        
+        MDIconButton:
+            id: btn_edit
+            icon: "pencil"
+            icon_size: "20sp"
+            theme_text_color: "Custom"
+            text_color: 0.5, 0.5, 0.5, 1
+            opacity: 0 if root.is_email else 1
+            disabled: root.is_email
+            on_release: root.start_edit()
+            
+        MDIconButton:
+            id: btn_save
+            icon: "check"
+            icon_size: "20sp"
+            theme_text_color: "Custom"
+            text_color: 0, 0.7, 0, 1
+            opacity: 0
+            disabled: True
+            on_release: root.save_edit()
+            
+        MDIconButton:
+            id: btn_cancel
+            icon: "close"
+            icon_size: "20sp"
+            theme_text_color: "Custom"
+            text_color: 1, 0, 0, 1
+            opacity: 0
+            disabled: True
+            on_release: root.cancel_edit()
 
+<ActionRow@MDCard>:
+    size_hint_y: None
+    height: "50dp"
+    elevation: 0
+    md_bg_color: 1, 1, 1, 1
+    ripple_behavior: True
+    padding: ["10dp", "0dp", "10dp", "0dp"]
+    
+    text_label: ""
+    icon_name: "chevron-right"
+    text_color: 0, 0, 0, 1
+    
+    MDLabel:
+        text: root.text_label
+        bold: True
+        font_size: "16sp"
+        theme_text_color: "Custom"
+        text_color: root.text_color
+        
+    MDIcon:
+        icon: root.icon_name
+        theme_text_color: "Custom"
+        text_color: root.text_color
+        pos_hint: {"center_y": .5}
+
+<ProfileTabContent>:
+    md_bg_color: 1, 1, 1, 1
+
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: "20dp"
+        spacing: "10dp"
+        adaptive_height: True
+
+        # AVATAR
+        MDFloatLayout:
+            size_hint_y: None
+            height: "100dp"
+            
+            MDCard:
+                size_hint: None, None
+                size: "80dp", "80dp"
+                pos_hint: {"center_x": .5, "center_y": .5}
+                radius: [40, 40, 40, 40]
+                md_bg_color: 0.9, 0.9, 0.9, 1
+                elevation: 0
+                
+                MDIcon:
+                    icon: "account"
+                    font_size: "50sp"
+                    theme_text_color: "Custom"
+                    text_color: 0, 0, 0, 1
+                    pos_hint: {"center_x": .5, "center_y": .5}
+
+        # SWITCH DE EXIBIÇÃO
+        MDBoxLayout:
+            adaptive_height: True
+            padding: ["0dp", "10dp", "0dp", "10dp"]
+            
+            MDLabel:
+                text: "Modo de exibição"
+                bold: True
+                font_size: "16sp"
+            
+            MDSwitch:
+                active: False
+                pos_hint: {"center_y": .5}
+                icon_active: "check"
+                thumb_color_active: 0.22, 0.75, 0.94, 1
+                track_color_active: 0.22, 0.75, 0.94, 0.5
+
+        MDSeparator:
+
+        # DADOS DO USUÁRIO
+        MDBoxLayout:
+            id: fields_container
+            orientation: "vertical"
+            adaptive_height: True
+            spacing: "5dp"
+
+        # BOTÕES DE AÇÃO
+        MDBoxLayout:
+            orientation: "vertical"
+            adaptive_height: True
+            spacing: "5dp"
+            padding: ["0dp", "10dp", "0dp", "0dp"]
+
+            ActionRow:
+                id: btn_redefinir_senha
+                text_label: "Redefinir senha"
+                icon_name: "chevron-right"
+                on_release: root.go_to_reset_password()
+
+            MDSeparator:
+                id: sep_redefinir_senha
+
+            ActionRow:
+                text_label: "Sair da conta"
+                icon_name: "logout"
+                on_release: root.logout()
+
+            MDSeparator:
+
+            ActionRow:
+                text_label: "Excluir conta"
+                icon_name: "delete-forever"
+                text_color: 1, 0, 0, 1
+                on_release: root.open_delete_dialog()
+'''
+Builder.load_string(KV_PROFILE_TAB)
+
+class ProfileField(MDBoxLayout):
+    label_text = StringProperty("")
+    api_key = StringProperty("")
+    text_value = StringProperty("Carregando...")
+    is_email = BooleanProperty(False)
+    callback_save = ObjectProperty(None)
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.original_value = ""
+
+    def start_edit(self):
+        self.original_value = self.ids.field_input.text
+        self.ids.field_input.readonly = False
+        self.ids.field_input.text_color_normal = (0, 0, 0, 1) # Fica preto
+        self.ids.field_input.line_color_normal = (0.5, 0.5, 0.5, 1) # Mostra a linha
+        self.ids.field_input.focus = True
+        
+        self.ids.btn_edit.opacity = 0
+        self.ids.btn_edit.disabled = True
+        self.ids.btn_save.opacity = 1
+        self.ids.btn_save.disabled = False
+        self.ids.btn_cancel.opacity = 1
+        self.ids.btn_cancel.disabled = False
+
+    def cancel_edit(self):
+        self.ids.field_input.text = self.original_value
+        self._lock_field()
+
+    def save_edit(self):
+        if self.callback_save:
+            # Chama a função lá na tela principal para ir na internet
+            self.callback_save(self.api_key, self.ids.field_input.text, self)
+
+    def _lock_field(self):
+        self.ids.field_input.readonly = True
+        self.ids.field_input.text_color_normal = (0.5, 0.5, 0.5, 1)
+        self.ids.field_input.line_color_normal = (0, 0, 0, 0)
+        self.ids.field_input.focus = False
+        
+        self.ids.btn_edit.opacity = 1
+        self.ids.btn_edit.disabled = False
+        self.ids.btn_save.opacity = 0
+        self.ids.btn_save.disabled = True
+        self.ids.btn_cancel.opacity = 0
+        self.ids.btn_cancel.disabled = True
+
+
+class ProfileTabContent(ScrollView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fields_refs = {}
+        self.dialog = None
+        Clock.schedule_once(self.setup_fields, 0)
+        # Trocamos a chamada antiga por essa nova que pode ser repetida:
+        Clock.schedule_once(lambda dt: self.refresh_data(), 0.5)
+
+    @mainthread
+    def refresh_data(self):
+        # Volta tudo para 'Carregando...' visualmente
+        for field in self.fields_refs.values():
+            field.text_value = "Carregando..."
+            field.ids.field_input.text = "Carregando..."
+            
+        # Manda a thread buscar os dados novos na internet
+        threading.Thread(target=self.load_user_data).start()
+
+    def setup_fields(self, dt):
+        config_campos = [
+            {"label": "Nome", "key": "first_name", "email": False},
+            {"label": "Sobrenome", "key": "last_name", "email": False},
+            {"label": "Usuário", "key": "username", "email": False},
+            {"label": "Email", "key": "email", "email": True},
+        ]
+        
+        for c in config_campos:
+            field = ProfileField(
+                label_text=c["label"], 
+                api_key=c["key"], 
+                is_email=c["email"],
+                callback_save=self.salvar_na_api
+            )
+            self.fields_refs[c["key"]] = field
+            self.ids.fields_container.add_widget(field)
+
+    def load_user_data(self):
+        store = JsonStore('vigiaa_storage.json')
+        if not store.exists("session"): return
+        token = store.get("session")["token"]
+        
         try:
-            response = requests.delete(
-                f"{API_URL}/api/delete-account/",
+            res = requests.get(f"{config.API_URL}/api/profile/", headers={"Authorization": f"Bearer {token}"})
+            if res.status_code == 200:
+                data = res.json()
+                self.update_ui_fields(data)
+        except Exception as ex:
+            print(f"Erro ao carregar perfil: {ex}")
+
+    @mainthread
+    def update_ui_fields(self, data):
+        print("DADOS DA API:", data)
+        for key, field in self.fields_refs.items():
+            if key in data:
+                field.text_value = data.get(key, "")
+                field.ids.field_input.text = data.get(key, "")
+
+            if data.get("tem_senha") is False:
+                self.ids.btn_redefinir_senha.opacity = 0
+                self.ids.btn_redefinir_senha.disabled = True
+                self.ids.btn_redefinir_senha.height = "0dp" 
+                
+                self.ids.sep_redefinir_senha.opacity = 0
+                self.ids.sep_redefinir_senha.height = "0dp"
+
+    def salvar_na_api(self, api_key, novo_valor, field_instance):
+        threading.Thread(target=self._worker_save, args=(api_key, novo_valor, field_instance)).start()
+
+    def _worker_save(self, api_key, novo_valor, field_instance):
+        store = JsonStore('vigiaa_storage.json')
+        if not store.exists("session"): return
+        token = store.get("session")["token"]
+        
+        try:
+            res = requests.patch(
+                f"{config.API_URL}/api/profile/",
+                json={api_key: novo_valor},
                 headers={"Authorization": f"Bearer {token}"}
             )
-            
-            if response.status_code == 200:
-                page.snack_bar = ft.SnackBar(ft.Text("Conta desativada."))
-                page.snack_bar.open = True
-                page.update()
-                logout(None)
+            if res.status_code == 200:
+                self.mostrar_aviso(f"{field_instance.label_text} atualizado com sucesso!")
+                Clock.schedule_once(lambda dt: field_instance._lock_field(), 0)
             else:
-                page.snack_bar = ft.SnackBar(ft.Text("Erro ao desativar conta."), bgcolor="red")
-                page.snack_bar.open = True
-                page.update()
-                
-        except Exception as ex:
-            print(f"Erro: {ex}")
+                self.mostrar_aviso("Erro ao salvar dados.")
+                Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
+        except Exception as e:
+            self.mostrar_aviso(f"Erro de conexão: {e}")
+            Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
 
-    confirm_dialog = ft.AlertDialog(
-        modal=True,
-        title=ft.Text("Excluir Conta"),
-        content=ft.Text("Tem certeza? Isso desativará sua conta permanentemente."),
-        actions=[
-            ft.TextButton("Cancelar", on_click=lambda e: page.close(confirm_dialog)),
-            ft.TextButton("Sim, Excluir", on_click=delete_account_action, style=ft.ButtonStyle(color="red")),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
-    )
-
-    def open_delete_dialog(e):
-        page.open(confirm_dialog)
-
-    # --- FÁBRICA DE LINHAS (Visual Clean) ---
-    def create_clean_row(label, api_key, is_email=False):
-        text_field = ft.TextField(
-            value="Carregando...",
-            read_only=True,
-            border=ft.InputBorder.NONE,
-            text_size=16,
-            color="grey",
-            text_align=ft.TextAlign.LEFT,
-            expand=True,
-            disabled=is_email,
-            content_padding=ft.padding.only(left=20) 
-        )
-
-        fields_refs[api_key] = text_field
-
-        if is_email:
-            return ft.Column([
-                ft.Container(
-                    padding=ft.padding.symmetric(vertical=10),
-                    content=ft.Row(
-                        controls=[
-                            ft.Container(ft.Text(label, weight="bold", size=16, color="black"), width=100),
-                            text_field,
-                            ft.Container(width=30)
-                        ],
-                        alignment=ft.MainAxisAlignment.START
-                    )
-                ),
-                ft.Divider(height=1, thickness=0.5, color="#EEEEEE")
-            ])
-
-        btn_edit = ft.IconButton(icon=ft.Icons.EDIT, icon_color="grey", icon_size=20, tooltip="Editar")
-        btn_save = ft.IconButton(icon=ft.Icons.CHECK, icon_color="green", icon_size=20, tooltip="Salvar", visible=False)
-        btn_cancel = ft.IconButton(icon=ft.Icons.CLOSE, icon_color="red", icon_size=20, tooltip="Cancelar", visible=False)
-
-        original_value = [""]
-
-        def on_edit(e):
-            original_value[0] = text_field.value
-            text_field.read_only = False
-            text_field.color = "black"
-            text_field.content_padding = ft.padding.all(10) 
-            text_field.border = ft.InputBorder.UNDERLINE 
-            text_field.focus()
+    # --- AÇÕES DA CONTA ---
+    def logout(self):
+        if store.exists("session"):
+            store.delete("session")
             
-            btn_edit.visible = False
-            btn_save.visible = True
-            btn_cancel.visible = True
-            page.update()
-
-        def on_cancel(e):
-            text_field.value = original_value[0]
-            text_field.read_only = True
-            text_field.color = "grey"
-            text_field.text_align = ft.TextAlign.LEFT
-            text_field.content_padding = ft.padding.only(left=20)
-            text_field.border = ft.InputBorder.NONE
+        # --- A FAXINA (A MÁGICA ACONTECE AQUI) ---
+        # Voltamos tudo para o estado "Carregando..." antes de sair
+        for field in self.fields_refs.values():
+            field.text_value = "Carregando..."
+            field.ids.field_input.text = "Carregando..."
             
-            btn_edit.visible = True
-            btn_save.visible = False
-            btn_cancel.visible = False
-            page.update()
+        # Oculta o botão de redefinir senha por precaução (caso o próximo seja Google)
+        if 'btn_redefinir_senha' in self.ids:
+            self.ids.btn_redefinir_senha.opacity = 1
+            self.ids.btn_redefinir_senha.disabled = False
+            self.ids.btn_redefinir_senha.height = "50dp"
+            self.ids.sep_redefinir_senha.opacity = 1
+            self.ids.sep_redefinir_senha.height = "1dp"
 
-        def on_save(e):
-            token = page.client_storage.get("token")
-            payload = {api_key: text_field.value}
+        # Troca para a tela de login
+        MDApp.get_running_app().root.current = 'login'
 
-            try:
-                response = requests.patch(
-                    f"{API_URL}/api/profile/",
-                    json=payload,
-                    headers={"Authorization": f"Bearer {token}"}
-                )
-                if response.status_code == 200:
-                    page.snack_bar = ft.SnackBar(ft.Text(f"{label} salvo!"), bgcolor="green")
-                    text_field.read_only = True
-                    text_field.color = "grey"
-                    text_field.text_align = ft.TextAlign.LEFT
-                    text_field.content_padding = ft.padding.only(left=20)
-                    text_field.border = ft.InputBorder.NONE
-                    btn_edit.visible = True
-                    btn_save.visible = False
-                    btn_cancel.visible = False
-                else:
-                    page.snack_bar = ft.SnackBar(ft.Text("Erro ao salvar."), bgcolor="red")
-            except Exception as ex:
-                page.snack_bar = ft.SnackBar(ft.Text(f"Erro: {ex}"), bgcolor="red")
-            
-            page.snack_bar.open = True
-            page.update()
+    def go_to_reset_password(self):
+        MDApp.get_running_app().root.current = 'change_password'
 
-        btn_edit.on_click = on_edit
-        btn_cancel.on_click = on_cancel
-        btn_save.on_click = on_save
+    def open_delete_dialog(self):
+        if not self.dialog:
+            self.dialog = MDDialog(
+                title="Excluir Conta",
+                text="Tem certeza? Isso desativará sua conta permanentemente.",
+                buttons=[
+                    MDFlatButton(text="Cancelar", on_release=lambda x: self.dialog.dismiss()),
+                    MDFlatButton(text="Sim, Excluir", text_color=(1, 0, 0, 1), on_release=self.delete_account_action)
+                ],
+            )
+        self.dialog.open()
 
-        return ft.Column([
-            ft.Container(
-                padding=ft.padding.symmetric(vertical=5),
-                content=ft.Row(
-                    controls=[
-                        ft.Container(ft.Text(label, weight="bold", size=16, color="black"), width=100),
-                        text_field,
-                        ft.Row([btn_edit, btn_save, btn_cancel], spacing=0)
-                    ],
-                    alignment=ft.MainAxisAlignment.START
-                )
-            ),
-            ft.Divider(height=1, thickness=0.5, color="#EEEEEE")
-        ])
+    def delete_account_action(self, *args):
+        self.dialog.dismiss()
+        threading.Thread(target=self._worker_delete).start()
 
-    # --- BOTÕES DE AÇÃO ---
-
-    # 1. Redefinir Senha
-    def go_to_reset_password(e):
-        page.go("/change-password")
-
-    btn_reset_password = ft.Container(
-        padding=ft.padding.symmetric(vertical=15),
-        content=ft.Row(
-            controls=[
-                ft.Text("Redefinir senha", weight="bold", size=16, color="black"),
-                ft.Icon(ft.Icons.CHEVRON_RIGHT, color="grey")
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-        ),
-        on_click=go_to_reset_password,
-        ink=True 
-    )
-
-    # 2. Sair da Conta (Logout) - AGORA NO ESTILO LISTA
-    btn_logout = ft.Container(
-        padding=ft.padding.symmetric(vertical=15),
-        content=ft.Row(
-            controls=[
-                ft.Text("Sair da conta", weight="bold", size=16, color="black"),
-                ft.Icon(ft.Icons.LOGOUT, color="grey", size=20) # Ícone de porta/saída
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-        ),
-        on_click=logout,
-        ink=True 
-    )
-
-    # 3. Excluir Conta (Vermelho)
-    btn_delete_account = ft.Container(
-        padding=ft.padding.symmetric(vertical=15),
-        content=ft.Row(
-            controls=[
-                ft.Text("Excluir conta", weight="bold", size=16, color="red"),
-                ft.Icon(ft.Icons.DELETE_FOREVER, color="red") 
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-        ),
-        on_click=open_delete_dialog,
-        ink=True 
-    )
-
-    switch_display = ft.Container(
-        padding=ft.padding.symmetric(vertical=10),
-        content=ft.Row(
-            controls=[
-                ft.Text("Modo de exibição", weight="bold", size=16),
-                ft.Switch(active_color="#39BFEF")
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN
-        )
-    )
-
-    def load_user_data():
-        token = page.client_storage.get("token")
-        if not token: return
+    def _worker_delete(self):
+        store = JsonStore('vigiaa_storage.json')
+        if not store.exists("session"): return
+        token = store.get("session")["token"]
         try:
-            response = requests.get(f"{API_URL}/api/profile/", headers={"Authorization": f"Bearer {token}"})
-            if response.status_code == 200:
-                data = response.json()
-                if 'username' in fields_refs: fields_refs['username'].value = data.get('username', '')
-                if 'email' in fields_refs: fields_refs['email'].value = data.get('email', '')
-                if 'first_name' in fields_refs: fields_refs['first_name'].value = data.get('first_name', '')
-                if 'last_name' in fields_refs: fields_refs['last_name'].value = data.get('last_name', '')
-                page.update()
-        except Exception as ex:
-            print(f"Erro: {ex}")
+            res = requests.delete(f"{config.API_URL}/api/delete-account/", headers={"Authorization": f"Bearer {token}"})
+            if res.status_code == 200:
+                self.mostrar_aviso("Conta desativada com sucesso.")
+                Clock.schedule_once(lambda dt: self.logout(), 0)
+            else:
+                self.mostrar_aviso("Erro ao desativar conta.")
+        except Exception as e:
+            self.mostrar_aviso("Sem conexão com a internet.")
 
-    # --- MONTAGEM DA TELA ---
-    row_first_name = create_clean_row("Nome", "first_name")
-    row_last_name = create_clean_row("Sobrenome", "last_name")
-    row_username = create_clean_row("Usuário", "username")
-    row_email = create_clean_row("Email", "email", is_email=True)
-
-    content = ft.Container(
-        bgcolor="white",
-        padding=20,
-        content=ft.Column(
-            [
-                ft.Container(
-                    content=ft.CircleAvatar(
-                        content=ft.Icon(ft.Icons.PERSON, size=60, color="black"), 
-                        radius=60, 
-                        bgcolor="#E0E0E0"
-                    ),
-                    alignment=ft.alignment.center,
-                    padding=ft.padding.only(bottom=30)
-                ),
-                
-                switch_display,
-                ft.Divider(height=1, thickness=0.5, color="#EEEEEE"),
-                
-                row_first_name,
-                row_last_name,
-                row_username,
-                row_email,
-                
-                # --- Seção de Ações ---
-                btn_reset_password,
-                ft.Divider(height=1, thickness=0.5, color="#EEEEEE"),
-                
-                # Sair da Conta (Agora aqui em cima)
-                btn_logout,
-                ft.Divider(height=1, thickness=0.5, color="#EEEEEE"),
-                
-                # Excluir Conta (Por último)
-                btn_delete_account,
-                
-            ],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            scroll=ft.ScrollMode.AUTO
-        ),
-        expand=True
-    )
-
-    load_user_data()
-    return content
+    @mainthread
+    def mostrar_aviso(self, texto):
+        MDSnackbar(
+            MDLabel(
+                text=texto,
+                theme_text_color="Custom",
+                text_color=(1, 1, 1, 1) # Letra branca para ficar visível no fundo escuro
+            )
+        ).open()

@@ -1,161 +1,151 @@
-import flet as ft
+from kivymd.uix.screen import MDScreen
+from kivy.lang import Builder
+from kivy.clock import mainthread, Clock
+from kivy.storage.jsonstore import JsonStore
+from kivymd.uix.snackbar import MDSnackbar
+from kivymd.uix.label import MDLabel
 import requests
+import threading
 import config
 
-def create_change_password_view(page: ft.Page):
-    print("--- Abrindo Tela de Alterar Senha ---")
-    
-    API_URL = config.API_URL
-    
-    # --- ESTILOS ---
-    header_gradient = ft.LinearGradient(
-        begin=ft.alignment.top_left,
-        end=ft.alignment.bottom_right,
-        colors=["#39BFEF", "#4ADE80"] 
-    )
-    
-    input_style = {
-        "border": ft.InputBorder.UNDERLINE,
-        "border_color": "#E0E0E0",
-        "focused_border_color": "#39BFEF",
-        "label_style": ft.TextStyle(color="grey", size=14),
-        "text_style": ft.TextStyle(color="black", size=16),
-        "bgcolor": "transparent",
-        "content_padding": ft.padding.only(bottom=5, top=15),
-        "password": True,
-        "can_reveal_password": True
-    }
+store = JsonStore('vigiaa_storage.json')
 
-    # --- CAMPOS ---
-    old_pass = ft.TextField(label="Senha Atual", **input_style)
-    new_pass = ft.TextField(label="Nova Senha", **input_style)
-    confirm_pass = ft.TextField(label="Confirmar Nova Senha", **input_style)
-    
-    status_text = ft.Text(size=14, text_align=ft.TextAlign.CENTER)
+KV_CHANGE_PASSWORD = '''
+<ChangePasswordScreen>:
+    md_bg_color: 1, 1, 1, 1
 
-    # --- FUNÇÕES ---
-    def go_back(e):
-        # CORREÇÃO: Verificação manual da pilha de telas
-        if len(page.views) > 1:
-            page.views.pop() # Remove a tela atual
-            top_view = page.views[-1] # Pega a tela anterior
-            page.go(top_view.route) # Navega para ela
-        else:
-            page.go("/perfil") # Se não tiver histórico, força ir para a Home
-        page.update()
+    MDBoxLayout:
+        orientation: "vertical"
 
-    def change_click(e):
-        token = page.client_storage.get("token")
-        if not token: 
-            page.go("/login")
+        # HEADER
+        MDTopAppBar:
+            title: "Alterar senha"
+            md_bg_color: 0.22, 0.75, 0.94, 1  # Azul ciano
+            specific_text_color: 1, 1, 1, 1
+            elevation: 2
+            left_action_items: [["chevron-left", lambda x: root.go_back()]]
+
+        # BODY
+        ScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "30dp"
+                spacing: "20dp"
+                adaptive_height: True
+
+                MDLabel:
+                    text: "Defina sua nova credencial"
+                    theme_text_color: "Hint"
+                    font_size: "14sp"
+                    adaptive_height: True
+
+                MDTextField:
+                    id: old_pass
+                    hint_text: "Senha Atual"
+                    password: True
+                    color_mode: "custom"
+                    line_color_focus: 0.22, 0.75, 0.94, 1
+
+                MDTextField:
+                    id: new_pass
+                    hint_text: "Nova Senha"
+                    password: True
+                    color_mode: "custom"
+                    line_color_focus: 0.22, 0.75, 0.94, 1
+
+                MDTextField:
+                    id: confirm_pass
+                    hint_text: "Confirmar Nova Senha"
+                    password: True
+                    color_mode: "custom"
+                    line_color_focus: 0.22, 0.75, 0.94, 1
+
+                # Espaçamento extra
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: "20dp"
+
+                MDRaisedButton:
+                    text: "Salvar Nova Senha"
+                    md_bg_color: 0, 0, 0, 1
+                    text_color: 1, 1, 1, 1
+                    size_hint_x: 1
+                    elevation: 0
+                    padding: "15dp"
+                    on_release: root.change_click()
+'''
+Builder.load_string(KV_CHANGE_PASSWORD)
+
+class ChangePasswordScreen(MDScreen):
+    def go_back(self):
+        # Desliza a tela de volta para a Home
+        self.manager.current = 'home'
+
+    def change_click(self):
+        old_p = self.ids.old_pass.text
+        new_p = self.ids.new_pass.text
+        conf_p = self.ids.confirm_pass.text
+
+        if not old_p or not new_p or not conf_p:
+            self.mostrar_aviso("Preencha todos os campos.", "red")
+            return
+
+        if new_p != conf_p:
+            self.mostrar_aviso("As novas senhas não coincidem.", "red")
+            return
+
+        self.mostrar_aviso("Salvando...", "blue")
+        threading.Thread(target=self._worker_change, args=(old_p, new_p)).start()
+
+    def _worker_change(self, old_p, new_p):
+        if not store.exists("session"):
+            Clock.schedule_once(lambda dt: self.ir_para_login(), 0)
             return
             
-        if not old_pass.value or not new_pass.value or not confirm_pass.value:
-            status_text.value = "Preencha todos os campos."
-            status_text.color = "red"
-            status_text.update()
-            return
-
-        if new_pass.value != confirm_pass.value:
-            status_text.value = "As novas senhas não coincidem."
-            status_text.color = "red"
-            status_text.update()
-            return
-
-        status_text.value = "Salvando..."
-        status_text.color = "blue"
-        status_text.update()
-
+        token = store.get("session")["token"]
+        
         try:
             headers = {"Authorization": f"Bearer {token}", "ngrok-skip-browser-warning": "true"}
-            
             response = requests.put(
-                f"{API_URL}/api/change-password/", 
-                data={"old_password": old_pass.value, "new_password": new_pass.value},
+                f"{config.API_URL}/api/change-password/", 
+                data={"old_password": old_p, "new_password": new_p},
                 headers=headers
             )
             
             if response.status_code in [200, 204]:
-                status_text.value = "Senha alterada com sucesso!"
-                status_text.color = "green"
-                old_pass.value = ""; new_pass.value = ""; confirm_pass.value = ""
-                old_pass.update(); new_pass.update(); confirm_pass.update()
+                self.mostrar_aviso("Senha alterada com sucesso!", "green")
+                Clock.schedule_once(self.limpar_campos, 0)
             elif response.status_code == 400:
-                status_text.value = "Senha incorreta ou inválida."
-                status_text.color = "red"
+                self.mostrar_aviso("Senha incorreta ou inválida.", "red")
             elif response.status_code == 401:
-                page.go("/login")
+                Clock.schedule_once(lambda dt: self.ir_para_login(), 0)
             else:
-                status_text.value = f"Erro {response.status_code}"
-                status_text.color = "red"
+                self.mostrar_aviso(f"Erro {response.status_code}", "red")
         except Exception as ex:
-            status_text.value = f"Erro de conexão: {ex}"
-            status_text.color = "red"
+            self.mostrar_aviso("Erro de conexão com a internet.", "red")
+
+    @mainthread
+    def limpar_campos(self, dt):
+        self.ids.old_pass.text = ""
+        self.ids.new_pass.text = ""
+        self.ids.confirm_pass.text = ""
         
-        status_text.update()
+        # Opcional: volta pra aba de perfil automaticamente depois de 1.5s
+        Clock.schedule_once(lambda dt: self.go_back(), 1.5)
 
-    # --- HEADER ---
-    header = ft.Container(
-        height=80,
-        gradient=header_gradient,
-        padding=ft.padding.symmetric(horizontal=15),
-        alignment=ft.alignment.center_left,
-        content=ft.Row(
-            controls=[
-                ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="white", on_click=go_back),
-                ft.Text("Alterar senha", color="white", size=20, weight="bold")
-            ]
-        )
-    )
+    @mainthread
+    def ir_para_login(self):
+        self.manager.current = 'login'
 
-    # --- BOTÃO ---
-    btn_save = ft.ElevatedButton(
-        "Salvar Nova Senha",
-        on_click=change_click,
-        bgcolor="black",
-        color="white",
-        width=float("inf"),
-        height=50,
-        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
-    )
-
-    # --- BODY ---
-    body_content = ft.Column(
-        controls=[
-            ft.Text("Defina sua nova credencial", color="grey", size=14),
-            ft.Container(height=30),
-            old_pass,
-            ft.Container(height=20),
-            new_pass,
-            ft.Container(height=20),
-            confirm_pass,
-            ft.Container(height=40),
-            btn_save,
-            ft.Container(height=20),
-            status_text
-        ]
-    )
-
-    body = ft.Container(
-        padding=30,
-        bgcolor="white",
-        expand=True,
-        content=ft.ListView(
-            controls=[body_content],
-            padding=0
-        )
-    )
-
-    # --- VIEW FINAL ---
-    return ft.View(
-        route="/change-password",
-        bgcolor="white",
-        padding=0,
-        controls=[
-            ft.Column(
-                expand=True,
-                spacing=0,
-                controls=[header, body]
-            )
-        ]
-    )
+    @mainthread
+    def mostrar_aviso(self, texto, cor):
+        cores_rgba = {
+            "red": (1, 0, 0, 1),
+            "green": (0, 0.7, 0, 1),
+            "blue": (0.22, 0.75, 0.94, 1)
+        }
+        cor_escolhida = cores_rgba.get(cor, (1, 1, 1, 1))
+        
+        MDSnackbar(
+            MDLabel(text=texto, theme_text_color="Custom", text_color=cor_escolhida)
+        ).open()

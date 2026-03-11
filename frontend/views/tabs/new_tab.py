@@ -1,96 +1,133 @@
-import flet as ft
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivy.uix.scrollview import ScrollView
+from kivy.lang import Builder
+from kivymd.app import MDApp
 
-def get_new_tab(page: ft.Page):
-    
-    def go_to_form(route):
-        page.go(route)
+# O Visual da Aba "Novo"
+KV_NEW_TAB = '''
+<NewTabContent>:
+    md_bg_color: 1, 1, 1, 1
 
-    # --- Componente: Card de Cadastro ---
-    def create_action_card(title, description, img_filename, route):
-        img_src = f"/images/{img_filename}"
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: "20dp"
+        spacing: "20dp"
+        adaptive_height: True
 
-        return ft.Container(
-            bgcolor="white",
-            border_radius=15,
-            # Sombra com Hexadecimal Direto (Sem erro de ft.colors)
-            shadow=ft.BoxShadow(
-                blur_radius=10, 
-                color="#1A000000", 
-                offset=ft.Offset(0, 4)
-            ),
-            content=ft.Stack(
-                controls=[
-                    ft.Column(
-                        spacing=0,
-                        controls=[
-                            ft.Image(
-                                src=img_src,
-                                height=150,
-                                width=float("inf"),
-                                fit=ft.ImageFit.COVER,
-                                border_radius=ft.border_radius.only(top_left=15, top_right=15),
-                                error_content=ft.Container(bgcolor="#EEEEEE", height=150, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.IMAGE_NOT_SUPPORTED, color="grey"))
-                            ),
-                            ft.Container(
-                                padding=ft.padding.only(top=15, left=20, right=20, bottom=20),
-                                content=ft.Column(
-                                    spacing=5,
-                                    controls=[
-                                        ft.Text(title, size=16, weight="bold", color="black"),
-                                        ft.Text(description, size=13, color="grey", selectable=False),
-                                    ]
-                                )
-                            )
-                        ]
-                    ),
-                    
-                    ft.Container(
-                        content=ft.IconButton(
-                            icon=ft.Icons.ADD, 
-                            icon_color="white", 
-                            icon_size=30,
-                            on_click=lambda _: go_to_form(route)
-                        ),
-                        bgcolor="#39BFEF",
-                        shape=ft.BoxShape.CIRCLE,
-                        width=50, height=50,
-                        alignment=ft.alignment.center,
-                        right=20, top=125,
-                        shadow=ft.BoxShadow(blur_radius=5, color="#4D000000")
-                    )
-                ]
-            ),
-            margin=ft.margin.only(bottom=40) # Aumentei o espaço aqui!
-        )
+        MDLabel:
+            text: "Cadastro"
+            font_size: "24sp"
+            bold: True
+            theme_text_color: "Custom"
+            text_color: 0, 0, 0, 1
+            adaptive_height: True
 
-    # --- Conteúdo da Aba ---
-    content = ft.Container(
-        padding=20,
-        content=ft.Column(
-            controls=[
-                ft.Text("Cadastro", size=24, weight="bold", color="black"),
-                ft.Container(height=10),
+        # --- CARD 1: FOCO DE DENGUE ---
+        MDCard:
+            orientation: "vertical"
+            size_hint_y: None
+            height: "260dp"
+            radius: [15, 15, 15, 15]
+            elevation: 2
+            md_bg_color: 1, 1, 1, 1
+            on_release: root.go_to_foco()
+
+            # Imagem no topo do card
+            FitImage:
+                source: "assets/images/focos.jpg"
+                size_hint_y: 0.55
+                radius: [15, 15, 0, 0]
+
+            # Área de texto e botão do card
+            MDRelativeLayout:
+                size_hint_y: 0.45
                 
-                create_action_card(
-                    "Cadastrar novo foco de dengue",
-                    "Forneça informações necessárias para o cadastro de um local com possíveis focos do mosquito.",
-                    "focos.jpg", 
-                    "/form-foco"
-                ),
+                MDBoxLayout:
+                    orientation: "vertical"
+                    padding: ["15dp", "10dp", "60dp", "10dp"] # Espaço na direita pro botão flutuar
+                    spacing: "5dp"
 
-                create_action_card(
-                    "Cadastrar novo paciente",
-                    "Forneça informações necessárias para o cadastro de um paciente.",
-                    "paciente.jpg", 
-                    "/form-caso" # CORREÇÃO: Mudei para /form-caso para bater com o main.py!
-                ),
+                    MDLabel:
+                        text: "Cadastrar novo foco"
+                        font_size: "16sp"
+                        bold: True
+                        adaptive_height: True
+
+                    MDLabel:
+                        text: "Forneça informações sobre um local com possíveis focos do mosquito."
+                        theme_text_color: "Hint"
+                        font_size: "13sp"
+                        adaptive_height: True
+                        
+                # Botão Redondo (+) flutuando em cima da borda
+                MDFloatingActionButton:
+                    icon: "plus"
+                    md_bg_color: 0.22, 0.75, 0.94, 1 # Azul Ciano
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    elevation: 1
+                    pos_hint: {"right": 0.95, "center_y": 0.5}
+                    on_release: root.go_to_foco()
+
+        # --- CARD 2: PACIENTE ---
+        MDCard:
+            orientation: "vertical"
+            size_hint_y: None
+            height: "260dp"
+            radius: [15, 15, 15, 15]
+            elevation: 2
+            md_bg_color: 1, 1, 1, 1
+            on_release: root.go_to_caso()
+
+            # Imagem no topo do card
+            FitImage:
+                source: "assets/images/paciente.jpg"
+                size_hint_y: 0.55
+                radius: [15, 15, 0, 0]
+
+            # Área de texto e botão do card
+            MDRelativeLayout:
+                size_hint_y: 0.45
                 
-                ft.Container(height=50)
-            ],
-            scroll=ft.ScrollMode.AUTO
-        ),
-        expand=True,
-        alignment=ft.alignment.top_left
-    )
+                MDBoxLayout:
+                    orientation: "vertical"
+                    padding: ["15dp", "10dp", "60dp", "10dp"]
+                    spacing: "5dp"
 
-    return content
+                    MDLabel:
+                        text: "Cadastrar novo paciente"
+                        font_size: "16sp"
+                        bold: True
+                        adaptive_height: True
+
+                    MDLabel:
+                        text: "Forneça informações necessárias para o cadastro de um paciente."
+                        theme_text_color: "Hint"
+                        font_size: "13sp"
+                        adaptive_height: True
+                        
+                # Botão Redondo (+) flutuando em cima da borda
+                MDFloatingActionButton:
+                    icon: "plus"
+                    md_bg_color: 0.22, 0.75, 0.94, 1 # Azul Ciano
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    elevation: 1
+                    pos_hint: {"right": 0.95, "center_y": 0.5}
+                    on_release: root.go_to_caso()
+
+        # Espaçamento no fundo para o menu inferior não engolir o último card
+        MDBoxLayout:
+            size_hint_y: None
+            height: "80dp"
+'''
+Builder.load_string(KV_NEW_TAB)
+
+class NewTabContent(ScrollView):
+    def go_to_foco(self):
+        # Acha o maestro do app e manda mudar para a tela de Formulário de Foco
+        MDApp.get_running_app().root.current = 'form_foco'
+
+    def go_to_caso(self):
+        # Acha o maestro do app e manda mudar para a tela de Formulário de Paciente
+        MDApp.get_running_app().root.current = 'form_caso'

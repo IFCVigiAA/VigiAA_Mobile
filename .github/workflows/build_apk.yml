@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK (Kivy)
 
 on:
   push:
@@ -10,41 +10,57 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Baixando o código do repositório
+      uses: actions/checkout@v4
 
-    - name: Setup Python
+    - name: Configurando o Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.24.0'
-
-    - name: Build APK (Oficial Flet)
+    - name: Instalando Ferramentas do Linux (Buildozer OS)
       run: |
-        echo "🚀 INICIANDO BUILD LISO E DIRETO"
+        sudo apt-get update
+        sudo apt-get install -y build-essential git python3-dev ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev libffi-dev libssl-dev libtool autoconf automake pkg-config unzip zip
 
-        # 1. Configura Ambiente
-        python -m venv venv
-        source venv/bin/activate
+    - name: Instalando Buildozer
+      run: |
         pip install --upgrade pip
-        pip install flet==0.28.3
+        pip install buildozer cython virtualenv
 
-        # 2. Entrando na pasta do app
-        echo "📂 Entrando na pasta frontend..."
-        cd frontend 
-
-        # 3. Gera requirements e Roda o Build
-        printf "flet==0.28.3\nrequests\ncertifi\nurllib3\ncharset-normalizer\nidna\n" > requirements.txt
+    - name: Mágica da Receita (buildozer.spec)
+      run: |
+        echo "📂 Entrando na pasta frontend e criando a receita..."
+        cd frontend
+        buildozer init
         
-        echo "🚀 Flet Build Iniciado com Permissões Nativas..."
-        # É esta linha mágica que avisa o Android para liberar o GPS!
-        flet build apk --permissions location 
+        python -c "
+        with open('buildozer.spec', 'r') as f: text = f.read()
+        
+        # 1. Nome e Pacote
+        text = text.replace('title = My Application', 'title = VigiAA')
+        text = text.replace('package.name = myapp', 'package.name = vigiaa')
+        
+        # 2. Extensões permitidas (O salva-vidas das imagens JPEG e fontes!)
+        text = text.replace('source.include_exts = py,png,jpg,kv,atlas', 'source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf')
+        
+        # 3. Bibliotecas do Python (Com Plyer para o GPS)
+        text = text.replace('requirements = python3, kivy==2.0.0', 'requirements = python3, kivy==2.3.1, kivymd, requests, plyer')
+        
+        # 4. Permissões Nativas do Android (Internet e GPS!)
+        text = text.replace('# android.permissions = INTERNET', 'android.permissions = INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION')
+        
+        with open('buildozer.spec', 'w') as f: f.write(text)
+        "
+
+    - name: Fabricando o APK (Pode ir tomar café!)
+      run: |
+        echo "🚀 Iniciando a máquina de APKs..."
+        cd frontend
+        yes | buildozer android debug
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: vigiaa-release-FINAL-${{ github.run_number }}
-        path: frontend/build/apk/app-release.apk
+        path: frontend/bin/*.apk
