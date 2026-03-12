@@ -18,16 +18,16 @@ jobs:
 
       - name: Preparar Receita do VigiAA (buildozer.spec)
         run: |
-          # 1. Instalamos o buildozer rapidinho só para criar a receita
+          # Instalamos o buildozer só para criar a receita
           pip install buildozer
           
           echo "📂 Entrando na pasta frontend..."
           cd frontend
           
-          # 2. Criamos a receita padrão
+          # Criamos a receita padrão
           buildozer init
           
-          # 3. Modificamos a receita com o Python
+          # Modificamos a receita com o Python
           python3 -c "
           with open('buildozer.spec', 'r') as f: text = f.read()
           
@@ -47,7 +47,7 @@ jobs:
         id: buildozer
         with:
           workdir: frontend
-          buildozer_args: android debug
+          command: buildozer android debug    # <-- O AJUSTE FOI AQUI!
 
       - name: Disponibilizar APK para Download
         uses: actions/upload-artifact@v4
