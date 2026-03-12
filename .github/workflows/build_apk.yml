@@ -47,13 +47,17 @@ jobs:
           text = text.replace('package.name = myapp', 'package.name = vigiaa')
           text = text.replace('source.include_exts = py,png,jpg,kv,atlas', 'source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf')
           
-          # A CORREÇÃO ESTÁ AQUI: Um caçador de linha implacável!
-          text = re.sub(r'^requirements = .*', 'requirements = python3, kivy==2.3.1, kivymd, requests, plyer', text, flags=re.MULTILINE)
+          # A MÁGICA DE OURO: Versões compatíveis e biblioteca Pillow para imagens!
+          text = re.sub(r'^requirements = .*', 'requirements = python3, kivy==2.2.1, kivymd==1.1.1, pillow, requests, plyer', text, flags=re.MULTILINE)
           
           text = text.replace('# android.permissions = INTERNET', 'android.permissions = INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION')
           text = text.replace('# android.accept_sdk_license = False', 'android.accept_sdk_license = True')
           text = text.replace('# android.api = 27', 'android.api = 33')
           text = text.replace('# android.minapi = 21', 'android.minapi = 24')
+          
+          # FORÇANDO SUPORTE A CELULARES MODERNOS (64 bits e 32 bits)
+          text = re.sub(r'^#?android\.archs = .*', 'android.archs = arm64-v8a, armeabi-v7a', text, flags=re.MULTILINE)
+          
           text = text.replace('log_level = 1', 'log_level = 2')
           
           with open('buildozer.spec', 'w') as f: f.write(text)
