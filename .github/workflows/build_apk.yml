@@ -7,50 +7,65 @@ on:
 
 jobs:
   build-android:
-    runs-on: ubuntu-latest
-    
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    runs-on: ubuntu-22.04
 
     steps:
-      - name: Baixando o Código do Repositório
+      - name: Baixando o Código
         uses: actions/checkout@v4
 
-      - name: Preparar Receita do VigiAA (buildozer.spec)
+      - name: Configurando o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # O SEGREDO ESTÁ AQUI: O Android SDK precisa dessa versão exata do Java!
+      - name: Configurando o Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Instalando Ferramentas Essenciais do Linux
         run: |
-          # Instalamos o buildozer só para criar a receita
-          pip install buildozer
-          
-          echo "📂 Entrando na pasta frontend..."
+          sudo apt-get update
+          sudo apt-get install -y build-essential git ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev libffi-dev libssl-dev autoconf automake libtool pkg-config unzip zip
+
+      - name: Instalando Buildozer e Cython
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython virtualenv
+
+      - name: Mágica da Receita (buildozer.spec)
+        run: |
           cd frontend
+          buildozer init || true
           
-          # Criamos a receita padrão
-          buildozer init
-          
-          # Modificamos a receita com o Python
           python3 -c "
           with open('buildozer.spec', 'r') as f: text = f.read()
           
           text = text.replace('title = My Application', 'title = VigiAA')
           text = text.replace('package.name = myapp', 'package.name = vigiaa')
           text = text.replace('source.include_exts = py,png,jpg,kv,atlas', 'source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf')
-          text = text.replace('requirements = python3, kivy==2.0.0', 'requirements = python3, kivy==2.3.1, kivymd, requests, plyer, cython')
+          text = text.replace('requirements = python3, kivy==2.0.0', 'requirements = python3, kivy==2.3.1, kivymd, requests, plyer')
           text = text.replace('# android.permissions = INTERNET', 'android.permissions = INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION')
+          
+          # Isso impede o Buildozer de travar pedindo [y/n]
+          text = text.replace('# android.accept_sdk_license = False', 'android.accept_sdk_license = True')
+          
+          # APIs modernas para o GPS funcionar
           text = text.replace('# android.api = 27', 'android.api = 33')
           text = text.replace('# android.minapi = 21', 'android.minapi = 24')
           
           with open('buildozer.spec', 'w') as f: f.write(text)
           "
 
-      - name: Fabricar o APK com Action Oficial
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          workdir: frontend
-          command: buildozer android debug    # <-- O AJUSTE FOI AQUI!
+      - name: Fabricar o APK
+        run: |
+          cd frontend
+          buildozer android debug
 
       - name: Disponibilizar APK para Download
         uses: actions/upload-artifact@v4
         with:
           name: vigiaa-apk-release-${{ github.run_number }}
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: frontend/bin/*.apk
