@@ -29,37 +29,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev libffi-dev libssl-dev autoconf automake libtool pkg-config unzip zip
 
-      - name: Instalando Buildozer e Cython
+      - name: Instalando Buildozer e Cython (Versões Modernas)
         run: |
           pip install --upgrade pip
+          # Deixando o Cython moderno para combinar com o Kivy moderno!
           pip install buildozer cython virtualenv setuptools
 
-      - name: Escrevendo a Receita Perfeita (buildozer.spec)
+      - name: Criando a Receita Pura do VigiAA
         run: |
           cd frontend
-          buildozer init || true
+          # Apaga qualquer receita velha
+          rm -f buildozer.spec
           
-          cat << 'EOF' > config_spec.py
-          lines = []
-          with open('buildozer.spec', 'r') as f:
-              for line in f:
-                  if line.startswith('title ='): line = 'title = VigiAA\n'
-                  elif line.startswith('package.name ='): line = 'package.name = vigiaa\n'
-                  elif line.startswith('source.include_exts ='): line = 'source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf\n'
-                  elif line.startswith('requirements ='): line = 'requirements = python3, kivy==2.3.1, kivymd==1.2.0, pillow, requests, plyer\n'
-                  elif line.startswith('# android.permissions ='): line = 'android.permissions = INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION\n'
-                  elif line.startswith('# android.accept_sdk_license ='): line = 'android.accept_sdk_license = True\n'
-                  elif line.startswith('# android.api ='): line = 'android.api = 34\n'
-                  elif line.startswith('# android.minapi ='): line = 'android.minapi = 24\n'
-                  elif line.startswith('# android.archs ='): line = 'android.archs = arm64-v8a\n'
-                  lines.append(line)
-          with open('buildozer.spec', 'w') as f:
-              f.writelines(lines)
+          # Cria uma receita perfeita do zero
+          cat << 'EOF' > buildozer.spec
+          [app]
+          title = VigiAA
+          package.name = vigiaa
+          package.domain = org.ifcvigiaa
+          source.dir = .
+          source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf
+          version = 1.0
+          
+          # O PAR DE OURO E O GPS (plyer)
+          requirements = python3,kivy==2.3.0,kivymd==1.2.0,pillow,requests,plyer
+          
+          orientation = portrait
+          android.permissions = INTERNET,ACCESS_FINE_LOCATION,ACCESS_COARSE_LOCATION
+          android.accept_sdk_license = True
+          android.api = 33
+          android.minapi = 24
+          android.archs = arm64-v8a
+          p4a.branch = master
+          
+          [buildozer]
+          log_level = 2
+          warn_on_root = 1
           EOF
-          python3 config_spec.py
 
-      - name: Fabricar o APK (Verdadeiro Erro Revelado)
-        # ISSO APAGA O NDK 27 DO GITHUB DA MEMÓRIA ANTES DE RODAR
+      - name: Fabricar o APK
         env:
           ANDROID_HOME: ''
           ANDROID_SDK_ROOT: ''
@@ -67,7 +75,6 @@ jobs:
           ANDROID_NDK_ROOT: ''
         run: |
           cd frontend
-          # TIRAMOS O "yes |" PARA O ERRO REAL APARECER SE DER RUIM
           buildozer android debug
 
       - name: Disponibilizar APK
