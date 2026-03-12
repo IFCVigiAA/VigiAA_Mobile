@@ -32,14 +32,13 @@ jobs:
       - name: Instalando Buildozer e Cython
         run: |
           pip install --upgrade pip
-          pip install buildozer cython virtualenv
+          pip install buildozer cython virtualenv setuptools
 
       - name: Escrevendo a Receita Perfeita (buildozer.spec)
         run: |
           cd frontend
           buildozer init || true
           
-          # Script super seguro para alterar a receita linha por linha
           cat << 'EOF' > config_spec.py
           lines = []
           with open('buildozer.spec', 'r') as f:
@@ -47,24 +46,29 @@ jobs:
                   if line.startswith('title ='): line = 'title = VigiAA\n'
                   elif line.startswith('package.name ='): line = 'package.name = vigiaa\n'
                   elif line.startswith('source.include_exts ='): line = 'source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf\n'
-                  elif line.startswith('requirements ='): line = 'requirements = python3, kivy==2.3.0, kivymd==1.2.0, pillow, requests, plyer\n'
+                  elif line.startswith('requirements ='): line = 'requirements = python3, kivy==2.3.1, kivymd==1.2.0, pillow, requests, plyer\n'
                   elif line.startswith('# android.permissions ='): line = 'android.permissions = INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION\n'
                   elif line.startswith('# android.accept_sdk_license ='): line = 'android.accept_sdk_license = True\n'
                   elif line.startswith('# android.api ='): line = 'android.api = 34\n'
                   elif line.startswith('# android.minapi ='): line = 'android.minapi = 24\n'
                   elif line.startswith('# android.archs ='): line = 'android.archs = arm64-v8a\n'
-                  elif line.startswith('# p4a.branch ='): line = 'p4a.branch = master\n'
                   lines.append(line)
           with open('buildozer.spec', 'w') as f:
               f.writelines(lines)
           EOF
           python3 config_spec.py
 
-      - name: Fabricar o APK (Rápido - Apenas 64-bits)
+      - name: Fabricar o APK (Verdadeiro Erro Revelado)
+        # ISSO APAGA O NDK 27 DO GITHUB DA MEMÓRIA ANTES DE RODAR
+        env:
+          ANDROID_HOME: ''
+          ANDROID_SDK_ROOT: ''
+          ANDROID_NDK_HOME: ''
+          ANDROID_NDK_ROOT: ''
         run: |
           cd frontend
-          unset ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK_HOME ANDROID_NDK_ROOT
-          yes | buildozer android debug
+          # TIRAMOS O "yes |" PARA O ERRO REAL APARECER SE DER RUIM
+          buildozer android debug
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
