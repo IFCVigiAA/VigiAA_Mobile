@@ -32,7 +32,6 @@ jobs:
       - name: Instalando Buildozer e Cython Estável
         run: |
           pip install --upgrade pip
-          # Fixar o Cython no 0.29.33 previne 99% dos erros de compilação do Kivy
           pip install buildozer cython==0.29.33 virtualenv
 
       - name: Preparando a Receita (buildozer.spec)
@@ -41,12 +40,16 @@ jobs:
           buildozer init || true
           
           python3 -c "
+          import re
           with open('buildozer.spec', 'r') as f: text = f.read()
           
           text = text.replace('title = My Application', 'title = VigiAA')
           text = text.replace('package.name = myapp', 'package.name = vigiaa')
           text = text.replace('source.include_exts = py,png,jpg,kv,atlas', 'source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf')
-          text = text.replace('requirements = python3, kivy==2.0.0', 'requirements = python3, kivy==2.3.1, kivymd, requests, plyer')
+          
+          # A CORREÇÃO ESTÁ AQUI: Um caçador de linha implacável!
+          text = re.sub(r'^requirements = .*', 'requirements = python3, kivy==2.3.1, kivymd, requests, plyer', text, flags=re.MULTILINE)
+          
           text = text.replace('# android.permissions = INTERNET', 'android.permissions = INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION')
           text = text.replace('# android.accept_sdk_license = False', 'android.accept_sdk_license = True')
           text = text.replace('# android.api = 27', 'android.api = 33')
@@ -56,13 +59,10 @@ jobs:
           with open('buildozer.spec', 'w') as f: f.write(text)
           "
 
-      - name: Fabricar o APK (A MÁGICA ACONTECE AQUI)
+      - name: Fabricar o APK
         run: |
           cd frontend
-          
-          # APAGA AS VARIÁVEIS INIMIGAS DO GITHUB PARA FORÇAR O NDK 25b DO BUILDOZER
           unset ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK_HOME ANDROID_NDK_ROOT
-          
           yes | buildozer android debug
 
       - name: Disponibilizar APK
