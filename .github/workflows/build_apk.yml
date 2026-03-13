@@ -29,19 +29,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev libffi-dev libssl-dev autoconf automake libtool pkg-config unzip zip
 
-      - name: Instalando Buildozer e Cython (Versões Modernas)
+      - name: Instalando Buildozer e Cython (Versões Modernas e Fixadas)
         run: |
           pip install --upgrade pip
-          # Deixando o Cython moderno para combinar com o Kivy moderno!
-          pip install buildozer cython virtualenv setuptools
+          # A CORREÇÃO FINAL: Fixando o Cython na versão que compila o jnius perfeitamente!
+          pip install buildozer cython==0.29.33 virtualenv setuptools
 
       - name: Criando a Receita Pura do VigiAA
         run: |
           cd frontend
-          # Apaga qualquer receita velha
           rm -f buildozer.spec
           
-          # Cria uma receita perfeita do zero
           cat << 'EOF' > buildozer.spec
           [app]
           title = VigiAA
@@ -51,7 +49,6 @@ jobs:
           source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf
           version = 1.0
           
-          # O PAR DE OURO E O GPS (plyer)
           requirements = python3,kivy==2.3.0,kivymd==1.2.0,pillow,requests,plyer
           
           orientation = portrait
