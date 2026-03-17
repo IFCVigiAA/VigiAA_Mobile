@@ -1,278 +1,529 @@
-import flet as ft
+from kivymd.uix.screen import MDScreen
+from kivy.lang import Builder
+from kivy.clock import mainthread, Clock
+from kivy.storage.jsonstore import JsonStore
+from kivymd.uix.snackbar import Snackbar
+from kivymd.uix.menu import MDDropdownMenu
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDFlatButton, MDRaisedButton
+from kivymd.uix.list import OneLineListItem
+from kivy.metrics import dp
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivy.uix.image import Image
+from plyer import filechooser
 import requests
-import config
-from urllib.parse import quote
-import unicodedata
 import threading
+import unicodedata
+from urllib.parse import quote
+import os
+import config
 
-def create_focus_form_view(page: ft.Page):
-    try:
-        API_URL = config.API_URL
-        selected_files = []
-        gps_address_data = {} 
+store = JsonStore('vigiaa_storage.json')
+
+KV_FOCUS_FORM = '''
+<ImageCard@MDBoxLayout>:
+    orientation: "horizontal"
+    adaptive_height: True
+    spacing: "10dp"
+    padding: "5dp"
+    image_path: ""
+    image_name: ""
+    
+    Image:
+        source: root.image_path
+        size_hint: None, None
+        size: "60dp", "60dp"
+        allow_stretch: True
+        keep_ratio: False
         
-        def on_file_result(e):
-            if e.files:
-                selected_files.extend(e.files)
-                update_images_display()
-        
-        file_picker = ft.FilePicker(on_result=on_file_result)
-        
-        for c in page.overlay[:]:
-            if type(c).__name__ == "FilePicker":
-                page.overlay.remove(c)
-        page.overlay.append(file_picker)
-
-        txt_gps_rua = ft.Text(value="Carregando...", weight="bold", color="black", size=14)
-        txt_gps_bairro = ft.Text(value="...", size=13, color="black")
-        txt_gps_cidade = ft.Text(value="...", size=12, color="grey")
-        txt_gps_source = ft.Text(value="...", size=10, color="grey")
-        
-        btn_gps = ft.ElevatedButton("Capturar localização (Rede)", icon=ft.Icons.WIFI, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
-        btn_submit = ft.ElevatedButton("CADASTRAR FOCO", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
-
-        gps_overlay = ft.Container(visible=False) 
-        address_overlay = ft.Container(visible=False)
-
-        def normalize_string(s):
-            if not s: return ""
-            return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
-
-        neighborhoods_db = {"Camboriú": ["Areias", "Braço", "Caetés", "Cedro", "Centro", "Conde Vila Verde", "João da Costa", "Lídia Duarte", "Macacos", "Monte Alegre", "Rio do Meio", "Rio Pequeno", "Santa Regina", "São Francisco de Assis", "Tabuleiro", "Várzea do Ranchinho", "Vila Conceição"], "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]}
-
-        tf_cep = ft.TextField(hint_text="Digite o CEP", keyboard_type=ft.KeyboardType.NUMBER, border="none", text_size=14, content_padding=10)
-        dd_municipio = ft.Dropdown(hint_text="Selecione a cidade", options=[ft.dropdown.Option("Camboriú"), ft.dropdown.Option("Balneário Camboriú")], icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
-        dd_bairro = ft.Dropdown(hint_text="Selecione o bairro", disabled=True, icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
-        
-        btn_search_inline = ft.IconButton(icon=ft.Icons.SEARCH, icon_color="#39BFEF", tooltip="Pesquisar rua")
-        tf_rua = ft.TextField(hint_text="Digite o nome da rua", border="none", text_size=14, content_padding=10, suffix=btn_search_inline)
-        
-        tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10)
-        tf_descricao = ft.TextField(hint_text="Descreva o local", multiline=True, min_lines=3, border="none", text_size=14, content_padding=10)
-
-        def fill_address_fields(data):
-            city_api = data.get("localidade") or ""
-            city_clean = normalize_string(city_api)
-            target_city = None
-            if "balneario" in city_clean and "camboriu" in city_clean: target_city = "Balneário Camboriú"
-            elif "camboriu" in city_clean and "balneario" not in city_clean: target_city = "Camboriú"
+    MDBoxLayout:
+        orientation: "vertical"
+        pos_hint: {"center_y": .5}
+        MDLabel:
+            text: root.image_name
+            font_style: "Caption"
+            bold: True
+            shorten: True
+            shorten_from: "right"
+        MDLabel:
+            text: "Imagem"
+            font_style: "Caption"
+            theme_text_color: "Hint"
             
-            if target_city:
-                dd_municipio.value = target_city
-                dd_bairro.disabled = False
-                if target_city in neighborhoods_db:
-                    opts = neighborhoods_db[target_city]
-                    b = data.get("bairro")
-                    if b:
-                        if b not in opts: opts.append(b); opts.sort()
-                        dd_bairro.value = b
-                    dd_bairro.options = [ft.dropdown.Option(o) for o in opts]
-                tf_rua.value = data.get("logradouro")
-                tf_cep.value = data.get("cep")
-                if data.get("numero"): tf_numero.value = data.get("numero")
-            else:
-                dd_municipio.value = None; dd_bairro.value = None; dd_bairro.disabled = True; dd_bairro.options = []
-                tf_rua.value = ""; tf_numero.value = ""; tf_cep.value = ""
-                page.open(ft.SnackBar(content=ft.Text(f"Serviço indisponível em {city_api}"), bgcolor="red"))
-            page.update()
+    MDIconButton:
+        icon: "delete-outline"
+        theme_text_color: "Error"
+        pos_hint: {"center_y": .5}
+        on_release: app.root.get_screen('focus_form').remove_image(root.image_path)
 
-        def on_city_change(e):
-            if dd_municipio.value in neighborhoods_db: 
-                dd_bairro.options = [ft.dropdown.Option(b) for b in neighborhoods_db[dd_municipio.value]]
-                dd_bairro.disabled = False
-            else: dd_bairro.disabled = True
-            page.update()
-            
-        dd_municipio.on_change = on_city_change
+<FocusFormScreen>:
+    md_bg_color: 1, 1, 1, 1
 
-        def search_address_by_name(e=None):
-            city = dd_municipio.value
-            street = tf_rua.value
-            
-            if not city or len(street) < 3:
-                page.open(ft.SnackBar(ft.Text("⚠️ Selecione a cidade e digite 3 letras da rua."), bgcolor="orange"))
-                return
-                
-            tf_rua.suffix = ft.Container(content=ft.ProgressRing(width=20, height=20, stroke_width=2), padding=10)
-            page.update()
-            
-            try:
-                url = f"https://viacep.com.br/ws/SC/{quote(city)}/{quote(street)}/json/"
-                res = requests.get(url, timeout=10)
-                
-                if res.status_code == 200:
-                    data = res.json()
-                    if isinstance(data, list) and len(data) > 0: 
-                        open_manual_modal(data)
-                    else: 
-                        page.open(ft.SnackBar(ft.Text("Nada encontrado."), bgcolor="orange"))
-                else:
-                    page.open(ft.SnackBar(ft.Text(f"Erro do ViaCEP: {res.status_code}"), bgcolor="red"))
-            except Exception as ex: 
-                page.open(ft.SnackBar(ft.Text("Erro na busca da rua."), bgcolor="red"))
-                
-            tf_rua.suffix = btn_search_inline
-            page.update()
+    MDBoxLayout:
+        orientation: "vertical"
 
-        btn_search_inline.on_click = search_address_by_name
-        tf_rua.on_submit = search_address_by_name
+        # HEADER
+        MDTopAppBar:
+            title: "Cadastrar Foco"
+            md_bg_color: 0.22, 0.75, 0.94, 1
+            specific_text_color: 1, 1, 1, 1
+            elevation: 2
+            left_action_items: [["chevron-left", lambda x: root.go_back()]]
 
-        def search_cep(e):
-            cep = tf_cep.value.replace("-", "").replace(".", "").strip()
-            if len(cep) == 8:
-                try:
-                    res = requests.get(f"https://viacep.com.br/ws/{cep}/json/").json()
-                    if "erro" not in res: fill_address_fields(res)
-                except: pass
-        tf_cep.on_change = search_cep
+        # FORMULÁRIO
+        ScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "20dp"
+                spacing: "15dp"
+                adaptive_height: True
 
-        def run_ip_location():
-            btn_gps.text = "Buscando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
-            try:
-                res = requests.get("http://ip-api.com/json/", timeout=5)
-                if res.status_code == 200:
-                    data = res.json()
-                    get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
-            except:
-                page.open(ft.SnackBar(ft.Text("Erro de conexão."), bgcolor="red"))
-                btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
+                MDFillRoundFlatIconButton:
+                    id: btn_gps
+                    text: "Capturar localização (Rede)"
+                    icon: "wifi"
+                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    pos_hint: {"center_x": .5}
+                    on_release: root.start_ip_location()
 
-        def get_address_from_coords(lat, lon, source="Rede"):
-            try:
-                headers = {'User-Agent': 'VigiAA/1.0'}
-                url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-                res = requests.get(url, headers=headers).json()
-                addr = res.get("address", {})
-                
-                gps_address_data.clear()
-                gps_address_data["lat"] = str(lat) 
-                gps_address_data["lon"] = str(lon) 
-                gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality")
-                gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood")
-                gps_address_data["logradouro"] = addr.get("road")
-                gps_address_data["cep"] = addr.get("postcode")
-                gps_address_data["numero"] = addr.get("house_number")
-                
-                txt_gps_rua.value = gps_address_data["logradouro"] or "Rua não detectada"
-                txt_gps_bairro.value = gps_address_data["bairro"] or "Bairro não detectado"
-                txt_gps_cidade.value = gps_address_data["localidade"] or "Cidade não detectada"
-                txt_gps_source.value = f"Fonte: {source}"
-                
-                gps_overlay.visible = True
-                btn_gps.text = "Localização Encontrada!"; btn_gps.icon = ft.Icons.CHECK; btn_gps.disabled = False; page.update()
-            except:
-                page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
-                btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
+                MDLabel:
+                    text: "Campos marcados com * são obrigatórios"
+                    font_style: "Caption"
+                    theme_text_color: "Hint"
 
-        btn_gps.on_click = lambda e: threading.Thread(target=run_ip_location).start()
+                MDTextField:
+                    id: tf_cep
+                    hint_text: "CEP *"
+                    input_filter: "int"
+                    on_text: root.on_cep_change(self.text)
 
-        def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
-        def confirm_gps_fill(e=None): fill_address_fields(gps_address_data); close_gps_modal()
+                MDTextField:
+                    id: tf_city
+                    hint_text: "MUNICÍPIO *"
+                    readonly: True
+                    on_focus: if self.focus: root.open_city_menu()
 
-        gps_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, bgcolor="white", border_radius=20, padding=25, shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"), content=ft.Column(alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, height=350, controls=[ft.Icon(ft.Icons.MAP_SHARP, color="#39BFEF", size=50), ft.Text("Localização Encontrada!", size=20, weight="bold", color="#39BFEF"), txt_gps_source, ft.Divider(), ft.Text("Confira os dados abaixo:", size=14, color="grey"), ft.Container(bgcolor="#F5F5F5", padding=15, border_radius=10, content=ft.Column([txt_gps_rua, txt_gps_bairro, txt_gps_cidade], spacing=2)), ft.Container(height=10), ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.OutlinedButton("Cancelar", on_click=close_gps_modal), ft.ElevatedButton("Confirmar", bgcolor="#39BFEF", color="white", on_click=confirm_gps_fill)])])))
+                MDTextField:
+                    id: tf_neighborhood
+                    hint_text: "BAIRRO *"
+                    readonly: True
+                    disabled: True
+                    on_focus: if self.focus: root.open_neighborhood_menu()
+
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: "10dp"
+                    MDTextField:
+                        id: tf_street
+                        hint_text: "RUA *"
+                        size_hint_x: 0.8
+                        on_text_validate: root.search_address_by_name()
+                    MDIconButton:
+                        id: btn_search_street
+                        icon: "magnify"
+                        theme_text_color: "Custom"
+                        text_color: 0.22, 0.75, 0.94, 1
+                        on_release: root.search_address_by_name()
+
+                MDTextField:
+                    id: tf_number
+                    hint_text: "NÚMERO *"
+
+                MDTextField:
+                    id: tf_description
+                    hint_text: "DESCRIÇÃO"
+                    multiline: True
+
+                MDLabel:
+                    text: "IMAGENS"
+                    bold: True
+                    font_style: "Caption"
+
+                MDBoxLayout:
+                    id: images_container
+                    orientation: "vertical"
+                    adaptive_height: True
+                    spacing: "10dp"
+
+                MDFlatButton:
+                    text: "+ Adicionar imagem"
+                    theme_text_color: "Custom"
+                    text_color: 0.22, 0.75, 0.94, 1
+                    on_release: root.pick_image()
+
+                Widget:
+                    size_hint_y: None
+                    height: "20dp"
+
+                MDRaisedButton:
+                    id: btn_submit
+                    text: "CADASTRAR FOCO"
+                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    size_hint_x: 1
+                    elevation: 0
+                    padding: "15dp"
+                    on_release: root.submit_form()
+'''
+
+Builder.load_string(KV_FOCUS_FORM)
+
+class FocusFormScreen(MDScreen):
+    neighborhoods_db = {
+        "Camboriú": ["Areias", "Braço", "Caetés", "Cedro", "Centro", "Conde Vila Verde", "João da Costa", "Lídia Duarte", "Macacos", "Monte Alegre", "Rio do Meio", "Rio Pequeno", "Santa Regina", "São Francisco de Assis", "Tabuleiro", "Várzea do Ranchinho", "Vila Conceição"], 
+        "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]
+    }
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.selected_files = []
+        self.gps_address_data = {}
+        self.menu_cities = None
+        self.menu_neighborhoods = None
+        self.gps_dialog = None
+        self.manual_dialog = None
+        self.success_dialog = None
+
+    def on_pre_enter(self, *args):
+        # Limpa o formulário sempre que a tela abrir
+        self.selected_files.clear()
+        self.gps_address_data.clear()
+        self.update_images_display()
+        self.ids.tf_cep.text = ""
+        self.ids.tf_city.text = ""
+        self.ids.tf_neighborhood.text = ""
+        self.ids.tf_neighborhood.disabled = True
+        self.ids.tf_street.text = ""
+        self.ids.tf_number.text = ""
+        self.ids.tf_description.text = ""
+        self.ids.btn_gps.text = "Capturar localização (Rede)"
+        self.ids.btn_gps.icon = "wifi"
+
+    def go_back(self):
+        self.manager.current = 'home'
+        self.manager.get_screen('home').ids.bottom_nav.switch_tab('tab_new')
+
+    # --- MENUS (DROPDOWNS) ---
+    def open_city_menu(self):
+        menu_items = [
+            {"viewclass": "OneLineListItem", "text": city, "on_release": lambda x=city: self.set_city(x)}
+            for city in self.neighborhoods_db.keys()
+        ]
+        self.menu_cities = MDDropdownMenu(caller=self.ids.tf_city, items=menu_items, width_mult=4)
+        self.menu_cities.open()
+
+    def set_city(self, text_item):
+        self.ids.tf_city.text = text_item
+        self.ids.tf_neighborhood.disabled = False
+        self.ids.tf_neighborhood.text = "" # Reseta o bairro ao trocar cidade
+        self.menu_cities.dismiss()
+
+    def open_neighborhood_menu(self):
+        city = self.ids.tf_city.text
+        if city in self.neighborhoods_db:
+            menu_items = [
+                {"viewclass": "OneLineListItem", "text": bairro, "on_release": lambda x=bairro: self.set_neighborhood(x)}
+                for bairro in self.neighborhoods_db[city]
+            ]
+            self.menu_neighborhoods = MDDropdownMenu(caller=self.ids.tf_neighborhood, items=menu_items, width_mult=4)
+            self.menu_neighborhoods.open()
+
+    def set_neighborhood(self, text_item):
+        self.ids.tf_neighborhood.text = text_item
+        self.menu_neighborhoods.dismiss()
+
+    # --- LÓGICA DE UTILIDADES ---
+    def normalize_string(self, s):
+        if not s: return ""
+        return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
+
+    @mainthread
+    def mostrar_aviso(self, texto, cor="blue"):
+        cores = {"red": (1,0,0,1), "green": (0,0.7,0,1), "blue": (0.22, 0.75, 0.94, 1), "orange": (1, 0.6, 0, 1)}
+        Snackbar(text=texto, bg_color=cores.get(cor, (0,0,0,1))).open()
+
+    # --- AUTOCOMPLETAR (VIACEP & NOMINATIM) ---
+    @mainthread
+    def fill_address_fields(self, data):
+        city_api = data.get("localidade") or ""
+        city_clean = self.normalize_string(city_api)
+        target_city = None
         
-        overlay_list_content = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=0)
-        def close_manual_modal(e): address_overlay.visible = False; page.update()
-        def select_address_manual(addr_data): address_overlay.visible = False; page.update(); fill_address_fields(addr_data)
+        if "balneario" in city_clean and "camboriu" in city_clean: target_city = "Balneário Camboriú"
+        elif "camboriu" in city_clean and "balneario" not in city_clean: target_city = "Camboriú"
+        
+        if target_city:
+            self.ids.tf_city.text = target_city
+            self.ids.tf_neighborhood.disabled = False
+            if target_city in self.neighborhoods_db:
+                opts = self.neighborhoods_db[target_city]
+                b = data.get("bairro")
+                if b:
+                    if b not in opts: opts.append(b); opts.sort()
+                    self.ids.tf_neighborhood.text = b
+            self.ids.tf_street.text = data.get("logradouro", "")
+            self.ids.tf_cep.text = data.get("cep", "").replace("-", "")
+            if data.get("numero"): self.ids.tf_number.text = data.get("numero")
+        else:
+            self.ids.tf_city.text = ""
+            self.ids.tf_neighborhood.text = ""
+            self.ids.tf_neighborhood.disabled = True
+            self.ids.tf_street.text = ""
+            self.ids.tf_number.text = ""
+            self.ids.tf_cep.text = ""
+            self.mostrar_aviso(f"Serviço indisponível em {city_api}", "red")
 
-        address_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, height=500, bgcolor="white", border_radius=20, padding=20, content=ft.Column(controls=[ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.Text("Selecione a Rua", size=18, weight="bold", color="#39BFEF"), ft.Icon(ft.Icons.LOCATION_CITY, color="#39BFEF")]), ft.Divider(height=1, color="#EEEEEE"), ft.Container(content=overlay_list_content, expand=True), ft.ElevatedButton("Fechar", bgcolor="#39BFEF", color="white", width=float("inf"), on_click=close_manual_modal)])))
+    def on_cep_change(self, text):
+        cep = text.replace("-", "").replace(".", "").strip()
+        if len(cep) == 8:
+            threading.Thread(target=self._worker_search_cep, args=(cep,), daemon=True).start()
 
-        def open_manual_modal(address_list):
-            overlay_list_content.controls.clear()
-            overlay_list_content.controls.append(ft.Text(f"{len(address_list)} ruas encontradas:", size=12, color="grey"))
-            for addr in address_list: overlay_list_content.controls.append(ft.Container(padding=10, content=ft.Row([ft.Icon(ft.Icons.PLACE, size=16), ft.Column([ft.Text(addr.get("logradouro", ""), weight="bold"), ft.Text(f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}", size=12)])]), on_click=lambda e, a=addr: select_address_manual(a), ink=True))
-            address_overlay.visible = True; page.update()
+    def _worker_search_cep(self, cep):
+        try:
+            res = requests.get(f"https://viacep.com.br/ws/{cep}/json/").json()
+            if "erro" not in res:
+                self.fill_address_fields(res)
+        except: pass
 
-        images_list_container = ft.Column(spacing=15)
-        def remove_image(file_obj):
-            if file_obj in selected_files: selected_files.remove(file_obj); update_images_display()
-
-        def update_images_display():
-            images_list_container.controls.clear()
-            for file in selected_files: images_list_container.controls.append(ft.Row([ft.Image(src=file.path, width=60, height=60, fit=ft.ImageFit.COVER, border_radius=8), ft.Column([ft.Text(file.name, weight="bold"), ft.Text("Imagem", size=12)], alignment=ft.MainAxisAlignment.CENTER), ft.IconButton(ft.Icons.DELETE_OUTLINE, on_click=lambda e, f=file: remove_image(f))], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
-            images_list_container.controls.append(ft.Row([ft.Container(width=60, height=60, bgcolor="#E0E0E0", border_radius=8, alignment=ft.alignment.center, content=ft.Icon(ft.Icons.ADD, size=30), on_click=lambda _: file_picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)), ft.Text("Adicionar imagem", size=16)], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=15))
-            if page.views: page.update()
-
-        def close_success_dialog(e):
-            try: page.close(success_dialog)
-            except: pass
-            page.go("/novo") 
-
-        success_dialog = ft.AlertDialog(modal=True, title=ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, color="green", size=30), ft.Text("Sucesso!")]), content=ft.Text("Foco de dengue cadastrado com sucesso!"), actions=[ft.TextButton("OK", on_click=close_success_dialog)])
-
-        def submit_form(e):
-            token = page.client_storage.get("token")
-            if not token: page.go("/login"); return
-            if not all([dd_municipio.value, dd_bairro.value, tf_rua.value, tf_numero.value]): page.open(ft.SnackBar(ft.Text("Preencha os campos obrigatórios (*)!"), bgcolor="red")); return
-            btn_submit.text = "Enviando..."; btn_submit.disabled = True; page.update()
+    def search_address_by_name(self):
+        city = self.ids.tf_city.text
+        street = self.ids.tf_street.text
+        
+        if not city or len(street) < 3:
+            self.mostrar_aviso("Selecione a cidade e digite 3 letras da rua.", "orange")
+            return
             
-            try:
-                data = {
-                    "cep": tf_cep.value, 
-                    "city": dd_municipio.value, 
-                    "neighborhood": dd_bairro.value, 
-                    "street": tf_rua.value, 
-                    "number": tf_numero.value, 
-                    "description": tf_descricao.value, 
-                    "latitude": gps_address_data.get("lat", "-27.000"), 
-                    "longitude": gps_address_data.get("lon", "-48.000")
-                }
-                files = [('uploaded_images', (f.name, open(f.path, 'rb'), 'image/jpeg')) for f in selected_files]
-                headers = {"Authorization": f"Bearer {token}"}
-                res = requests.post(f"{API_URL}/api/report-focus/", data=data, files=files, headers=headers)
-                
-                if res.status_code in [200, 201]: 
-                    try: page.open(success_dialog)
-                    except: page.dialog = success_dialog; success_dialog.open = True; page.update()
-                
-                # BLINDAGEM CONTRA TELA VERMELHA
+        self.ids.btn_search_street.icon = "timer-sand" # Simulando um loading
+        threading.Thread(target=self._worker_search_street, args=(city, street), daemon=True).start()
+
+    def _worker_search_street(self, city, street):
+        try:
+            url = f"https://viacep.com.br/ws/SC/{quote(city)}/{quote(street)}/json/"
+            res = requests.get(url, timeout=10)
+            
+            if res.status_code == 200:
+                data = res.json()
+                if isinstance(data, list) and len(data) > 0: 
+                    Clock.schedule_once(lambda dt: self.open_manual_modal(data), 0)
                 else: 
-                    page.open(ft.SnackBar(ft.Text(f"Erro no servidor. Código: {res.status_code}"), bgcolor="red"))
-                    
-            except Exception as ex: 
-                # BLINDAGEM CONTRA TELA VERMELHA
-                page.open(ft.SnackBar(ft.Text("Erro de comunicação com o sistema."), bgcolor="red"))
-                
-            btn_submit.text = "CADASTRAR FOCO"; btn_submit.disabled = False; page.update()
+                    self.mostrar_aviso("Rua não encontrada.", "orange")
+            else:
+                self.mostrar_aviso(f"Erro do ViaCEP: {res.status_code}", "red")
+        except Exception: 
+            self.mostrar_aviso("Erro na busca da rua.", "red")
+            
+        Clock.schedule_once(lambda dt: self._reset_search_icon(), 0)
 
-        btn_submit.on_click = submit_form
-        update_images_display()
+    @mainthread
+    def _reset_search_icon(self):
+        self.ids.btn_search_street.icon = "magnify"
 
-        def back_click(e): 
-            page.go("/novo")
-                
-        header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Cadastrar Foco", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
+    @mainthread
+    def open_manual_modal(self, address_list):
+        # Cria a lista de opções para o usuário escolher
+        from kivymd.uix.list import TwoLineIconListItem, IconLeftWidget
+        from kivymd.uix.boxlayout import MDBoxLayout
+        from kivy.uix.scrollview import ScrollView
         
-        def create_row(label, field, obrigatorio=False): 
-            label_controls = [ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))]
-            if obrigatorio: label_controls.append(ft.Text(" *", color="red", weight="bold", size=14))
-            return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Row(label_controls, spacing=0)), ft.Row([ft.Container(content=field, expand=True)], expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
+        content = ScrollView(size_hint_y=None, height=dp(300))
+        box = MDBoxLayout(orientation='vertical', adaptive_height=True)
+        
+        for addr in address_list:
+            item = TwoLineIconListItem(
+                text=addr.get("logradouro", ""),
+                secondary_text=f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}",
+                on_release=lambda x, a=addr: self.select_address_manual(a)
+            )
+            item.add_widget(IconLeftWidget(icon="map-marker"))
+            box.add_widget(item)
+            
+        content.add_widget(box)
 
-        form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
-            ft.Container(padding=20, content=btn_gps),
-            ft.Container(padding=ft.padding.only(left=20, bottom=10), content=ft.Text("Campos marcados com * são obrigatórios", size=10, color="black")),
-            create_row("CEP", tf_cep, obrigatorio=True), 
-            create_row("MUNICÍPIO", dd_municipio, obrigatorio=True), 
-            create_row("BAIRRO", dd_bairro, obrigatorio=True), 
-            create_row("RUA", tf_rua, obrigatorio=True), 
-            create_row("NÚMERO", tf_numero, obrigatorio=True), 
-            create_row("DESCRIÇÃO", tf_descricao, obrigatorio=False),
-            ft.Container(padding=20, content=ft.Column([ft.Text("IMAGENS", weight="bold", size=12), images_list_container])), ft.Container(padding=20, content=btn_submit),
-        ]))
+        self.manual_dialog = MDDialog(
+            title="Selecione a Rua",
+            type="custom",
+            content_cls=content,
+            buttons=[MDFlatButton(text="Fechar", on_release=lambda x: self.manual_dialog.dismiss())]
+        )
+        self.manual_dialog.open()
 
-        return ft.View(
-            route="/form-foco", 
-            bgcolor="white", 
-            padding=0, 
-            controls=[
-                ft.Stack(expand=True, controls=[
-                    ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]), 
-                    gps_overlay, 
-                    address_overlay
-                ])
+    def select_address_manual(self, addr_data):
+        if self.manual_dialog: self.manual_dialog.dismiss()
+        self.fill_address_fields(addr_data)
+
+    # --- GPS E NOMINATIM ---
+    def start_ip_location(self):
+        self.ids.btn_gps.text = "Buscando..."
+        self.ids.btn_gps.icon = "timer-sand"
+        self.ids.btn_gps.disabled = True
+        threading.Thread(target=self._worker_ip_location, daemon=True).start()
+
+    def _worker_ip_location(self):
+        try:
+            res = requests.get("http://ip-api.com/json/", timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                self._worker_get_address_from_coords(data.get('lat'), data.get('lon'), "Internet (Aproximado)")
+                return
+        except: pass
+        
+        self.mostrar_aviso("Erro de conexão com satélite/rede.", "red")
+        Clock.schedule_once(lambda dt: self._reset_gps_btn(), 0)
+
+    def _worker_get_address_from_coords(self, lat, lon, source="Rede"):
+        try:
+            headers = {'User-Agent': 'VigiAA/1.0'}
+            url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
+            res = requests.get(url, headers=headers).json()
+            addr = res.get("address", {})
+            
+            self.gps_address_data.clear()
+            self.gps_address_data["lat"] = str(lat) 
+            self.gps_address_data["lon"] = str(lon) 
+            self.gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality")
+            self.gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood")
+            self.gps_address_data["logradouro"] = addr.get("road")
+            self.gps_address_data["cep"] = addr.get("postcode")
+            self.gps_address_data["numero"] = addr.get("house_number")
+            
+            Clock.schedule_once(lambda dt: self.open_gps_modal(source), 0)
+        except:
+            self.mostrar_aviso("Erro ao traduzir endereço.", "red")
+            Clock.schedule_once(lambda dt: self._reset_gps_btn(), 0)
+
+    @mainthread
+    def _reset_gps_btn(self):
+        self.ids.btn_gps.text = "Capturar localização (Rede)"
+        self.ids.btn_gps.icon = "wifi"
+        self.ids.btn_gps.disabled = False
+
+    @mainthread
+    def open_gps_modal(self, source):
+        self.ids.btn_gps.text = "Localização Encontrada!"
+        self.ids.btn_gps.icon = "check"
+        self.ids.btn_gps.disabled = False
+        
+        rua = self.gps_address_data.get("logradouro") or "Rua não detectada"
+        bairro = self.gps_address_data.get("bairro") or "Bairro não detectado"
+        cidade = self.gps_address_data.get("localidade") or "Cidade não detectada"
+        
+        texto_dialog = f"[b]Rua:[/b] {rua}\n[b]Bairro:[/b] {bairro}\n[b]Cidade:[/b] {cidade}\n\n[i]Fonte: {source}[/i]"
+        
+        self.gps_dialog = MDDialog(
+            title="Confirme os Dados:",
+            text=texto_dialog,
+            buttons=[
+                MDFlatButton(text="Cancelar", text_color=(1,0,0,1), on_release=lambda x: self.gps_dialog.dismiss()),
+                MDRaisedButton(text="Confirmar", md_bg_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_gps_fill)
             ]
         )
+        self.gps_dialog.open()
 
-    except Exception as e:
-        print(f"Erro ao criar tela: {e}")
-        return ft.View(route="/form-foco", controls=[ft.Text(f"Erro crítico da tela.", color="red")])
+    def confirm_gps_fill(self, instance):
+        self.gps_dialog.dismiss()
+        self.fill_address_fields(self.gps_address_data)
+
+    # --- SELEÇÃO DE IMAGENS ---
+    def pick_image(self):
+        try:
+            filechooser.open_file(on_selection=self._handle_selection, filters=[("Images", "*.png", "*.jpg", "*.jpeg")])
+        except Exception as e:
+            self.mostrar_aviso("Permissão de galeria negada ou indisponível.", "red")
+
+    def _handle_selection(self, selection):
+        if selection:
+            for path in selection:
+                if path not in self.selected_files:
+                    self.selected_files.append(path)
+            Clock.schedule_once(lambda dt: self.update_images_display(), 0)
+
+    def remove_image(self, path):
+        if path in self.selected_files:
+            self.selected_files.remove(path)
+            self.update_images_display()
+
+    @mainthread
+    def update_images_display(self):
+        self.ids.images_container.clear_widgets()
+        for path in self.selected_files:
+            nome_arquivo = os.path.basename(path)
+            card = Builder.template('ImageCard', image_path=path, image_name=nome_arquivo)
+            self.ids.images_container.add_widget(card)
+
+    # --- ENVIO DO FORMULÁRIO ---
+    def submit_form(self):
+        if not store.exists("session"):
+            self.manager.current = 'login'
+            return
+            
+        token = store.get("session")["token"]
+        
+        cidade = self.ids.tf_city.text
+        bairro = self.ids.tf_neighborhood.text
+        rua = self.ids.tf_street.text
+        numero = self.ids.tf_number.text
+        
+        if not all([cidade, bairro, rua, numero]):
+            self.mostrar_aviso("Preencha os campos obrigatórios (*)", "red")
+            return
+            
+        self.ids.btn_submit.text = "Enviando..."
+        self.ids.btn_submit.disabled = True
+        
+        threading.Thread(target=self._worker_submit, args=(token,), daemon=True).start()
+
+    def _worker_submit(self, token):
+        try:
+            data = {
+                "cep": self.ids.tf_cep.text, 
+                "city": self.ids.tf_city.text, 
+                "neighborhood": self.ids.tf_neighborhood.text, 
+                "street": self.ids.tf_street.text, 
+                "number": self.ids.tf_number.text, 
+                "description": self.ids.tf_description.text, 
+                "latitude": self.gps_address_data.get("lat", "-27.000"), 
+                "longitude": self.gps_address_data.get("lon", "-48.000")
+            }
+            
+            # Formatação exata exigida pelo backend para envio Multipart (Arquivos + Texto)
+            files = []
+            file_handles = []
+            for path in self.selected_files:
+                f = open(path, 'rb')
+                file_handles.append(f)
+                files.append(('uploaded_images', (os.path.basename(path), f, 'image/jpeg')))
+                
+            headers = {"Authorization": f"Bearer {token}"}
+            res = requests.post(f"{config.API_URL}/api/report-focus/", data=data, files=files, headers=headers)
+            
+            # Fecha os arquivos que foram abertos
+            for f in file_handles: f.close()
+            
+            if res.status_code in [200, 201]: 
+                Clock.schedule_once(lambda dt: self.open_success_modal(), 0)
+            else: 
+                self.mostrar_aviso(f"Erro no servidor. Código: {res.status_code}", "red")
+                
+        except Exception as ex: 
+            self.mostrar_aviso("Erro de comunicação com o sistema.", "red")
+            
+        Clock.schedule_once(lambda dt: self._reset_submit_btn(), 0)
+
+    @mainthread
+    def _reset_submit_btn(self):
+        self.ids.btn_submit.text = "CADASTRAR FOCO"
+        self.ids.btn_submit.disabled = False
+
+    @mainthread
+    def open_success_modal(self):
+        self.success_dialog = MDDialog(
+            title="Sucesso!",
+            text="Foco de dengue cadastrado com sucesso!",
+            buttons=[
+                MDRaisedButton(text="OK", md_bg_color=(0, 0.7, 0, 1), on_release=self.close_success_modal)
+            ]
+        )
+        self.success_dialog.open()
+
+    def close_success_modal(self, instance):
+        self.success_dialog.dismiss()
+        self.go_back()

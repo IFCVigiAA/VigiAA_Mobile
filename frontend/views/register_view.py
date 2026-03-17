@@ -32,7 +32,7 @@ KV_REGISTER = '''
                         radius: [0, 0, 50, 50]
                 
                 Image:
-                    source: "assets/logo-sem-fundo.png"
+                    source: "assets/images/logo-sem-fundo.png"
                     size_hint: None, None
                     size: "170dp", "170dp"
                     pos_hint: {"center_x": .5}

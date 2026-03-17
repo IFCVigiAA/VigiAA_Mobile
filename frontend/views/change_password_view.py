@@ -78,8 +78,8 @@ Builder.load_string(KV_CHANGE_PASSWORD)
 
 class ChangePasswordScreen(MDScreen):
     def go_back(self):
-        # Desliza a tela de volta para a Home
         self.manager.current = 'home'
+        self.manager.get_screen('home').ids.bottom_nav.switch_tab('tab_profile')
 
     def change_click(self):
         old_p = self.ids.old_pass.text

@@ -1,319 +1,500 @@
-import flet as ft
+from kivymd.uix.screen import MDScreen
+from kivy.lang import Builder
+from kivy.clock import mainthread, Clock
+from kivy.storage.jsonstore import JsonStore
+from kivymd.uix.snackbar import Snackbar
+from kivymd.uix.menu import MDDropdownMenu
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDFlatButton, MDRaisedButton
+from kivymd.uix.pickers import MDDatePicker
+from kivy.metrics import dp
 import requests
-import config
-from urllib.parse import quote
-import unicodedata
-import datetime
 import threading
+import unicodedata
+from urllib.parse import quote
+import config
 
-def create_case_form_view(page: ft.Page):
-    try:
-        API_URL = config.API_URL
-        gps_address_data = {} 
+store = JsonStore('vigiaa_storage.json')
+
+KV_CASE_FORM = '''
+<CaseFormScreen>:
+    md_bg_color: 1, 1, 1, 1
+
+    MDBoxLayout:
+        orientation: "vertical"
+
+        # HEADER
+        MDTopAppBar:
+            title: "Casos de dengue"
+            md_bg_color: 0.22, 0.75, 0.94, 1
+            specific_text_color: 1, 1, 1, 1
+            elevation: 2
+            left_action_items: [["chevron-left", lambda x: root.go_back()]]
+
+        # FORMULÁRIO
+        ScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "20dp"
+                spacing: "15dp"
+                adaptive_height: True
+
+                MDFillRoundFlatIconButton:
+                    id: btn_gps
+                    text: "Capturar localização (Rede)"
+                    icon: "wifi"
+                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    pos_hint: {"center_x": .5}
+                    on_release: root.start_ip_location()
+
+                MDLabel:
+                    text: "Campos marcados com * são obrigatórios"
+                    font_style: "Caption"
+                    theme_text_color: "Hint"
+
+                # CALENDÁRIO 1
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: "10dp"
+                    MDTextField:
+                        id: tf_notif_date
+                        hint_text: "Data da notificação *"
+                        readonly: True
+                        on_focus: if self.focus: root.show_date_picker('notif')
+                    MDIconButton:
+                        icon: "calendar-month"
+                        theme_text_color: "Custom"
+                        text_color: 0.22, 0.75, 0.94, 1
+                        on_release: root.show_date_picker('notif')
+
+                MDTextField:
+                    id: tf_cep
+                    hint_text: "CEP *"
+                    input_filter: "int"
+                    on_text: root.on_cep_change(self.text)
+
+                MDTextField:
+                    id: tf_city
+                    hint_text: "MUNICÍPIO *"
+                    readonly: True
+                    on_focus: if self.focus: root.open_city_menu()
+
+                MDTextField:
+                    id: tf_neighborhood
+                    hint_text: "BAIRRO *"
+                    readonly: True
+                    disabled: True
+                    on_focus: if self.focus: root.open_neighborhood_menu()
+
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: "10dp"
+                    MDTextField:
+                        id: tf_street
+                        hint_text: "RUA *"
+                        size_hint_x: 0.8
+                        on_text_validate: root.search_address_by_name()
+                    MDIconButton:
+                        id: btn_search_street
+                        icon: "magnify"
+                        theme_text_color: "Custom"
+                        text_color: 0.22, 0.75, 0.94, 1
+                        on_release: root.search_address_by_name()
+
+                MDTextField:
+                    id: tf_number
+                    hint_text: "NÚMERO *"
+                    input_filter: "int"
+
+                # CALENDÁRIO 2
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: "10dp"
+                    MDTextField:
+                        id: tf_birth_date
+                        hint_text: "Data de nascimento *"
+                        readonly: True
+                        on_focus: if self.focus: root.show_date_picker('birth')
+                    MDIconButton:
+                        icon: "calendar-month"
+                        theme_text_color: "Custom"
+                        text_color: 0.22, 0.75, 0.94, 1
+                        on_release: root.show_date_picker('birth')
+
+                # RADIO BUTTONS (Sim/Não)
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: "5dp"
+                    MDLabel:
+                        text: "Teste positivo *"
+                        theme_text_color: "Hint"
+                    MDCheckbox:
+                        id: chk_sim
+                        group: 'teste'
+                        size_hint: None, None
+                        size: "48dp", "48dp"
+                    MDLabel:
+                        text: "Sim"
+                        adaptive_width: True
+                    MDCheckbox:
+                        id: chk_nao
+                        group: 'teste'
+                        size_hint: None, None
+                        size: "48dp", "48dp"
+                    MDLabel:
+                        text: "Não"
+                        adaptive_width: True
+
+                # CAIXA DE AVISO CINZA
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    padding: "15dp"
+                    spacing: "10dp"
+                    md_bg_color: 0.96, 0.96, 0.96, 1
+                    radius: [8, 8, 8, 8]
+                    
+                    MDBoxLayout:
+                        adaptive_height: True
+                        spacing: "10dp"
+                        pos_hint: {"center_x": .5}
+                        MDIcon:
+                            icon: "alert-outline"
+                            theme_text_color: "Hint"
+                            pos_hint: {"center_y": .5}
+                        MDLabel:
+                            text: "Aviso"
+                            bold: True
+                            theme_text_color: "Hint"
+                            pos_hint: {"center_y": .5}
+                    
+                    MDLabel:
+                        text: "Nosso objetivo é registrar a ocorrência de casos de dengue.\\n\\nNão identificamos o paciente."
+                        theme_text_color: "Hint"
+                        font_style: "Caption"
+                        halign: "center"
+
+                Widget:
+                    size_hint_y: None
+                    height: "10dp"
+
+                MDRaisedButton:
+                    id: btn_submit
+                    text: "CADASTRAR"
+                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    size_hint_x: 1
+                    elevation: 0
+                    padding: "15dp"
+                    on_release: root.pre_submit_check()
+'''
+
+Builder.load_string(KV_CASE_FORM)
+
+class CaseFormScreen(MDScreen):
+    neighborhoods_db = {
+        "Camboriú": ["Areias", "Braço", "Caetés", "Cedro", "Centro", "Conde Vila Verde", "João da Costa", "Lídia Duarte", "Macacos", "Monte Alegre", "Rio do Meio", "Rio Pequeno", "Santa Regina", "São Francisco de Assis", "Tabuleiro", "Várzea do Ranchinho", "Vila Conceição"], 
+        "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]
+    }
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.gps_address_data = {}
+        self.menu_cities = None
+        self.menu_neighborhoods = None
+        self.gps_dialog = None
+        self.manual_dialog = None
+        self.success_dialog = None
+        self.warning_dialog = None
+
+    def on_pre_enter(self, *args):
+        # Limpa tudo
+        self.gps_address_data.clear()
+        self.ids.tf_notif_date.text = ""
+        self.ids.tf_birth_date.text = ""
+        self.ids.tf_cep.text = ""
+        self.ids.tf_city.text = ""
+        self.ids.tf_neighborhood.text = ""
+        self.ids.tf_neighborhood.disabled = True
+        self.ids.tf_street.text = ""
+        self.ids.tf_number.text = ""
+        self.ids.chk_sim.active = False
+        self.ids.chk_nao.active = False
+        self.ids.btn_gps.text = "Capturar localização (Rede)"
+        self.ids.btn_gps.icon = "wifi"
+
+    def go_back(self):
+        self.manager.current = 'home'
+        self.manager.get_screen('home').ids.bottom_nav.switch_tab('tab_new')
+
+    # --- CALENDÁRIOS NATIVOS ---
+    def show_date_picker(self, field_type):
+        date_dialog = MDDatePicker()
+        if field_type == 'notif':
+            date_dialog.bind(on_save=self.on_save_notif)
+        else:
+            date_dialog.bind(on_save=self.on_save_birth)
+        date_dialog.open()
+
+    def on_save_notif(self, instance, value, date_range):
+        self.ids.tf_notif_date.text = value.strftime("%d/%m/%Y")
+
+    def on_save_birth(self, instance, value, date_range):
+        self.ids.tf_birth_date.text = value.strftime("%d/%m/%Y")
+
+    # --- MENUS (DROPDOWNS) ---
+    def open_city_menu(self):
+        menu_items = [{"viewclass": "OneLineListItem", "text": city, "on_release": lambda x=city: self.set_city(x)} for city in self.neighborhoods_db.keys()]
+        self.menu_cities = MDDropdownMenu(caller=self.ids.tf_city, items=menu_items, width_mult=4)
+        self.menu_cities.open()
+
+    def set_city(self, text_item):
+        self.ids.tf_city.text = text_item
+        self.ids.tf_neighborhood.disabled = False
+        self.ids.tf_neighborhood.text = "" 
+        self.menu_cities.dismiss()
+
+    def open_neighborhood_menu(self):
+        city = self.ids.tf_city.text
+        if city in self.neighborhoods_db:
+            menu_items = [{"viewclass": "OneLineListItem", "text": bairro, "on_release": lambda x=bairro: self.set_neighborhood(x)} for bairro in self.neighborhoods_db[city]]
+            self.menu_neighborhoods = MDDropdownMenu(caller=self.ids.tf_neighborhood, items=menu_items, width_mult=4)
+            self.menu_neighborhoods.open()
+
+    def set_neighborhood(self, text_item):
+        self.ids.tf_neighborhood.text = text_item
+        self.menu_neighborhoods.dismiss()
+
+    # --- LÓGICA DE UTILIDADES ---
+    def normalize_string(self, s):
+        if not s: return ""
+        return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
+
+    @mainthread
+    def mostrar_aviso(self, texto, cor="blue"):
+        cores = {"red": (1,0,0,1), "green": (0,0.7,0,1), "blue": (0.22, 0.75, 0.94, 1), "orange": (1, 0.6, 0, 1)}
+        Snackbar(text=texto, bg_color=cores.get(cor, (0,0,0,1))).open()
+
+    # --- AUTOCOMPLETAR (VIACEP & NOMINATIM) ---
+    @mainthread
+    def fill_address_fields(self, data):
+        city_api = data.get("localidade") or ""
+        city_clean = self.normalize_string(city_api)
+        target_city = "Balneário Camboriú" if "balneario" in city_clean and "camboriu" in city_clean else "Camboriú" if "camboriu" in city_clean else None
         
-        txt_gps_rua = ft.Text(value="Carregando...", weight="bold", color="black", size=14)
-        txt_gps_bairro = ft.Text(value="...", size=13, color="black")
-        txt_gps_cidade = ft.Text(value="...", size=12, color="grey")
-        txt_gps_source = ft.Text(value="...", size=10, color="grey")
+        if target_city:
+            self.ids.tf_city.text = target_city
+            self.ids.tf_neighborhood.disabled = False
+            if target_city in self.neighborhoods_db:
+                opts = self.neighborhoods_db[target_city]
+                b = data.get("bairro")
+                if b:
+                    if b not in opts: opts.append(b); opts.sort()
+                    self.ids.tf_neighborhood.text = b
+            self.ids.tf_street.text = data.get("logradouro", "")
+            self.ids.tf_cep.text = data.get("cep", "").replace("-", "")
+            if data.get("numero"): self.ids.tf_number.text = data.get("numero")
+        else:
+            self.ids.tf_city.text = ""; self.ids.tf_neighborhood.text = ""; self.ids.tf_neighborhood.disabled = True
+            self.ids.tf_street.text = ""; self.ids.tf_number.text = ""; self.ids.tf_cep.text = ""
+            self.mostrar_aviso(f"Serviço indisponível em {city_api}", "red")
+
+    def on_cep_change(self, text):
+        cep = text.replace("-", "").replace(".", "").strip()
+        if len(cep) == 8: threading.Thread(target=self._worker_search_cep, args=(cep,), daemon=True).start()
+
+    def _worker_search_cep(self, cep):
+        try:
+            res = requests.get(f"https://viacep.com.br/ws/{cep}/json/").json()
+            if "erro" not in res: self.fill_address_fields(res)
+        except: pass
+
+    def search_address_by_name(self):
+        city = self.ids.tf_city.text
+        street = self.ids.tf_street.text
+        if not city or len(street) < 3: return
+        self.ids.btn_search_street.icon = "timer-sand" 
+        threading.Thread(target=self._worker_search_street, args=(city, street), daemon=True).start()
+
+    def _worker_search_street(self, city, street):
+        try:
+            url = f"https://viacep.com.br/ws/SC/{quote(city)}/{quote(street)}/json/"
+            res = requests.get(url, timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                if isinstance(data, list) and len(data) > 0: 
+                    Clock.schedule_once(lambda dt: self.open_manual_modal(data), 0)
+                else: self.mostrar_aviso("Rua não encontrada.", "orange")
+            else: self.mostrar_aviso(f"Erro do ViaCEP: {res.status_code}", "red")
+        except Exception: self.mostrar_aviso("Erro na busca.", "red")
+        Clock.schedule_once(lambda dt: self._reset_search_icon(), 0)
+
+    @mainthread
+    def _reset_search_icon(self): self.ids.btn_search_street.icon = "magnify"
+
+    @mainthread
+    def open_manual_modal(self, address_list):
+        from kivymd.uix.list import TwoLineIconListItem, IconLeftWidget
+        from kivymd.uix.boxlayout import MDBoxLayout
+        from kivy.uix.scrollview import ScrollView
         
-        btn_gps = ft.ElevatedButton("Capturar localização (Rede)", icon=ft.Icons.WIFI, bgcolor="#39BFEF", color="white", width=float("inf"), style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
-        btn_submit = ft.ElevatedButton("CADASTRAR", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
+        content = ScrollView(size_hint_y=None, height=dp(300))
+        box = MDBoxLayout(orientation='vertical', adaptive_height=True)
+        for addr in address_list:
+            item = TwoLineIconListItem(text=addr.get("logradouro", ""), secondary_text=f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}", on_release=lambda x, a=addr: self.select_address_manual(a))
+            item.add_widget(IconLeftWidget(icon="map-marker"))
+            box.add_widget(item)
+        content.add_widget(box)
+        self.manual_dialog = MDDialog(title="Selecione a Rua", type="custom", content_cls=content, buttons=[MDFlatButton(text="Fechar", on_release=lambda x: self.manual_dialog.dismiss())])
+        self.manual_dialog.open()
 
-        gps_overlay = ft.Container(visible=False) 
-        address_overlay = ft.Container(visible=False)
+    def select_address_manual(self, addr_data):
+        if self.manual_dialog: self.manual_dialog.dismiss()
+        self.fill_address_fields(addr_data)
 
-        def normalize_string(s):
-            if not s: return ""
-            return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
+    # --- GPS ---
+    def start_ip_location(self):
+        self.ids.btn_gps.text = "Buscando..."; self.ids.btn_gps.icon = "timer-sand"; self.ids.btn_gps.disabled = True
+        threading.Thread(target=self._worker_ip_location, daemon=True).start()
 
-        neighborhoods_db = {"Camboriú": ["Areias", "Braço", "Caetés", "Cedro", "Centro", "Conde Vila Verde", "João da Costa", "Lídia Duarte", "Macacos", "Monte Alegre", "Rio do Meio", "Rio Pequeno", "Santa Regina", "São Francisco de Assis", "Tabuleiro", "Várzea do Ranchinho", "Vila Conceição"], "Balneário Camboriú": ["Ariribá", "Barra", "Centro", "Das Nações", "Dos Estados", "Estaleirinho", "Estaleiro", "Iate Clube", "Jardim Parque Bandeirantes", "Laranjeiras", "Municípios", "Nova Esperança", "Pioneiros", "Praia dos Amores", "São Judas Tadeu", "Taquaras", "Vila Real"]}
-
-        tf_cep = ft.TextField(hint_text="Digite o CEP", keyboard_type=ft.KeyboardType.NUMBER, border="none", text_size=14, content_padding=10)
-        dd_municipio = ft.Dropdown(hint_text="Selecione a cidade", options=[ft.dropdown.Option("Camboriú"), ft.dropdown.Option("Balneário Camboriú")], icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
-        dd_bairro = ft.Dropdown(hint_text="Selecione o bairro", disabled=True, icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
-        btn_search_inline = ft.IconButton(icon=ft.Icons.SEARCH, icon_color="#39BFEF", tooltip="Pesquisar rua")
-        tf_rua = ft.TextField(hint_text="Selecione a rua", border="none", text_size=14, content_padding=10, suffix=btn_search_inline)
-        tf_numero = ft.TextField(hint_text="Digite o número", border="none", text_size=14, content_padding=10, keyboard_type=ft.KeyboardType.NUMBER)
-
-        # =========================================================
-        # CALENDÁRIOS NATIVOS (DATEPICKER) - ADEUS LISTAS GIGANTES!
-        # =========================================================
-        
-        def change_notif_date(e):
-            if dp_notif.value:
-                btn_notif.text = dp_notif.value.strftime("%d/%m/%Y")
-                page.update()
-
-        def change_nasc_date(e):
-            if dp_nasc.value:
-                btn_nasc.text = dp_nasc.value.strftime("%d/%m/%Y")
-                page.update()
-
-        dp_notif = ft.DatePicker(
-            first_date=datetime.datetime(2020, 1, 1),
-            last_date=datetime.datetime.now(),
-            on_change=change_notif_date,
-            help_text="Data da notificação"
-        )
-        
-        dp_nasc = ft.DatePicker(
-            first_date=datetime.datetime(1920, 1, 1),
-            last_date=datetime.datetime.now(),
-            on_change=change_nasc_date,
-            help_text="Data de nascimento"
-        )
-        
-        # Adiciona os pop-ups de calendário na memória da página
-        page.overlay.extend([dp_notif, dp_nasc])
-
-        # Os botões bonitões que o usuário vai clicar
-        btn_notif = ft.OutlinedButton(
-            text="Selecionar Data",
-            icon=ft.Icons.CALENDAR_MONTH,
-            on_click=lambda _: page.open(dp_notif), # CORRIGIDO!
-            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), color="black", side=ft.BorderSide(1, "#E0E0E0"))
-        )
-
-        btn_nasc = ft.OutlinedButton(
-            text="Selecionar Data",
-            icon=ft.Icons.CALENDAR_MONTH,
-            on_click=lambda _: page.open(dp_nasc), # CORRIGIDO!
-            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8), color="black", side=ft.BorderSide(1, "#E0E0E0"))
-        )
-
-        # =========================================================
-
-        rg_teste = ft.RadioGroup(content=ft.Row([ft.Radio(value="sim", label="Sim", active_color="black"), ft.Radio(value="nao", label="Não", active_color="black")]))
-
-        def fill_address_fields(data):
-            city_api = data.get("localidade") or ""
-            city_clean = normalize_string(city_api)
-            target_city = "Balneário Camboriú" if "balneario" in city_clean and "camboriu" in city_clean else "Camboriú" if "camboriu" in city_clean else None
-            if target_city:
-                dd_municipio.value = target_city
-                dd_bairro.disabled = False
-                if target_city in neighborhoods_db:
-                    opts = neighborhoods_db[target_city]
-                    b = data.get("bairro")
-                    if b and b not in opts: opts.append(b); opts.sort()
-                    if b: dd_bairro.value = b
-                    dd_bairro.options = [ft.dropdown.Option(o) for o in opts]
-                tf_rua.value = data.get("logradouro")
-                tf_cep.value = data.get("cep")
-            page.update()
-
-        def on_city_change(e):
-            if dd_municipio.value in neighborhoods_db: 
-                dd_bairro.options = [ft.dropdown.Option(b) for b in neighborhoods_db[dd_municipio.value]]
-                dd_bairro.disabled = False
-            else: dd_bairro.disabled = True
-            page.update()
-        dd_municipio.on_change = on_city_change
-
-        def search_cep(e):
-            cep = tf_cep.value.replace("-", "").replace(".", "").strip()
-            if len(cep) == 8:
-                try:
-                    res = requests.get(f"https://viacep.com.br/ws/{cep}/json/", timeout=5).json()
-                    if "erro" not in res: fill_address_fields(res)
-                except: pass
-        tf_cep.on_change = search_cep
-
-        def search_address_by_name(e=None):
-            city = dd_municipio.value
-            street = tf_rua.value
-            if not city or not street or len(street) < 3: return
-            tf_rua.suffix = ft.Container(content=ft.ProgressRing(width=20, height=20, stroke_width=2), padding=10); page.update()
-            try:
-                url = f"https://viacep.com.br/ws/SC/{quote(city)}/{quote(street)}/json/"
-                res = requests.get(url, timeout=10)
-                if res.status_code == 200:
-                    data = res.json()
-                    if isinstance(data, list) and len(data) > 0: open_manual_modal(data)
-            except: pass
-            tf_rua.suffix = btn_search_inline; page.update()
-
-        btn_search_inline.on_click = search_address_by_name
-        tf_rua.on_submit = search_address_by_name
-
-        def run_ip_location():
-            btn_gps.text = "Buscando..."; btn_gps.icon = ft.Icons.HOURGLASS_TOP; btn_gps.disabled = True; page.update()
-            try:
-                res = requests.get("http://ip-api.com/json/", timeout=5)
-                if res.status_code == 200:
-                    data = res.json()
-                    get_address_from_coords(data.get('lat'), data.get('lon'), source="Internet (Aproximado)")
-            except: 
-                page.open(ft.SnackBar(ft.Text("Erro de conexão."), bgcolor="red"))
-                btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
-
-        def get_address_from_coords(lat, lon, source="Rede"):
-            try:
-                headers = {'User-Agent': 'VigiAA/1.0'}
-                url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-                res = requests.get(url, headers=headers).json()
-                addr = res.get("address", {})
-                gps_address_data.clear()
-                gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality")
-                gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood")
-                gps_address_data["logradouro"] = addr.get("road")
-                gps_address_data["cep"] = addr.get("postcode")
-                
-                txt_gps_rua.value = gps_address_data["logradouro"] or "Rua não detectada"
-                txt_gps_bairro.value = gps_address_data["bairro"] or "Bairro não detectado"
-                txt_gps_cidade.value = gps_address_data["localidade"] or "Cidade não detectada"
-                txt_gps_source.value = f"Fonte: {source}"
-                
-                gps_overlay.visible = True
-                btn_gps.text = "Localização Encontrada!"; btn_gps.icon = ft.Icons.CHECK; btn_gps.disabled = False; page.update()
-            except:
-                page.open(ft.SnackBar(ft.Text("Erro ao traduzir endereço."), bgcolor="red"))
-                btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
-
-        btn_gps.on_click = lambda e: threading.Thread(target=run_ip_location).start()
-
-        def close_gps_modal(e=None): gps_overlay.visible = False; btn_gps.text = "Capturar localização (Rede)"; btn_gps.icon = ft.Icons.WIFI; btn_gps.disabled = False; page.update()
-        def confirm_gps_fill(e=None): fill_address_fields(gps_address_data); close_gps_modal()
-
-        gps_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, bgcolor="white", border_radius=20, padding=25, shadow=ft.BoxShadow(blur_radius=15, spread_radius=1, color="#4D000000"), content=ft.Column(alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=15, height=350, controls=[ft.Icon(ft.Icons.MAP_SHARP, color="#39BFEF", size=50), ft.Text("Localização Encontrada!", size=20, weight="bold", color="#39BFEF"), txt_gps_source, ft.Divider(), ft.Text("Confira os dados abaixo:", size=14, color="grey"), ft.Container(bgcolor="#F5F5F5", padding=15, border_radius=10, content=ft.Column([txt_gps_rua, txt_gps_bairro, txt_gps_cidade], spacing=2)), ft.Container(height=10), ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.OutlinedButton("Cancelar", on_click=close_gps_modal), ft.ElevatedButton("Confirmar", bgcolor="#39BFEF", color="white", on_click=confirm_gps_fill)])])))
-        
-        overlay_list_content = ft.Column(scroll=ft.ScrollMode.AUTO, spacing=0)
-        def close_manual_modal(e): address_overlay.visible = False; page.update()
-        def select_address_manual(addr_data): address_overlay.visible = False; page.update(); fill_address_fields(addr_data)
-
-        address_overlay = ft.Container(visible=False, bgcolor="#80000000", alignment=ft.alignment.center, expand=True, content=ft.Container(width=320, height=500, bgcolor="white", border_radius=20, padding=20, content=ft.Column(controls=[ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, controls=[ft.Text("Selecione a Rua", size=18, weight="bold", color="#39BFEF"), ft.Icon(ft.Icons.LOCATION_CITY, color="#39BFEF")]), ft.Divider(height=1, color="#EEEEEE"), ft.Container(content=overlay_list_content, expand=True), ft.ElevatedButton("Fechar", bgcolor="#39BFEF", color="white", width=float("inf"), on_click=close_manual_modal)])))
-
-        def close_success_dialog(e):
-            try: page.close(success_dialog)
-            except: pass
-            page.go("/novo") 
-
-        success_dialog = ft.AlertDialog(modal=True, title=ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, color="green", size=30), ft.Text("Sucesso!")]), content=ft.Text("Caso de dengue cadastrado!"), actions=[ft.TextButton("OK", on_click=close_success_dialog)])
-
-        def confirm_positive_and_submit(e):
-            try: page.close(aviso_identificacao_dialog)
-            except: pass
-            execute_submit(is_positive=True)
-
-        aviso_identificacao_dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Row([ft.Icon(ft.Icons.WARNING, color="black"), ft.Text("Aviso", weight="bold")]),
-            content=ft.Text("Nos casos de teste positivo o\npaciente deve ser identificado.", text_align=ft.TextAlign.CENTER),
-            actions=[ft.ElevatedButton("Ok", bgcolor="#39BFEF", color="white", width=150, on_click=confirm_positive_and_submit)],
-            actions_alignment=ft.MainAxisAlignment.CENTER
-        )
-
-        def pre_submit_check(e):
-            # Validação agora checa se as datas foram escolhidas (se dp_notif.value tem conteúdo)
-            if not all([tf_cep.value, dd_municipio.value, dd_bairro.value, tf_rua.value, tf_numero.value, rg_teste.value, dp_notif.value, dp_nasc.value]): 
-                page.open(ft.SnackBar(ft.Text("Preencha todos os campos obrigatórios (*)!"), bgcolor="red"))
+    def _worker_ip_location(self):
+        try:
+            res = requests.get("http://ip-api.com/json/", timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                self._worker_get_address_from_coords(data.get('lat'), data.get('lon'), "Internet (Aproximado)")
                 return
+        except: pass
+        self.mostrar_aviso("Erro de conexão.", "red")
+        Clock.schedule_once(lambda dt: self._reset_gps_btn(), 0)
+
+    def _worker_get_address_from_coords(self, lat, lon, source="Rede"):
+        try:
+            url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
+            res = requests.get(url, headers={'User-Agent': 'VigiAA/1.0'}).json()
+            addr = res.get("address", {})
+            self.gps_address_data.clear()
+            self.gps_address_data["lat"] = str(lat); self.gps_address_data["lon"] = str(lon) 
+            self.gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality")
+            self.gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood")
+            self.gps_address_data["logradouro"] = addr.get("road")
+            self.gps_address_data["cep"] = addr.get("postcode")
+            self.gps_address_data["numero"] = addr.get("house_number")
+            Clock.schedule_once(lambda dt: self.open_gps_modal(source), 0)
+        except:
+            self.mostrar_aviso("Erro ao traduzir endereço.", "red")
+            Clock.schedule_once(lambda dt: self._reset_gps_btn(), 0)
+
+    @mainthread
+    def _reset_gps_btn(self): self.ids.btn_gps.text = "Capturar localização (Rede)"; self.ids.btn_gps.icon = "wifi"; self.ids.btn_gps.disabled = False
+
+    @mainthread
+    def open_gps_modal(self, source):
+        self.ids.btn_gps.text = "Localização Encontrada!"; self.ids.btn_gps.icon = "check"; self.ids.btn_gps.disabled = False
+        texto_dialog = f"[b]Rua:[/b] {self.gps_address_data.get('logradouro', '')}\n[b]Bairro:[/b] {self.gps_address_data.get('bairro', '')}\n[b]Cidade:[/b] {self.gps_address_data.get('localidade', '')}\n\n[i]Fonte: {source}[/i]"
+        self.gps_dialog = MDDialog(title="Confirme os Dados:", text=texto_dialog, buttons=[MDFlatButton(text="Cancelar", text_color=(1,0,0,1), on_release=lambda x: self.gps_dialog.dismiss()), MDRaisedButton(text="Confirmar", md_bg_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_gps_fill)])
+        self.gps_dialog.open()
+
+    def confirm_gps_fill(self, instance):
+        self.gps_dialog.dismiss(); self.fill_address_fields(self.gps_address_data)
+
+    # --- ENVIO DO FORMULÁRIO (COM LÓGICA DE POSITIVO/NEGATIVO) ---
+    def pre_submit_check(self):
+        # Validação de campos
+        if not all([self.ids.tf_cep.text, self.ids.tf_city.text, self.ids.tf_neighborhood.text, self.ids.tf_street.text, self.ids.tf_number.text, self.ids.tf_notif_date.text, self.ids.tf_birth_date.text]):
+            self.mostrar_aviso("Preencha todos os campos obrigatórios (*)", "red")
+            return
             
-            if rg_teste.value == "sim":
-                page.open(aviso_identificacao_dialog)
-            else:
-                execute_submit(is_positive=False)
-
-        def execute_submit(is_positive):
-            token = page.client_storage.get("token")
-            btn_submit.text = "Enviando..."; btn_submit.disabled = True; page.update()
+        if not self.ids.chk_sim.active and not self.ids.chk_nao.active:
+            self.mostrar_aviso("Selecione se o teste foi positivo ou negativo", "red")
+            return
             
-            # Pega as datas bonitinhas do calendário
-            data_notif = dp_notif.value.strftime("%d/%m/%Y")
-            data_nasc = dp_nasc.value.strftime("%d/%m/%Y")
-            
-            try:
-                data = {
-                    "notification_date": data_notif,
-                    "cep": tf_cep.value,
-                    "city": dd_municipio.value,
-                    "neighborhood": dd_bairro.value,
-                    "street": tf_rua.value,
-                    "number": tf_numero.value,
-                    "birth_date": data_nasc,
-                    "positive_test": is_positive
-                }
-                headers = {"Authorization": f"Bearer {token}"}
-                res = requests.post(f"{API_URL}/api/report-case/", json=data, headers=headers)
-                
-                if res.status_code in [200, 201]: 
-                    case_data = res.json()
-                    case_id = case_data.get('id')
-                    
-                    if is_positive:
-                        page.session.set("current_case_id", case_id)
-                        page.go("/form-caso-positivo")
-                    else:
-                        try: page.open(success_dialog)
-                        except: page.dialog = success_dialog; success_dialog.open = True; page.update()
-                
-                else: 
-                    page.open(ft.SnackBar(ft.Text("Erro no servidor. Verifique a conexão."), bgcolor="red"))
-                    
-            except Exception as ex: 
-                page.open(ft.SnackBar(ft.Text("Erro de comunicação com o sistema."), bgcolor="red"))
-                
-            btn_submit.text = "CADASTRAR"; btn_submit.disabled = False; page.update()
+        if self.ids.chk_sim.active:
+            self.open_warning_modal()
+        else:
+            self.execute_submit(is_positive=False)
 
-        btn_submit.on_click = pre_submit_check
-
-        def back_click(e): 
-            page.go("/novo")
-                
-        header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Casos de dengue", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
-        
-        def create_row(label, field, obrigatorio=True): 
-            label_controls = [ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))]
-            if obrigatorio: label_controls.append(ft.Text(" *", color="red", weight="bold", size=14))
-            return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=120, content=ft.Row(label_controls, spacing=0)), ft.Row([ft.Container(content=field, expand=True)], expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
-
-        caixa_aviso = ft.Container(
-            margin=ft.padding.symmetric(horizontal=20, vertical=10),
-            padding=15,
-            border=ft.border.all(1, "#BDBDBD"),
-            border_radius=8,
-            bgcolor="#F5F5F5",
-            content=ft.Column(
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=10,
-                controls=[
-                    ft.Row([ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color="grey"), ft.Text("Aviso", weight="bold", color="grey")], alignment=ft.MainAxisAlignment.CENTER),
-                    ft.Text("Nosso objetivo é registrar a ocorrência de casos de dengue.\n\nNão identificamos o paciente.", text_align=ft.TextAlign.CENTER, color="grey", size=13)
-                ]
-            )
-        )
-
-        form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30), controls=[
-            ft.Container(padding=20, content=btn_gps),
-            ft.Container(padding=ft.padding.only(left=20, bottom=10), content=ft.Text("Campos marcados com * são obrigatórios", size=10, color="black")),
-            
-            # Aqui entraram os botões novos que abrem o calendário!
-            create_row("Data da notificação", btn_notif), 
-            create_row("CEP", tf_cep), 
-            create_row("MUNICÍPIO", dd_municipio), 
-            create_row("BAIRRO", dd_bairro), 
-            create_row("RUA", tf_rua), 
-            create_row("NÚMERO", tf_numero), 
-            create_row("Data de nascimento", btn_nasc),
-            create_row("Teste positivo", rg_teste),
-            
-            caixa_aviso,
-            ft.Container(padding=20, content=btn_submit),
-        ]))
-
-        return ft.View(
-            route="/form-caso", 
-            bgcolor="white", 
-            padding=0, 
-            controls=[
-                ft.Stack(expand=True, controls=[
-                    ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body]), 
-                    gps_overlay, 
-                    address_overlay
-                ])
+    @mainthread
+    def open_warning_modal(self):
+        self.warning_dialog = MDDialog(
+            title="Aviso Importante",
+            text="Nos casos de teste positivo, o paciente deve ser identificado no próximo passo.",
+            buttons=[
+                MDFlatButton(text="Cancelar", on_release=lambda x: self.warning_dialog.dismiss()),
+                MDRaisedButton(text="OK, Continuar", md_bg_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_positive)
             ]
         )
+        self.warning_dialog.open()
 
-    except Exception as e:
-        print(f"Erro ao criar tela: {e}")
-        return ft.View(route="/form-caso", controls=[ft.Text(f"Erro crítico da tela.", color="red")])
+    def confirm_positive(self, instance):
+        self.warning_dialog.dismiss()
+        self.execute_submit(is_positive=True)
+
+    def execute_submit(self, is_positive):
+        if not store.exists("session"):
+            self.manager.current = 'login'
+            return
+            
+        token = store.get("session")["token"]
+        self.ids.btn_submit.text = "Enviando..."
+        self.ids.btn_submit.disabled = True
+        
+        threading.Thread(target=self._worker_submit, args=(token, is_positive), daemon=True).start()
+
+    def _worker_submit(self, token, is_positive):
+        try:
+            data = {
+                "notification_date": self.ids.tf_notif_date.text,
+                "cep": self.ids.tf_cep.text,
+                "city": self.ids.tf_city.text,
+                "neighborhood": self.ids.tf_neighborhood.text,
+                "street": self.ids.tf_street.text,
+                "number": self.ids.tf_number.text,
+                "birth_date": self.ids.tf_birth_date.text,
+                "positive_test": is_positive
+            }
+                
+            headers = {"Authorization": f"Bearer {token}"}
+            res = requests.post(f"{config.API_URL}/api/report-case/", json=data, headers=headers)
+            
+            if res.status_code in [200, 201]: 
+                case_data = res.json()
+                case_id = case_data.get('id')
+                
+                if is_positive:
+                    # Salva o ID na memória e vai para a tela do paciente
+                    store.put("current_case", id=case_id)
+                    Clock.schedule_once(lambda dt: self.go_to_positive_screen(), 0)
+                else:
+                    Clock.schedule_once(lambda dt: self.open_success_modal(), 0)
+            else: 
+                self.mostrar_aviso("Erro no servidor.", "red")
+                
+        except Exception as ex: 
+            self.mostrar_aviso("Erro de comunicação com o sistema.", "red")
+            
+        Clock.schedule_once(lambda dt: self._reset_submit_btn(), 0)
+
+    @mainthread
+    def go_to_positive_screen(self):
+        try:
+            self.manager.current = 'form_caso_positivo'
+        except Exception:
+            self.mostrar_aviso("A tela de identificação ainda não foi criada!", "red")
+
+    @mainthread
+    def _reset_submit_btn(self):
+        self.ids.btn_submit.text = "CADASTRAR"
+        self.ids.btn_submit.disabled = False
+
+    @mainthread
+    def open_success_modal(self):
+        self.success_dialog = MDDialog(
+            title="Sucesso!",
+            text="Caso de dengue cadastrado com sucesso!",
+            buttons=[MDRaisedButton(text="OK", md_bg_color=(0, 0.7, 0, 1), on_release=self.close_success_modal)]
+        )
+        self.success_dialog.open()
+
+    def close_success_modal(self, instance):
+        self.success_dialog.dismiss()
+        self.go_back()
