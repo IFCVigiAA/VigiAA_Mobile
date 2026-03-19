@@ -1,82 +1,214 @@
-import flet as ft
+from kivymd.uix.screen import MDScreen
+from kivy.lang import Builder
+from kivy.clock import mainthread, Clock
+from kivy.storage.jsonstore import JsonStore
+from kivymd.uix.menu import MDDropdownMenu
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDFlatButton
+from kivymd.toast import toast
 import requests
+import threading
 import config
 
-def create_positive_case_form_view(page: ft.Page):
-    API_URL = config.API_URL
+store = JsonStore('vigiaa_storage.json')
 
-    tf_nome = ft.TextField(hint_text="Digite seu nome", border="none", text_size=14, content_padding=10)
-    tf_cpf = ft.TextField(hint_text="000.000.000-00", border="none", text_size=14, content_padding=10, keyboard_type=ft.KeyboardType.NUMBER)
-    tf_telefone = ft.TextField(hint_text="(XX) XXXXX-XXXX", border="none", text_size=14, content_padding=10, keyboard_type=ft.KeyboardType.NUMBER)
+KV_POSITIVE_FORM = '''
+<PositiveCaseFormScreen>:
+    md_bg_color: 1, 1, 1, 1
+
+    MDBoxLayout:
+        orientation: "vertical"
+
+        MDBoxLayout:
+            size_hint_y: None
+            height: "56dp"
+            md_bg_color: 0.22, 0.75, 0.94, 1
+            padding: ["5dp", "0dp", "15dp", "0dp"]
+            spacing: "10dp"
+
+            MDIconButton:
+                icon: "chevron-left"
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                pos_hint: {"center_y": .5}
+                on_release: root.go_back()
+
+            MDLabel:
+                text: "Identificação do Paciente"
+                font_size: "20sp"
+                bold: True
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                pos_hint: {"center_y": .5}
+
+        ScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "20dp"
+                spacing: "20dp"
+                adaptive_height: True
+
+                MDBoxLayout:
+                    orientation: "vertical"
+                    adaptive_height: True
+                    padding: "15dp"
+                    spacing: "10dp"
+                    md_bg_color: 0.88, 0.96, 1, 1 
+                    
+                    MDLabel:
+                        text: "Teste Positivo Confirmado"
+                        bold: True
+                        theme_text_color: "Custom"
+                        text_color: 0.1, 0.46, 0.82, 1
+                        halign: "center"
+
+                    MDLabel:
+                        text: "Como o caso foi positivo, os dados do paciente são obrigatórios para a vigilância epidemiológica."
+                        theme_text_color: "Hint"
+                        font_style: "Caption"
+                        halign: "center"
+
+                MDLabel:
+                    text: "Campos marcados com * são obrigatórios"
+                    font_style: "Caption"
+                    theme_text_color: "Hint"
+
+                MDTextField:
+                    id: tf_nome
+                    hint_text: "Nome completo *"
+                    icon_left: "account-outline"
+
+                MDTextField:
+                    id: tf_cpf
+                    hint_text: "CPF (Apenas números)"
+                    icon_left: "card-account-details-outline"
+                    input_filter: "int"
+                    max_text_length: 11
+
+                MDTextField:
+                    id: tf_telefone
+                    hint_text: "Telefone com DDD *"
+                    icon_left: "phone-outline"
+                    input_filter: "int"
+                    max_text_length: 11
+
+                MDTextField:
+                    id: tf_local_teste
+                    hint_text: "Local do teste *"
+                    icon_left: "hospital-building"
+                    readonly: True
+                    on_focus: if self.focus: root.open_local_menu()
+
+                Widget:
+                    size_hint_y: None
+                    height: "20dp"
+
+                # BOTÃO SEM SOMBRA ANTI-CRASH
+                MDFlatButton:
+                    id: btn_submit
+                    text: "VINCULAR PACIENTE"
+                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    size_hint_x: 1
+                    padding: "15dp"
+                    on_release: root.submit_form()
+'''
+
+Builder.load_string(KV_POSITIVE_FORM)
+
+class PositiveCaseFormScreen(MDScreen):
     opcoes_locais = ["Posto de Saúde", "Farmácia", "Hospital", "Laboratório"]
-    dd_local_teste = ft.Dropdown(hint_text="Selecione o local", options=[ft.dropdown.Option(l) for l in opcoes_locais], icon=ft.Icons.KEYBOARD_ARROW_DOWN, border="none", text_size=14, content_padding=10)
 
-    btn_submit = ft.ElevatedButton("CADASTRAR", bgcolor="#39BFEF", color="white", width=float("inf"), height=50, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.menu_locais = None
+        self.success_dialog = None
 
-    def close_success_dialog(e):
-        try: page.close(success_dialog)
-        except: pass
-        page.go("/novo") 
+    def on_pre_enter(self, *args):
+        self.ids.tf_nome.text = ""
+        self.ids.tf_cpf.text = ""
+        self.ids.tf_telefone.text = ""
+        self.ids.tf_local_teste.text = ""
+        self.ids.btn_submit.text = "VINCULAR PACIENTE"
+        self.ids.btn_submit.disabled = False
 
-    success_dialog = ft.AlertDialog(modal=True, title=ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, color="green", size=30), ft.Text("Sucesso!")]), content=ft.Text("Paciente identificado com sucesso!"), actions=[ft.TextButton("OK", on_click=close_success_dialog)])
+    def go_back(self):
+        self.manager.current = 'form_caso'
 
-    def submit_positive_form(e):
-        token = page.client_storage.get("token")
-        
-        # Recupera o ID do caso de dengue base que salvamos na tela anterior
-        dengue_case_id = page.session.get("current_case_id")
-        
-        if not dengue_case_id:
-            page.open(ft.SnackBar(ft.Text("Erro: Caso base não encontrado. Volte e tente novamente."), bgcolor="red"))
-            return
+    def go_home(self):
+        self.manager.current = 'home'
+        self.manager.get_screen('home').ids.bottom_nav.switch_tab('tab_new')
 
-        if not all([tf_nome.value, tf_telefone.value, dd_local_teste.value]): 
-            page.open(ft.SnackBar(ft.Text("Preencha todos os campos obrigatórios (*)!"), bgcolor="red"))
+    def open_local_menu(self):
+        menu_items = [{"viewclass": "OneLineListItem", "text": local, "on_release": lambda x=local: self.set_local(x)} for local in self.opcoes_locais]
+        self.menu_locais = MDDropdownMenu(caller=self.ids.tf_local_teste, items=menu_items, width_mult=4)
+        self.menu_locais.open()
+
+    def set_local(self, text_item):
+        self.ids.tf_local_teste.text = text_item
+        self.menu_locais.dismiss()
+
+    def submit_form(self):
+        if not store.exists("session"):
+            self.manager.current = 'login'
             return
             
-        btn_submit.text = "Enviando..."; btn_submit.disabled = True; page.update()
+        if not store.exists("current_case"):
+            toast("Erro: Caso base não encontrado. Volte e tente novamente.")
+            return
+            
+        dengue_case_id = store.get("current_case")["id"]
+        token = store.get("session")["token"]
         
+        if not all([self.ids.tf_nome.text, self.ids.tf_telefone.text, self.ids.tf_local_teste.text]):
+            toast("Preencha todos os campos obrigatórios (*)")
+            return
+            
+        self.ids.btn_submit.text = "Enviando..."
+        self.ids.btn_submit.disabled = True
+        threading.Thread(target=self._worker_submit, args=(token, dengue_case_id), daemon=True).start()
+
+    def _worker_submit(self, token, dengue_case_id):
         try:
             data = {
                 "dengue_case": dengue_case_id,
-                "patient_name": tf_nome.value,
-                "cpf": tf_cpf.value,
-                "phone": tf_telefone.value,
-                "test_location": dd_local_teste.value
+                "patient_name": self.ids.tf_nome.text,
+                "cpf": self.ids.tf_cpf.text,
+                "phone": self.ids.tf_telefone.text,
+                "test_location": self.ids.tf_local_teste.text
             }
+                
             headers = {"Authorization": f"Bearer {token}"}
-            res = requests.post(f"{API_URL}/api/report-positive-case/", json=data, headers=headers)
+            res = requests.post(f"{config.API_URL}/api/report-positive-case/", json=data, headers=headers)
             
             if res.status_code in [200, 201]: 
-                try: page.open(success_dialog)
-                except: page.dialog = success_dialog; success_dialog.open = True; page.update()
-            else: page.open(ft.SnackBar(ft.Text(f"Erro: {res.text}"), bgcolor="red"))
-        except Exception as ex: page.open(ft.SnackBar(ft.Text(f"Erro no app: {ex}"), bgcolor="red"))
-        btn_submit.text = "CADASTRAR"; btn_submit.disabled = False; page.update()
-
-    btn_submit.on_click = submit_positive_form
-
-    def back_click(e): page.go("/form-caso")
+                store.delete("current_case")
+                Clock.schedule_once(lambda dt: self.open_success_modal(), 0)
+            else: 
+                Clock.schedule_once(lambda dt: toast(f"Erro no servidor. Código: {res.status_code}"), 0)
+                
+        except Exception as ex: 
+            Clock.schedule_once(lambda dt: toast("Erro de comunicação com o sistema."), 0)
             
-    header = ft.Container(padding=ft.padding.only(top=40, left=10, right=20, bottom=15), bgcolor="white", content=ft.Row([ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, icon_color="black", on_click=back_click, icon_size=20), ft.Text("Casos de dengue", size=18, weight="bold", color="black"), ft.Container(width=40)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN))
-    
-    def create_row(label, field, obrigatorio=True): 
-        label_controls = [ft.Text(label, style=ft.TextStyle(color="black", weight="bold", size=12))]
-        if obrigatorio: label_controls.append(ft.Text(" *", color="red", weight="bold", size=14))
-        return ft.Column([ft.Container(padding=ft.padding.symmetric(vertical=5, horizontal=20), content=ft.Row(alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[ft.Container(width=100, content=ft.Row(label_controls, spacing=0)), ft.Row([ft.Container(content=field, expand=True)], expand=True)])), ft.Divider(height=1, color="#F5F5F5")], spacing=0)
+        Clock.schedule_once(lambda dt: self._reset_submit_btn(), 0)
 
-    form_body = ft.Container(bgcolor="white", expand=True, content=ft.ListView(padding=ft.padding.only(bottom=30, top=20), controls=[
-        create_row("Nome", tf_nome, obrigatorio=True), 
-        create_row("CPF", tf_cpf, obrigatorio=False), 
-        create_row("Telefone", tf_telefone, obrigatorio=True), 
-        create_row("Local do teste", dd_local_teste, obrigatorio=True), 
-        ft.Container(height=40),
-        ft.Container(padding=20, content=btn_submit),
-    ]))
+    @mainthread
+    def _reset_submit_btn(self):
+        self.ids.btn_submit.text = "VINCULAR PACIENTE"
+        self.ids.btn_submit.disabled = False
 
-    return ft.View(
-        route="/form-caso-positivo", 
-        bgcolor="white", 
-        padding=0, 
-        controls=[ft.Column(expand=True, spacing=0, controls=[header, ft.Divider(height=1, color="#EEEEEE"), form_body])]
-    )
+    @mainthread
+    def open_success_modal(self):
+        self.success_dialog = MDDialog(
+            title="Sucesso!",
+            text="Paciente identificado com sucesso!",
+            buttons=[
+                MDFlatButton(text="OK", text_color=(1,1,1,1), md_bg_color=(0, 0.7, 0, 1), on_release=self.close_success_modal)
+            ]
+        )
+        self.success_dialog.open()
+
+    def close_success_modal(self, instance):
+        self.success_dialog.dismiss()
+        self.go_home()

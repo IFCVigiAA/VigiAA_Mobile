@@ -2,17 +2,22 @@ from kivymd.uix.screen import MDScreen
 from kivy.lang import Builder
 from kivy.clock import mainthread, Clock
 from kivy.storage.jsonstore import JsonStore
-from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.button import MDFlatButton, MDRaisedButton
+from kivymd.uix.button import MDFlatButton, MDRectangleFlatIconButton
 from kivymd.uix.pickers import MDDatePicker
 from kivy.metrics import dp
+from kivymd.toast import toast
 import requests
 import threading
 import unicodedata
 from urllib.parse import quote
 import config
+from plyer import gps
+from kivy.utils import platform
+
+if platform == 'android':
+    from android.permissions import request_permissions, Permission
 
 store = JsonStore('vigiaa_storage.json')
 
@@ -23,15 +28,28 @@ KV_CASE_FORM = '''
     MDBoxLayout:
         orientation: "vertical"
 
-        # HEADER
-        MDTopAppBar:
-            title: "Casos de dengue"
+        MDBoxLayout:
+            size_hint_y: None
+            height: "56dp"
             md_bg_color: 0.22, 0.75, 0.94, 1
-            specific_text_color: 1, 1, 1, 1
-            elevation: 2
-            left_action_items: [["chevron-left", lambda x: root.go_back()]]
+            padding: ["5dp", "0dp", "15dp", "0dp"]
+            spacing: "10dp"
 
-        # FORMULÁRIO
+            MDIconButton:
+                icon: "chevron-left"
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                pos_hint: {"center_y": .5}
+                on_release: root.go_back()
+
+            MDLabel:
+                text: "Casos de dengue"
+                font_size: "20sp"
+                bold: True
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                pos_hint: {"center_y": .5}
+
         ScrollView:
             MDBoxLayout:
                 orientation: "vertical"
@@ -39,20 +57,24 @@ KV_CASE_FORM = '''
                 spacing: "15dp"
                 adaptive_height: True
 
-                MDFillRoundFlatIconButton:
+                # BOTÃO SEM SOMBRA ANTI-CRASH
+                MDRectangleFlatIconButton:
                     id: btn_gps
-                    text: "Capturar localização (Rede)"
-                    icon: "wifi"
+                    text: "Capturar localização (GPS/Rede)"
+                    icon: "map-marker"
                     md_bg_color: 0.22, 0.75, 0.94, 1
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    icon_color: 1, 1, 1, 1
+                    line_color: 0.22, 0.75, 0.94, 1
                     pos_hint: {"center_x": .5}
-                    on_release: root.start_ip_location()
+                    on_release: root.start_location()
 
                 MDLabel:
                     text: "Campos marcados com * são obrigatórios"
                     font_style: "Caption"
                     theme_text_color: "Hint"
 
-                # CALENDÁRIO 1
                 MDBoxLayout:
                     adaptive_height: True
                     spacing: "10dp"
@@ -106,7 +128,6 @@ KV_CASE_FORM = '''
                     hint_text: "NÚMERO *"
                     input_filter: "int"
 
-                # CALENDÁRIO 2
                 MDBoxLayout:
                     adaptive_height: True
                     spacing: "10dp"
@@ -121,7 +142,6 @@ KV_CASE_FORM = '''
                         text_color: 0.22, 0.75, 0.94, 1
                         on_release: root.show_date_picker('birth')
 
-                # RADIO BUTTONS (Sim/Não)
                 MDBoxLayout:
                     adaptive_height: True
                     spacing: "5dp"
@@ -145,14 +165,12 @@ KV_CASE_FORM = '''
                         text: "Não"
                         adaptive_width: True
 
-                # CAIXA DE AVISO CINZA
                 MDBoxLayout:
                     orientation: "vertical"
                     adaptive_height: True
                     padding: "15dp"
                     spacing: "10dp"
                     md_bg_color: 0.96, 0.96, 0.96, 1
-                    radius: [8, 8, 8, 8]
                     
                     MDBoxLayout:
                         adaptive_height: True
@@ -178,12 +196,14 @@ KV_CASE_FORM = '''
                     size_hint_y: None
                     height: "10dp"
 
-                MDRaisedButton:
+                # BOTÃO SEM SOMBRA ANTI-CRASH
+                MDFlatButton:
                     id: btn_submit
                     text: "CADASTRAR"
                     md_bg_color: 0.22, 0.75, 0.94, 1
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
                     size_hint_x: 1
-                    elevation: 0
                     padding: "15dp"
                     on_release: root.pre_submit_check()
 '''
@@ -207,7 +227,6 @@ class CaseFormScreen(MDScreen):
         self.warning_dialog = None
 
     def on_pre_enter(self, *args):
-        # Limpa tudo
         self.gps_address_data.clear()
         self.ids.tf_notif_date.text = ""
         self.ids.tf_birth_date.text = ""
@@ -219,29 +238,22 @@ class CaseFormScreen(MDScreen):
         self.ids.tf_number.text = ""
         self.ids.chk_sim.active = False
         self.ids.chk_nao.active = False
-        self.ids.btn_gps.text = "Capturar localização (Rede)"
-        self.ids.btn_gps.icon = "wifi"
+        self.ids.btn_gps.text = "Capturar localização (GPS/Rede)"
+        self.ids.btn_gps.icon = "map-marker"
 
     def go_back(self):
         self.manager.current = 'home'
         self.manager.get_screen('home').ids.bottom_nav.switch_tab('tab_new')
 
-    # --- CALENDÁRIOS NATIVOS ---
     def show_date_picker(self, field_type):
         date_dialog = MDDatePicker()
-        if field_type == 'notif':
-            date_dialog.bind(on_save=self.on_save_notif)
-        else:
-            date_dialog.bind(on_save=self.on_save_birth)
+        if field_type == 'notif': date_dialog.bind(on_save=self.on_save_notif)
+        else: date_dialog.bind(on_save=self.on_save_birth)
         date_dialog.open()
 
-    def on_save_notif(self, instance, value, date_range):
-        self.ids.tf_notif_date.text = value.strftime("%d/%m/%Y")
+    def on_save_notif(self, instance, value, date_range): self.ids.tf_notif_date.text = value.strftime("%d/%m/%Y")
+    def on_save_birth(self, instance, value, date_range): self.ids.tf_birth_date.text = value.strftime("%d/%m/%Y")
 
-    def on_save_birth(self, instance, value, date_range):
-        self.ids.tf_birth_date.text = value.strftime("%d/%m/%Y")
-
-    # --- MENUS (DROPDOWNS) ---
     def open_city_menu(self):
         menu_items = [{"viewclass": "OneLineListItem", "text": city, "on_release": lambda x=city: self.set_city(x)} for city in self.neighborhoods_db.keys()]
         self.menu_cities = MDDropdownMenu(caller=self.ids.tf_city, items=menu_items, width_mult=4)
@@ -264,23 +276,19 @@ class CaseFormScreen(MDScreen):
         self.ids.tf_neighborhood.text = text_item
         self.menu_neighborhoods.dismiss()
 
-    # --- LÓGICA DE UTILIDADES ---
     def normalize_string(self, s):
         if not s: return ""
         return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
 
     @mainthread
     def mostrar_aviso(self, texto, cor="blue"):
-        cores = {"red": (1,0,0,1), "green": (0,0.7,0,1), "blue": (0.22, 0.75, 0.94, 1), "orange": (1, 0.6, 0, 1)}
-        Snackbar(text=texto, bg_color=cores.get(cor, (0,0,0,1))).open()
+        toast(texto)
 
-    # --- AUTOCOMPLETAR (VIACEP & NOMINATIM) ---
     @mainthread
     def fill_address_fields(self, data):
         city_api = data.get("localidade") or ""
         city_clean = self.normalize_string(city_api)
         target_city = "Balneário Camboriú" if "balneario" in city_clean and "camboriu" in city_clean else "Camboriú" if "camboriu" in city_clean else None
-        
         if target_city:
             self.ids.tf_city.text = target_city
             self.ids.tf_neighborhood.disabled = False
@@ -296,7 +304,7 @@ class CaseFormScreen(MDScreen):
         else:
             self.ids.tf_city.text = ""; self.ids.tf_neighborhood.text = ""; self.ids.tf_neighborhood.disabled = True
             self.ids.tf_street.text = ""; self.ids.tf_number.text = ""; self.ids.tf_cep.text = ""
-            self.mostrar_aviso(f"Serviço indisponível em {city_api}", "red")
+            self.mostrar_aviso(f"Serviço indisponível em {city_api}")
 
     def on_cep_change(self, text):
         cep = text.replace("-", "").replace(".", "").strip()
@@ -323,9 +331,9 @@ class CaseFormScreen(MDScreen):
                 data = res.json()
                 if isinstance(data, list) and len(data) > 0: 
                     Clock.schedule_once(lambda dt: self.open_manual_modal(data), 0)
-                else: self.mostrar_aviso("Rua não encontrada.", "orange")
-            else: self.mostrar_aviso(f"Erro do ViaCEP: {res.status_code}", "red")
-        except Exception: self.mostrar_aviso("Erro na busca.", "red")
+                else: self.mostrar_aviso("Rua não encontrada.")
+            else: self.mostrar_aviso(f"Erro do ViaCEP: {res.status_code}")
+        except Exception: self.mostrar_aviso("Erro na busca.")
         Clock.schedule_once(lambda dt: self._reset_search_icon(), 0)
 
     @mainthread
@@ -334,9 +342,7 @@ class CaseFormScreen(MDScreen):
     @mainthread
     def open_manual_modal(self, address_list):
         from kivymd.uix.list import TwoLineIconListItem, IconLeftWidget
-        from kivymd.uix.boxlayout import MDBoxLayout
         from kivy.uix.scrollview import ScrollView
-        
         content = ScrollView(size_hint_y=None, height=dp(300))
         box = MDBoxLayout(orientation='vertical', adaptive_height=True)
         for addr in address_list:
@@ -351,10 +357,36 @@ class CaseFormScreen(MDScreen):
         if self.manual_dialog: self.manual_dialog.dismiss()
         self.fill_address_fields(addr_data)
 
-    # --- GPS ---
-    def start_ip_location(self):
-        self.ids.btn_gps.text = "Buscando..."; self.ids.btn_gps.icon = "timer-sand"; self.ids.btn_gps.disabled = True
-        threading.Thread(target=self._worker_ip_location, daemon=True).start()
+    def start_location(self):
+        self.ids.btn_gps.text = "Conectando ao Satélite..."
+        self.ids.btn_gps.icon = "crosshairs-gps"
+        self.ids.btn_gps.disabled = True
+
+        if platform == 'android': request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
+        else: threading.Thread(target=self._worker_ip_location, daemon=True).start()
+
+    def _on_permissions_result(self, permissions, grants):
+        if all(grants):
+            try:
+                gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
+                gps.start(minTime=1000, minDistance=0)
+            except Exception as e:
+                self.mostrar_aviso("Erro ao ligar a antena do GPS.")
+                self._reset_gps_btn()
+        else:
+            self.mostrar_aviso("Você precisa permitir o uso do GPS!")
+            self._reset_gps_btn()
+
+    @mainthread
+    def _on_gps_location(self, **kwargs):
+        lat = kwargs.get('lat')
+        lon = kwargs.get('lon')
+        gps.stop() 
+        self.ids.btn_gps.text = "Traduzindo coordenadas..."
+        threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Satélite GPS Nativo"), daemon=True).start()
+
+    @mainthread
+    def _on_gps_status(self, stype, status): pass
 
     def _worker_ip_location(self):
         try:
@@ -364,7 +396,7 @@ class CaseFormScreen(MDScreen):
                 self._worker_get_address_from_coords(data.get('lat'), data.get('lon'), "Internet (Aproximado)")
                 return
         except: pass
-        self.mostrar_aviso("Erro de conexão.", "red")
+        self.mostrar_aviso("Erro de conexão.")
         Clock.schedule_once(lambda dt: self._reset_gps_btn(), 0)
 
     def _worker_get_address_from_coords(self, lat, lon, source="Rede"):
@@ -381,37 +413,49 @@ class CaseFormScreen(MDScreen):
             self.gps_address_data["numero"] = addr.get("house_number")
             Clock.schedule_once(lambda dt: self.open_gps_modal(source), 0)
         except:
-            self.mostrar_aviso("Erro ao traduzir endereço.", "red")
+            self.mostrar_aviso("Erro ao traduzir endereço.")
             Clock.schedule_once(lambda dt: self._reset_gps_btn(), 0)
 
     @mainthread
-    def _reset_gps_btn(self): self.ids.btn_gps.text = "Capturar localização (Rede)"; self.ids.btn_gps.icon = "wifi"; self.ids.btn_gps.disabled = False
+    def _reset_gps_btn(self): 
+        self.ids.btn_gps.text = "Capturar localização (GPS/Rede)"
+        self.ids.btn_gps.icon = "map-marker"
+        self.ids.btn_gps.disabled = False
 
     @mainthread
     def open_gps_modal(self, source):
-        self.ids.btn_gps.text = "Localização Encontrada!"; self.ids.btn_gps.icon = "check"; self.ids.btn_gps.disabled = False
-        texto_dialog = f"[b]Rua:[/b] {self.gps_address_data.get('logradouro', '')}\n[b]Bairro:[/b] {self.gps_address_data.get('bairro', '')}\n[b]Cidade:[/b] {self.gps_address_data.get('localidade', '')}\n\n[i]Fonte: {source}[/i]"
-        self.gps_dialog = MDDialog(title="Confirme os Dados:", text=texto_dialog, buttons=[MDFlatButton(text="Cancelar", text_color=(1,0,0,1), on_release=lambda x: self.gps_dialog.dismiss()), MDRaisedButton(text="Confirmar", md_bg_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_gps_fill)])
+        self.ids.btn_gps.text = "Localização Encontrada!"
+        self.ids.btn_gps.icon = "check"
+        self.ids.btn_gps.disabled = False
+        
+        rua = self.gps_address_data.get("logradouro") or "Rua não detectada"
+        bairro = self.gps_address_data.get("bairro") or "Bairro não detectado"
+        cidade = self.gps_address_data.get("localidade") or "Cidade não detectada"
+        texto_dialog = f"[b]Rua:[/b] {rua}\\n[b]Bairro:[/b] {bairro}\\n[b]Cidade:[/b] {cidade}\\n\\n[i]Fonte: {source}[/i]"
+        
+        self.gps_dialog = MDDialog(
+            title="Confirme os Dados:",
+            text=texto_dialog,
+            buttons=[
+                MDFlatButton(text="Cancelar", text_color=(1,0,0,1), on_release=lambda x: self.gps_dialog.dismiss()),
+                MDFlatButton(text="Confirmar", text_color=(1,1,1,1), md_bg_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_gps_fill)
+            ]
+        )
         self.gps_dialog.open()
 
     def confirm_gps_fill(self, instance):
-        self.gps_dialog.dismiss(); self.fill_address_fields(self.gps_address_data)
+        self.gps_dialog.dismiss()
+        self.fill_address_fields(self.gps_address_data)
 
-    # --- ENVIO DO FORMULÁRIO (COM LÓGICA DE POSITIVO/NEGATIVO) ---
     def pre_submit_check(self):
-        # Validação de campos
         if not all([self.ids.tf_cep.text, self.ids.tf_city.text, self.ids.tf_neighborhood.text, self.ids.tf_street.text, self.ids.tf_number.text, self.ids.tf_notif_date.text, self.ids.tf_birth_date.text]):
-            self.mostrar_aviso("Preencha todos os campos obrigatórios (*)", "red")
+            self.mostrar_aviso("Preencha todos os campos obrigatórios (*)")
             return
-            
         if not self.ids.chk_sim.active and not self.ids.chk_nao.active:
-            self.mostrar_aviso("Selecione se o teste foi positivo ou negativo", "red")
+            self.mostrar_aviso("Selecione se o teste foi positivo ou negativo")
             return
-            
-        if self.ids.chk_sim.active:
-            self.open_warning_modal()
-        else:
-            self.execute_submit(is_positive=False)
+        if self.ids.chk_sim.active: self.open_warning_modal()
+        else: self.execute_submit(is_positive=False)
 
     @mainthread
     def open_warning_modal(self):
@@ -420,7 +464,7 @@ class CaseFormScreen(MDScreen):
             text="Nos casos de teste positivo, o paciente deve ser identificado no próximo passo.",
             buttons=[
                 MDFlatButton(text="Cancelar", on_release=lambda x: self.warning_dialog.dismiss()),
-                MDRaisedButton(text="OK, Continuar", md_bg_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_positive)
+                MDFlatButton(text="OK, Continuar", text_color=(1,1,1,1), md_bg_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_positive)
             ]
         )
         self.warning_dialog.open()
@@ -433,11 +477,9 @@ class CaseFormScreen(MDScreen):
         if not store.exists("session"):
             self.manager.current = 'login'
             return
-            
         token = store.get("session")["token"]
         self.ids.btn_submit.text = "Enviando..."
         self.ids.btn_submit.disabled = True
-        
         threading.Thread(target=self._worker_submit, args=(token, is_positive), daemon=True).start()
 
     def _worker_submit(self, token, is_positive):
@@ -452,34 +494,25 @@ class CaseFormScreen(MDScreen):
                 "birth_date": self.ids.tf_birth_date.text,
                 "positive_test": is_positive
             }
-                
             headers = {"Authorization": f"Bearer {token}"}
             res = requests.post(f"{config.API_URL}/api/report-case/", json=data, headers=headers)
             
             if res.status_code in [200, 201]: 
                 case_data = res.json()
                 case_id = case_data.get('id')
-                
                 if is_positive:
-                    # Salva o ID na memória e vai para a tela do paciente
                     store.put("current_case", id=case_id)
                     Clock.schedule_once(lambda dt: self.go_to_positive_screen(), 0)
                 else:
                     Clock.schedule_once(lambda dt: self.open_success_modal(), 0)
-            else: 
-                self.mostrar_aviso("Erro no servidor.", "red")
-                
-        except Exception as ex: 
-            self.mostrar_aviso("Erro de comunicação com o sistema.", "red")
-            
+            else: self.mostrar_aviso("Erro no servidor.")
+        except Exception as ex: self.mostrar_aviso("Erro de comunicação com o sistema.")
         Clock.schedule_once(lambda dt: self._reset_submit_btn(), 0)
 
     @mainthread
     def go_to_positive_screen(self):
-        try:
-            self.manager.current = 'form_caso_positivo'
-        except Exception:
-            self.mostrar_aviso("A tela de identificação ainda não foi criada!", "red")
+        try: self.manager.current = 'form_caso_positivo'
+        except Exception: self.mostrar_aviso("A tela de identificação ainda não foi criada!")
 
     @mainthread
     def _reset_submit_btn(self):
@@ -491,7 +524,7 @@ class CaseFormScreen(MDScreen):
         self.success_dialog = MDDialog(
             title="Sucesso!",
             text="Caso de dengue cadastrado com sucesso!",
-            buttons=[MDRaisedButton(text="OK", md_bg_color=(0, 0.7, 0, 1), on_release=self.close_success_modal)]
+            buttons=[MDFlatButton(text="OK", text_color=(1,1,1,1), md_bg_color=(0, 0.7, 0, 1), on_release=self.close_success_modal)]
         )
         self.success_dialog.open()
 

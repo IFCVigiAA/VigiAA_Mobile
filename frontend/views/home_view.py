@@ -22,7 +22,6 @@ KV_HOME_VIEW = '''
             height: "60dp"
             padding: ["15dp", "0dp", "15dp", "0dp"]
             md_bg_color: 0.22, 0.75, 0.94, 1  # Cor #39BFEF
-            elevation: 2
 
             Image:
                 source: "assets/images/logo-sem-fundo.png"

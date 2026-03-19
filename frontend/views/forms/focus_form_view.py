@@ -5,7 +5,7 @@ from kivy.storage.jsonstore import JsonStore
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.button import MDFlatButton, MDRaisedButton
+from kivymd.uix.button import MDFlatButton, MDRectangleFlatIconButton
 from kivymd.uix.list import OneLineListItem
 from kivy.metrics import dp
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -17,6 +17,11 @@ import unicodedata
 from urllib.parse import quote
 import os
 import config
+from plyer import gps
+from kivy.utils import platform
+
+if platform == 'android':
+    from android.permissions import request_permissions, Permission
 
 store = JsonStore('vigiaa_storage.json')
 
@@ -54,7 +59,7 @@ KV_FOCUS_FORM = '''
         icon: "delete-outline"
         theme_text_color: "Error"
         pos_hint: {"center_y": .5}
-        on_release: app.root.get_screen('focus_form').remove_image(root.image_path)
+        on_release: app.root.get_screen('form_foco').remove_image(root.image_path)
 
 <FocusFormScreen>:
     md_bg_color: 1, 1, 1, 1
@@ -62,15 +67,28 @@ KV_FOCUS_FORM = '''
     MDBoxLayout:
         orientation: "vertical"
 
-        # HEADER
-        MDTopAppBar:
-            title: "Cadastrar Foco"
+        MDBoxLayout:
+            size_hint_y: None
+            height: "56dp"
             md_bg_color: 0.22, 0.75, 0.94, 1
-            specific_text_color: 1, 1, 1, 1
-            elevation: 2
-            left_action_items: [["chevron-left", lambda x: root.go_back()]]
+            padding: ["5dp", "0dp", "15dp", "0dp"]
+            spacing: "10dp"
 
-        # FORMULÁRIO
+            MDIconButton:
+                icon: "chevron-left"
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                pos_hint: {"center_y": .5}
+                on_release: root.go_back()
+
+            MDLabel:
+                text: "Cadastrar Foco"
+                font_size: "20sp"
+                bold: True
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                pos_hint: {"center_y": .5}
+
         ScrollView:
             MDBoxLayout:
                 orientation: "vertical"
@@ -78,13 +96,19 @@ KV_FOCUS_FORM = '''
                 spacing: "15dp"
                 adaptive_height: True
 
-                MDFillRoundFlatIconButton:
+                # BOTÃO SEM SOMBRA ANTI-CRASH
+                MDRectangleFlatIconButton:
                     id: btn_gps
-                    text: "Capturar localização (Rede)"
-                    icon: "wifi"
+                    text: "Capturar localização (GPS/Rede)"
+                    icon: "map-marker"
                     md_bg_color: 0.22, 0.75, 0.94, 1
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    icon_color: 1, 1, 1, 1
+                    line_color: 0.22, 0.75, 0.94, 1
                     pos_hint: {"center_x": .5}
-                    on_release: root.start_ip_location()
+                    radius: [8, 8, 8, 8]
+                    on_release: root.start_location()
 
                 MDLabel:
                     text: "Campos marcados com * são obrigatórios"
@@ -155,12 +179,14 @@ KV_FOCUS_FORM = '''
                     size_hint_y: None
                     height: "20dp"
 
-                MDRaisedButton:
+                # BOTÃO SEM SOMBRA ANTI-CRASH
+                MDFlatButton:
                     id: btn_submit
                     text: "CADASTRAR FOCO"
                     md_bg_color: 0.22, 0.75, 0.94, 1
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
                     size_hint_x: 1
-                    elevation: 0
                     padding: "15dp"
                     on_release: root.submit_form()
 '''
@@ -184,7 +210,6 @@ class FocusFormScreen(MDScreen):
         self.success_dialog = None
 
     def on_pre_enter(self, *args):
-        # Limpa o formulário sempre que a tela abrir
         self.selected_files.clear()
         self.gps_address_data.clear()
         self.update_images_display()
@@ -195,14 +220,13 @@ class FocusFormScreen(MDScreen):
         self.ids.tf_street.text = ""
         self.ids.tf_number.text = ""
         self.ids.tf_description.text = ""
-        self.ids.btn_gps.text = "Capturar localização (Rede)"
-        self.ids.btn_gps.icon = "wifi"
+        self.ids.btn_gps.text = "Capturar localização (GPS/Rede)"
+        self.ids.btn_gps.icon = "map-marker"
 
     def go_back(self):
         self.manager.current = 'home'
         self.manager.get_screen('home').ids.bottom_nav.switch_tab('tab_new')
 
-    # --- MENUS (DROPDOWNS) ---
     def open_city_menu(self):
         menu_items = [
             {"viewclass": "OneLineListItem", "text": city, "on_release": lambda x=city: self.set_city(x)}
@@ -214,7 +238,7 @@ class FocusFormScreen(MDScreen):
     def set_city(self, text_item):
         self.ids.tf_city.text = text_item
         self.ids.tf_neighborhood.disabled = False
-        self.ids.tf_neighborhood.text = "" # Reseta o bairro ao trocar cidade
+        self.ids.tf_neighborhood.text = ""
         self.menu_cities.dismiss()
 
     def open_neighborhood_menu(self):
@@ -231,17 +255,15 @@ class FocusFormScreen(MDScreen):
         self.ids.tf_neighborhood.text = text_item
         self.menu_neighborhoods.dismiss()
 
-    # --- LÓGICA DE UTILIDADES ---
     def normalize_string(self, s):
         if not s: return ""
         return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn').lower()
 
     @mainthread
     def mostrar_aviso(self, texto, cor="blue"):
-        cores = {"red": (1,0,0,1), "green": (0,0.7,0,1), "blue": (0.22, 0.75, 0.94, 1), "orange": (1, 0.6, 0, 1)}
-        Snackbar(text=texto, bg_color=cores.get(cor, (0,0,0,1))).open()
+        from kivymd.toast import toast
+        toast(texto)
 
-    # --- AUTOCOMPLETAR (VIACEP & NOMINATIM) ---
     @mainthread
     def fill_address_fields(self, data):
         city_api = data.get("localidade") or ""
@@ -287,19 +309,17 @@ class FocusFormScreen(MDScreen):
     def search_address_by_name(self):
         city = self.ids.tf_city.text
         street = self.ids.tf_street.text
-        
         if not city or len(street) < 3:
             self.mostrar_aviso("Selecione a cidade e digite 3 letras da rua.", "orange")
             return
             
-        self.ids.btn_search_street.icon = "timer-sand" # Simulando um loading
+        self.ids.btn_search_street.icon = "timer-sand"
         threading.Thread(target=self._worker_search_street, args=(city, street), daemon=True).start()
 
     def _worker_search_street(self, city, street):
         try:
             url = f"https://viacep.com.br/ws/SC/{quote(city)}/{quote(street)}/json/"
             res = requests.get(url, timeout=10)
-            
             if res.status_code == 200:
                 data = res.json()
                 if isinstance(data, list) and len(data) > 0: 
@@ -319,14 +339,11 @@ class FocusFormScreen(MDScreen):
 
     @mainthread
     def open_manual_modal(self, address_list):
-        # Cria a lista de opções para o usuário escolher
         from kivymd.uix.list import TwoLineIconListItem, IconLeftWidget
-        from kivymd.uix.boxlayout import MDBoxLayout
         from kivy.uix.scrollview import ScrollView
         
         content = ScrollView(size_hint_y=None, height=dp(300))
         box = MDBoxLayout(orientation='vertical', adaptive_height=True)
-        
         for addr in address_list:
             item = TwoLineIconListItem(
                 text=addr.get("logradouro", ""),
@@ -335,14 +352,13 @@ class FocusFormScreen(MDScreen):
             )
             item.add_widget(IconLeftWidget(icon="map-marker"))
             box.add_widget(item)
-            
         content.add_widget(box)
 
         self.manual_dialog = MDDialog(
             title="Selecione a Rua",
             type="custom",
             content_cls=content,
-            buttons=[MDFlatButton(text="Fechar", on_release=lambda x: self.manual_dialog.dismiss())]
+            buttons=[MDFlatButton(text="Fechar", radius=[8, 8, 8, 8], on_release=lambda x: self.manual_dialog.dismiss())]
         )
         self.manual_dialog.open()
 
@@ -350,12 +366,39 @@ class FocusFormScreen(MDScreen):
         if self.manual_dialog: self.manual_dialog.dismiss()
         self.fill_address_fields(addr_data)
 
-    # --- GPS E NOMINATIM ---
-    def start_ip_location(self):
-        self.ids.btn_gps.text = "Buscando..."
-        self.ids.btn_gps.icon = "timer-sand"
+    def start_location(self):
+        self.ids.btn_gps.text = "Conectando ao Satélite..."
+        self.ids.btn_gps.icon = "crosshairs-gps"
         self.ids.btn_gps.disabled = True
-        threading.Thread(target=self._worker_ip_location, daemon=True).start()
+
+        if platform == 'android':
+            request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
+        else:
+            threading.Thread(target=self._worker_ip_location, daemon=True).start()
+
+    def _on_permissions_result(self, permissions, grants):
+        if all(grants):
+            try:
+                gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
+                gps.start(minTime=1000, minDistance=0)
+            except Exception as e:
+                self.mostrar_aviso("Erro ao ligar a antena do GPS.", "red")
+                self._reset_gps_btn()
+        else:
+            self.mostrar_aviso("Você precisa permitir o uso do GPS!", "red")
+            self._reset_gps_btn()
+
+    @mainthread
+    def _on_gps_location(self, **kwargs):
+        lat = kwargs.get('lat')
+        lon = kwargs.get('lon')
+        gps.stop() 
+        self.ids.btn_gps.text = "Traduzindo coordenadas..."
+        threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Satélite GPS Nativo"), daemon=True).start()
+
+    @mainthread
+    def _on_gps_status(self, stype, status):
+        pass
 
     def _worker_ip_location(self):
         try:
@@ -365,35 +408,31 @@ class FocusFormScreen(MDScreen):
                 self._worker_get_address_from_coords(data.get('lat'), data.get('lon'), "Internet (Aproximado)")
                 return
         except: pass
-        
-        self.mostrar_aviso("Erro de conexão com satélite/rede.", "red")
+        self.mostrar_aviso("Erro de conexão.", "red")
         Clock.schedule_once(lambda dt: self._reset_gps_btn(), 0)
 
     def _worker_get_address_from_coords(self, lat, lon, source="Rede"):
         try:
-            headers = {'User-Agent': 'VigiAA/1.0'}
             url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-            res = requests.get(url, headers=headers).json()
+            res = requests.get(url, headers={'User-Agent': 'VigiAA/1.0'}).json()
             addr = res.get("address", {})
-            
             self.gps_address_data.clear()
-            self.gps_address_data["lat"] = str(lat) 
+            self.gps_address_data["lat"] = str(lat)
             self.gps_address_data["lon"] = str(lon) 
             self.gps_address_data["localidade"] = addr.get("city") or addr.get("town") or addr.get("municipality")
             self.gps_address_data["bairro"] = addr.get("suburb") or addr.get("neighbourhood")
             self.gps_address_data["logradouro"] = addr.get("road")
             self.gps_address_data["cep"] = addr.get("postcode")
             self.gps_address_data["numero"] = addr.get("house_number")
-            
             Clock.schedule_once(lambda dt: self.open_gps_modal(source), 0)
         except:
             self.mostrar_aviso("Erro ao traduzir endereço.", "red")
             Clock.schedule_once(lambda dt: self._reset_gps_btn(), 0)
 
     @mainthread
-    def _reset_gps_btn(self):
-        self.ids.btn_gps.text = "Capturar localização (Rede)"
-        self.ids.btn_gps.icon = "wifi"
+    def _reset_gps_btn(self): 
+        self.ids.btn_gps.text = "Capturar localização (GPS/Rede)"
+        self.ids.btn_gps.icon = "map-marker"
         self.ids.btn_gps.disabled = False
 
     @mainthread
@@ -405,15 +444,14 @@ class FocusFormScreen(MDScreen):
         rua = self.gps_address_data.get("logradouro") or "Rua não detectada"
         bairro = self.gps_address_data.get("bairro") or "Bairro não detectado"
         cidade = self.gps_address_data.get("localidade") or "Cidade não detectada"
-        
         texto_dialog = f"[b]Rua:[/b] {rua}\n[b]Bairro:[/b] {bairro}\n[b]Cidade:[/b] {cidade}\n\n[i]Fonte: {source}[/i]"
         
         self.gps_dialog = MDDialog(
             title="Confirme os Dados:",
             text=texto_dialog,
             buttons=[
-                MDFlatButton(text="Cancelar", text_color=(1,0,0,1), on_release=lambda x: self.gps_dialog.dismiss()),
-                MDRaisedButton(text="Confirmar", md_bg_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_gps_fill)
+                MDFlatButton(text="Cancelar", text_color=(1,0,0,1), radius=[8, 8, 8, 8], on_release=lambda x: self.gps_dialog.dismiss()),
+                MDFlatButton(text="Confirmar", text_color=(1,1,1,1), md_bg_color=(0.22, 0.75, 0.94, 1), radius=[8, 8, 8, 8], on_release=self.confirm_gps_fill)
             ]
         )
         self.gps_dialog.open()
@@ -422,7 +460,6 @@ class FocusFormScreen(MDScreen):
         self.gps_dialog.dismiss()
         self.fill_address_fields(self.gps_address_data)
 
-    # --- SELEÇÃO DE IMAGENS ---
     def pick_image(self):
         try:
             filechooser.open_file(on_selection=self._handle_selection, filters=[("Images", "*.png", "*.jpg", "*.jpeg")])
@@ -449,14 +486,12 @@ class FocusFormScreen(MDScreen):
             card = Builder.template('ImageCard', image_path=path, image_name=nome_arquivo)
             self.ids.images_container.add_widget(card)
 
-    # --- ENVIO DO FORMULÁRIO ---
     def submit_form(self):
         if not store.exists("session"):
             self.manager.current = 'login'
             return
             
         token = store.get("session")["token"]
-        
         cidade = self.ids.tf_city.text
         bairro = self.ids.tf_neighborhood.text
         rua = self.ids.tf_street.text
@@ -468,7 +503,6 @@ class FocusFormScreen(MDScreen):
             
         self.ids.btn_submit.text = "Enviando..."
         self.ids.btn_submit.disabled = True
-        
         threading.Thread(target=self._worker_submit, args=(token,), daemon=True).start()
 
     def _worker_submit(self, token):
@@ -484,7 +518,6 @@ class FocusFormScreen(MDScreen):
                 "longitude": self.gps_address_data.get("lon", "-48.000")
             }
             
-            # Formatação exata exigida pelo backend para envio Multipart (Arquivos + Texto)
             files = []
             file_handles = []
             for path in self.selected_files:
@@ -495,7 +528,6 @@ class FocusFormScreen(MDScreen):
             headers = {"Authorization": f"Bearer {token}"}
             res = requests.post(f"{config.API_URL}/api/report-focus/", data=data, files=files, headers=headers)
             
-            # Fecha os arquivos que foram abertos
             for f in file_handles: f.close()
             
             if res.status_code in [200, 201]: 
@@ -519,7 +551,7 @@ class FocusFormScreen(MDScreen):
             title="Sucesso!",
             text="Foco de dengue cadastrado com sucesso!",
             buttons=[
-                MDRaisedButton(text="OK", md_bg_color=(0, 0.7, 0, 1), on_release=self.close_success_modal)
+                MDFlatButton(text="OK", text_color=(1,1,1,1), md_bg_color=(0, 0.7, 0, 1), radius=[8, 8, 8, 8], on_release=self.close_success_modal)
             ]
         )
         self.success_dialog.open()

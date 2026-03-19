@@ -89,19 +89,75 @@ KV_LOGIN = '''
                 bold: True
                 halign: "center"
 
-            MDTextField:
-                id: email_field
-                hint_text: "email@domain.com"
-                mode: "round"
-                fill_color_normal: 1, 1, 1, 1
+            # CAMPO DE E-MAIL
+            MDBoxLayout:
+                size_hint_y: None
+                height: "50dp"
+                md_bg_color: 1, 1, 1, 1
+                radius: [8, 8, 8, 8]
+                padding: ["25dp", "0dp", "15dp", "0dp"]
+                spacing: "15dp"
 
-            MDTextField:
-                id: password_field
-                hint_text: "senha"
-                password: True
-                mode: "round"
-                fill_color_normal: 1, 1, 1, 1
+                MDIcon:
+                    icon: "email-outline"
+                    theme_text_color: "Custom"
+                    text_color: 0.7, 0.7, 0.7, 1
+                    font_size: "20sp"
+                    pos_hint: {"center_y": .5}
 
+                TextInput:
+                    id: email_field
+                    hint_text: "email@domain.com"
+                    background_normal: "" 
+                    background_color: 0, 0, 0, 0
+                    foreground_color: 0, 0, 0, 1
+                    hint_text_color: 0.6, 0.6, 0.6, 1
+                    cursor_color: 0, 0, 0, 1
+                    multiline: False
+                    size_hint_y: 1
+                    padding: ["10dp", (self.height - self.line_height) / 2, 0, 0]
+
+            # CAMPO DE SENHA
+            MDBoxLayout:
+                size_hint_y: None
+                height: "50dp"
+                md_bg_color: 1, 1, 1, 1
+                radius: [8, 8, 8, 8]
+                padding: ["25dp", "0dp", "15dp", "0dp"]
+                spacing: "15dp"
+
+                MDIcon:
+                    icon: "lock-outline"
+                    theme_text_color: "Custom"
+                    text_color: 0.7, 0.7, 0.7, 1
+                    font_size: "20sp"
+                    pos_hint: {"center_y": .5}
+
+                TextInput:
+                    id: password_field
+                    hint_text: "senha"
+                    password: True
+                    background_normal: ""
+                    background_color: 0, 0, 0, 0
+                    foreground_color: 0, 0, 0, 1
+                    hint_text_color: 0.6, 0.6, 0.6, 1
+                    cursor_color: 0, 0, 0, 1
+                    multiline: False
+                    size_hint_y: 1
+                    padding: ["10dp", (self.height - self.line_height) / 2, 0, 0]
+
+            # BOTÃO DE CONTINUAR (BLINDADO)
+            MDFlatButton:
+                text: "Continue"
+                md_bg_color: 0, 0, 0, 1
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                size_hint_x: 1
+                padding: "15dp"
+                radius: [8, 8, 8, 8]  # <-- A cura da ondinha!
+                on_release: root.login_click()
+
+            # ESPAÇO DE FEEDBACK DE ERRO
             MDLabel:
                 id: error_text
                 text: ""
@@ -109,20 +165,15 @@ KV_LOGIN = '''
                 font_style: "Caption"
                 theme_text_color: "Custom"
                 text_color: 1, 0, 0, 1
-
-            MDRaisedButton:
-                text: "Continue"
-                md_bg_color: 0, 0, 0, 1
-                text_color: 1, 1, 1, 1
-                size_hint_x: 1
-                elevation: 0
-                on_release: root.login_click()
+                size_hint_y: None
+                height: self.texture_size[1]
 
         # PARTE INFERIOR
         MDBoxLayout:
             orientation: "vertical"
             size_hint_y: 0.35
-            padding: ["20dp", "10dp", "20dp", "20dp"]
+            # AQUI: Aumentamos o 10dp para 30dp para afastar mais do bloco de cima!
+            padding: ["20dp", "30dp", "20dp", "20dp"] 
             spacing: "10dp"
             md_bg_color: 1, 1, 1, 1
 
@@ -130,48 +181,90 @@ KV_LOGIN = '''
                 text: "Esqueci minha senha"
                 theme_text_color: "Custom"
                 text_color: 0.1, 0.46, 0.82, 1
+                font_size: "12sp"
+                bold: True
                 pos_hint: {"center_x": .5}
                 on_release: root.go_forgot()
 
-            MDLabel:
-                text: "ou"
-                halign: "center"
-                theme_text_color: "Hint"
+            Widget:
+                size_hint_y: None
+                height: "5dp"
+
+            # LINHAS LATERAIS E A PALAVRA "OU"
+            MDBoxLayout:
+                orientation: "horizontal"
+                adaptive_height: True
+                spacing: "10dp"
+                pos_hint: {"center_x": .5}
+                
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: "1dp"
+                    md_bg_color: 0.9, 0.9, 0.9, 1
+                    pos_hint: {"center_y": .5}
+                
+                MDLabel:
+                    text: "ou"
+                    halign: "center"
+                    theme_text_color: "Hint"
+                    font_size: "12sp"
+                    adaptive_width: True
+                    pos_hint: {"center_y": .5}
+
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: "1dp"
+                    md_bg_color: 0.9, 0.9, 0.9, 1
+                    pos_hint: {"center_y": .5}
+
+            Widget:
+                size_hint_y: None
+                height: "5dp"
 
             MDRectangleFlatIconButton:
                 icon: "google"
                 text: "Continue com Google"
                 theme_text_color: "Custom"
                 text_color: 0, 0, 0, 1
+                icon_color: 0.85, 0.19, 0.16, 1
                 line_color: 0.96, 0.96, 0.96, 1
                 md_bg_color: 0.96, 0.96, 0.96, 1
                 size_hint_x: 1
+                radius: [8, 8, 8, 8]  # <-- A cura da ondinha!
                 on_release: root.login_google()
 
+            Widget:
+                size_hint_y: None
+                height: "10dp"
+
             MDLabel:
-                text: "Ao clicar em continuar, você aceita nossos\\nTermos de Serviço e Política de Privacidade"
+                text: "Ao clicar em continuar, você aceita nossos\\n[b]Termos de Serviço[/b] e [b]Política de Privacidade[/b]"
+                markup: True
                 halign: "center"
                 font_style: "Caption"
                 theme_text_color: "Hint"
-                font_size: "10sp"
+                font_size: "11.5sp"
 
             MDBoxLayout:
                 orientation: "horizontal"
-                adaptive_width: True
-                spacing: "5dp"
+                adaptive_size: True
                 pos_hint: {"center_x": .5}
+                spacing: "4dp"
 
                 MDLabel:
                     text: "Não possui uma conta?"
                     theme_text_color: "Hint"
                     font_size: "12sp"
                     adaptive_width: True
+                    pos_hint: {"center_y": .5}
 
                 MDTextButton:
                     text: "Crie sua conta aqui"
                     theme_text_color: "Custom"
                     text_color: 0.1, 0.46, 0.82, 1
                     font_size: "12sp"
+                    bold: True
+                    pos_hint: {"center_y": .5}
                     on_release: root.go_register()
 '''
 # O Builder carrega o visual para a memória

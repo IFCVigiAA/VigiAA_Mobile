@@ -45,9 +45,6 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = "https://froglike-cataleya-quirkily.ngrok-free.dev/api/google-callback/"
 
-# ==============================================================================
-# LÓGICA MANUAL DE LOGIN (O QUE O PROFESSOR PEDIU)
-# ==============================================================================
 
 def get_tokens_for_user(user):
     """Gera o JWT manualmente para um usuário"""

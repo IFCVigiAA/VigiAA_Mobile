@@ -1,14 +1,28 @@
 import traceback
 import os
 import sys
+import textwrap
+from kivymd.app import MDApp
 
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     if current_dir not in sys.path:
         sys.path.append(current_dir)
 
-    from kivymd.app import MDApp
     from kivy.uix.screenmanager import ScreenManager
+    from kivy.lang import Builder
+
+    # --- A VERDADEIRA VACINA ANTI-CRASH ---
+    # Sem o "@" para não causar loop infinito no Kivy!
+    vacina_kv = textwrap.dedent('''
+        <MDDropdownMenu>:
+            radius: [8, 8, 8, 8]
+            
+        <OverFlowMenu>:
+            radius: [8, 8, 8, 8]
+    ''')
+    Builder.load_string(vacina_kv)
+    # --------------------------------------
 
     from views.login_view import LoginScreen
     from views.home_view import HomeScreen
@@ -17,6 +31,7 @@ try:
     from views.register_view import RegisterScreen
     from views.forms.focus_form_view import FocusFormScreen
     from views.forms.case_form_view import CaseFormScreen
+    from views.forms.positive_case_form_view import PositiveCaseFormScreen
 
     class VigiAA(MDApp):
         def build(self):
@@ -31,6 +46,7 @@ try:
             sm.add_widget(RegisterScreen(name='register'))
             sm.add_widget(FocusFormScreen(name='form_foco'))
             sm.add_widget(CaseFormScreen(name='form_caso'))
+            sm.add_widget(PositiveCaseFormScreen(name='form_caso_positivo'))
 
             sm.current = 'login'
 
@@ -44,7 +60,7 @@ except Exception as e:
     from kivy.uix.label import Label
     from kivy.core.window import Window
     
-    class ErrorApp(App):
+    class ErrorApp(MDApp):
         def build(self):
             Window.clearcolor = (0.1, 0.1, 0.1, 1)
             msg_erro = traceback.format_exc()
