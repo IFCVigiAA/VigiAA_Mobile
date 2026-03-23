@@ -375,19 +375,21 @@ class FocusFormScreen(MDScreen):
             from android.permissions import request_permissions, Permission
             request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
         else:
-            self.mostrar_aviso("Teste no PC: Usando IP aproximado.")
+            # Teste no PC: Usando IP aproximado instantâneo
             threading.Thread(target=self._worker_ip_location, daemon=True).start()
 
     def _on_permissions_result(self, permissions, grants):
         if all(grants):
             try:
-                # O CÓDIGO PURO IGUAL AO DO SEU TESTE
                 gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
+                
+                # 1. Ligamos a Antena Nativa (Fino)
                 gps.start(minTime=1000, minDistance=1) 
+                self.ids.btn_gps.text = "Conectando ao Satélite..."
                 
-                self.ids.btn_gps.text = "Satélite conectado. Buscando coordenadas..."
-                
-                # REPARE: Removemos o Clock.schedule_once! Vamos deixar o Android pensar o tempo que precisar!
+                # 2. THE FIX: Ligamos o cronômetro de paciência curta (3 segundos)
+                # Se o satélite demorar, nós fugimos para o "Fused Simulation" (Rede)
+                Clock.schedule_once(self._gps_escape_fused, 3)
                 
             except Exception as e:
                 self.mostrar_aviso(f"Erro no sensor: {e}")
@@ -395,10 +397,25 @@ class FocusFormScreen(MDScreen):
         else:
             self.mostrar_aviso("Você precisa permitir o uso do GPS!")
             self._reset_gps_btn()
+    
+    @mainthread
+    def _gps_escape_fused(self, dt):
+        # 3. Escape Hatch (Fuga para a Memória/Rede)
+        # Se depois de 3 longos segundos ele não achar NADA, aí sim ele desiste do satélite puro.
+        if self.ids.btn_gps.text == "Conectando ao Satélite...":
+            
+            # Muda o texto para avisar o usuário
+            self.ids.btn_gps.text = "A buscar rede rápida..."
+            self.mostrar_aviso("Satélites demorando. Buscando localização aproximada...")
+            
+            # Aciona a função de IP que é instantânea (Pega "da memória" do OpenStreetMap via IP)
+            threading.Thread(target=self._worker_ip_location, daemon=True).start()
 
     @mainthread
     def _on_gps_location(self, **kwargs):
-        # A COORDENADA CHEGOU!
+        # 4. GPS Nativo ACHOU! (PRECISÃO MÁXIMA)
+        # Se o satélite puro responder antes dos 3 segundos ou se responder depois, cancelamos Plan B.
+        Clock.unschedule(self._gps_escape_fused) # Impede o Plan B de rodar
         gps.stop() 
         
         lat = kwargs.get('lat')
@@ -407,7 +424,7 @@ class FocusFormScreen(MDScreen):
         self.ids.btn_gps.text = "Coordenada Capturada!"
         self.ids.btn_gps.icon = "check"
         
-        # Manda direto pro seu tradutor de ruas
+        # Manda direto pro seu tradutor de ruas que preenche os campos
         threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Satélite GPS Nativo"), daemon=True).start()
 
     @mainthread
