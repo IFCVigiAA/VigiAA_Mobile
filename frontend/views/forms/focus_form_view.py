@@ -375,21 +375,20 @@ class FocusFormScreen(MDScreen):
             from android.permissions import request_permissions, Permission
             request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
         else:
-            # Teste no PC: Usando IP aproximado instantâneo
-            threading.Thread(target=self._worker_ip_location, daemon=True).start()
+            self.mostrar_aviso("O GPS nativo só funciona no celular.")
+            self._reset_gps_btn()
 
     def _on_permissions_result(self, permissions, grants):
         if all(grants):
             try:
+                # 1. Tenta ligar a Antena do satélite (precisão máxima)
                 gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
-                
-                # 1. Ligamos a Antena Nativa (Fino)
                 gps.start(minTime=1000, minDistance=1) 
-                self.ids.btn_gps.text = "Conectando ao Satélite..."
                 
-                # 2. THE FIX: Ligamos o cronômetro de paciência curta (3 segundos)
-                # Se o satélite demorar, nós fugimos para o "Fused Simulation" (Rede)
-                Clock.schedule_once(self._gps_escape_fused, 3)
+                self.ids.btn_gps.text = "Buscando satélite..."
+                
+                # 2. Damos 15 segundos para o satélite. Se não achar, puxamos da MEMÓRIA!
+                Clock.schedule_once(self._gps_escape_memory, 15)
                 
             except Exception as e:
                 self.mostrar_aviso(f"Erro no sensor: {e}")
@@ -397,25 +396,56 @@ class FocusFormScreen(MDScreen):
         else:
             self.mostrar_aviso("Você precisa permitir o uso do GPS!")
             self._reset_gps_btn()
-    
+
     @mainthread
-    def _gps_escape_fused(self, dt):
-        # 3. Escape Hatch (Fuga para a Memória/Rede)
-        # Se depois de 3 longos segundos ele não achar NADA, aí sim ele desiste do satélite puro.
-        if self.ids.btn_gps.text == "Conectando ao Satélite...":
+    def _gps_escape_memory(self, dt):
+        # 3. O SATÉLITE DEMOROU? Fugimos para a memória do Android!
+        if self.ids.btn_gps.text == "Buscando satélite...":
+            gps.stop() # Desliga a antena travada
+            self.ids.btn_gps.text = "Lendo memória do celular..."
             
-            # Muda o texto para avisar o usuário
-            self.ids.btn_gps.text = "A buscar rede rápida..."
-            self.mostrar_aviso("Satélites demorando. Buscando localização aproximada...")
+            # THE MAGIC: Pega da memória cruzada (Rede/Antenas da rua)
+            lat, lon = self._get_last_known_location_android()
             
-            # Aciona a função de IP que é instantânea (Pega "da memória" do OpenStreetMap via IP)
-            threading.Thread(target=self._worker_ip_location, daemon=True).start()
+            if lat and lon:
+                self.ids.btn_gps.text = "Coordenada da Memória!"
+                self.ids.btn_gps.icon = "check"
+                self.mostrar_aviso("Usando localização nativa da rede.")
+                
+                # Manda as coordenadas da memória para o tradutor de ruas!
+                threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Memória do Android"), daemon=True).start()
+            else:
+                self.mostrar_aviso("Memória vazia. Tente ir para um local mais aberto.", "red")
+                self._reset_gps_btn()
+
+    def _get_last_known_location_android(self):
+        """ Função secreta que fala direto com o hardware do Android ignorando o Plyer """
+        try:
+            from jnius import autoclass
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            LocationManager = autoclass('android.location.LocationManager')
+            
+            activity = PythonActivity.mActivity
+            lm = activity.getSystemService(Context.LOCATION_SERVICE)
+            
+            # Tenta pegar a localização cruzada pelas antenas de operadora e Wi-Fi (Muito rápido e funciona em casa)
+            loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            if not loc:
+                # Se falhar, tenta pegar a última vez que o GPS do celular esteve ligado noutro app
+                loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                
+            if loc:
+                return loc.getLatitude(), loc.getLongitude()
+        except Exception as e:
+            print("Erro ao acessar memória do GPS:", e)
+            
+        return None, None
 
     @mainthread
     def _on_gps_location(self, **kwargs):
-        # 4. GPS Nativo ACHOU! (PRECISÃO MÁXIMA)
-        # Se o satélite puro responder antes dos 3 segundos ou se responder depois, cancelamos Plan B.
-        Clock.unschedule(self._gps_escape_fused) # Impede o Plan B de rodar
+        # 4. Se o satélite for rápido, cancelamos a busca na memória e usamos o satélite!
+        Clock.unschedule(self._gps_escape_memory)
         gps.stop() 
         
         lat = kwargs.get('lat')
@@ -424,7 +454,6 @@ class FocusFormScreen(MDScreen):
         self.ids.btn_gps.text = "Coordenada Capturada!"
         self.ids.btn_gps.icon = "check"
         
-        # Manda direto pro seu tradutor de ruas que preenche os campos
         threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Satélite GPS Nativo"), daemon=True).start()
 
     @mainthread
