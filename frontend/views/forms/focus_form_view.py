@@ -375,19 +375,19 @@ class FocusFormScreen(MDScreen):
             from android.permissions import request_permissions, Permission
             request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
         else:
+            self.mostrar_aviso("Teste no PC: Usando IP aproximado.")
             threading.Thread(target=self._worker_ip_location, daemon=True).start()
 
     def _on_permissions_result(self, permissions, grants):
         if all(grants):
             try:
+                # O CÓDIGO PURO IGUAL AO DO SEU TESTE
                 gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
-                # IGUAL AO SEU TESTE: minDistance=1 e sem matar o processo cedo!
                 gps.start(minTime=1000, minDistance=1) 
                 
-                self.ids.btn_gps.text = "Satélite conectado. Aguarde..."
+                self.ids.btn_gps.text = "Satélite conectado. Buscando coordenadas..."
                 
-                # Mudamos de 15s para 45s! Damos tempo do hardware respirar e achar o satélite.
-                Clock.schedule_once(self._gps_escape_hatch, 45)
+                # REPARE: Removemos o Clock.schedule_once! Vamos deixar o Android pensar o tempo que precisar!
                 
             except Exception as e:
                 self.mostrar_aviso(f"Erro no sensor: {e}")
@@ -397,17 +397,8 @@ class FocusFormScreen(MDScreen):
             self._reset_gps_btn()
 
     @mainthread
-    def _gps_escape_hatch(self, dt):
-        # Se depois de longos 45 segundos ele não achar NADA, aí sim ele desiste.
-        if self.ids.btn_gps.text == "Satélite conectado. Aguarde...":
-            gps.stop()
-            self.mostrar_aviso("Sinal de satélite muito fraco. A usar a rede...")
-            self.ids.btn_gps.text = "A usar rede aproximada..."
-            threading.Thread(target=self._worker_ip_location, daemon=True).start()
-
-    @mainthread
     def _on_gps_location(self, **kwargs):
-        # GPS ACHOU! CANCELA TUDO E PEGA A COORDENADA!
+        # A COORDENADA CHEGOU!
         gps.stop() 
         
         lat = kwargs.get('lat')
@@ -416,12 +407,14 @@ class FocusFormScreen(MDScreen):
         self.ids.btn_gps.text = "Coordenada Capturada!"
         self.ids.btn_gps.icon = "check"
         
+        # Manda direto pro seu tradutor de ruas
         threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Satélite GPS Nativo"), daemon=True).start()
 
     @mainthread
     def _on_gps_status(self, stype, status):
         pass
-    
+        
+
     def _worker_ip_location(self):
         try:
             res = requests.get("http://ip-api.com/json/", timeout=5)
