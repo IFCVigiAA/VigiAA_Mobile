@@ -367,11 +367,12 @@ class FocusFormScreen(MDScreen):
         self.fill_address_fields(addr_data)
 
     def start_location(self):
-        self.ids.btn_gps.text = "Conectando ao Satélite..."
+        self.ids.btn_gps.text = "Pedindo permissão..."
         self.ids.btn_gps.icon = "crosshairs-gps"
         self.ids.btn_gps.disabled = True
 
         if platform == 'android':
+            from android.permissions import request_permissions, Permission
             request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
         else:
             threading.Thread(target=self._worker_ip_location, daemon=True).start()
@@ -380,20 +381,40 @@ class FocusFormScreen(MDScreen):
         if all(grants):
             try:
                 gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
-                gps.start(minTime=1000, minDistance=0)
+                # A MÁGICA DO SEU TESTE: minDistance=1
+                gps.start(minTime=1000, minDistance=1) 
+                self.ids.btn_gps.text = "Satélite conectado. Buscando..."
+                
+                # Mantemos o "Plano B" caso o usuário esteja no subsolo
+                Clock.schedule_once(self._gps_escape_hatch, 15)
+                
             except Exception as e:
-                self.mostrar_aviso("Erro ao ligar a antena do GPS.", "red")
+                self.mostrar_aviso(f"Erro no sensor: {e}")
                 self._reset_gps_btn()
         else:
-            self.mostrar_aviso("Você precisa permitir o uso do GPS!", "red")
+            self.mostrar_aviso("Você precisa permitir o uso do GPS!")
             self._reset_gps_btn()
 
     @mainthread
+    def _gps_escape_hatch(self, dt):
+        if self.ids.btn_gps.text == "Satélite conectado. Buscando...":
+            gps.stop()
+            self.mostrar_aviso("Sinal de satélite fraco. Usando a rede...")
+            self.ids.btn_gps.text = "A usar rede aproximada..."
+            threading.Thread(target=self._worker_ip_location, daemon=True).start()
+
+    @mainthread
     def _on_gps_location(self, **kwargs):
+        # PARA TUDO! Achamos a coordenada!
+        gps.stop() 
+        
         lat = kwargs.get('lat')
         lon = kwargs.get('lon')
-        gps.stop() 
-        self.ids.btn_gps.text = "Traduzindo coordenadas..."
+        
+        self.ids.btn_gps.text = "Coordenada Capturada!"
+        self.ids.btn_gps.icon = "check"
+        
+        # Manda as coordenadas para o tradutor de ruas que criamos
         threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Satélite GPS Nativo"), daemon=True).start()
 
     @mainthread
