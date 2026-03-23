@@ -381,14 +381,15 @@ class FocusFormScreen(MDScreen):
     def _on_permissions_result(self, permissions, grants):
         if all(grants):
             try:
-                # 1. Tenta ligar a Antena do satélite (precisão máxima)
                 gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
                 gps.start(minTime=1000, minDistance=1) 
                 
-                self.ids.btn_gps.text = "Buscando satélite..."
+                # Começamos com 40 segundos de paciência para o satélite!
+                self.gps_tempo = 40 
+                self.ids.btn_gps.text = f"Buscando satélite ({self.gps_tempo}s)..."
                 
-                # 2. Damos 15 segundos para o satélite. Se não achar, puxamos da MEMÓRIA!
-                Clock.schedule_once(self._gps_escape_memory, 15)
+                # Cria um relógio que roda a cada 1 segundo para atualizar o botão
+                self.gps_event = Clock.schedule_interval(self._gps_countdown, 1)
                 
             except Exception as e:
                 self.mostrar_aviso(f"Erro no sensor: {e}")
@@ -396,6 +397,17 @@ class FocusFormScreen(MDScreen):
         else:
             self.mostrar_aviso("Você precisa permitir o uso do GPS!")
             self._reset_gps_btn()
+
+    @mainthread
+    def _gps_countdown(self, dt):
+        self.gps_tempo -= 1
+        if self.gps_tempo > 0:
+            # Atualiza o texto do botão para o usuário ver o tempo caindo
+            self.ids.btn_gps.text = f"Buscando satélite ({self.gps_tempo}s)..."
+        else:
+            # Se o cronômetro chegar a zero, nós cancelamos a contagem e fugimos para a memória!
+            self.gps_event.cancel()
+            self._gps_escape_memory(None)
 
     @mainthread
     def _gps_escape_memory(self, dt):
@@ -445,7 +457,8 @@ class FocusFormScreen(MDScreen):
     @mainthread
     def _on_gps_location(self, **kwargs):
         # 4. Se o satélite for rápido, cancelamos a busca na memória e usamos o satélite!
-        Clock.unschedule(self._gps_escape_memory)
+        if hasattr(self, 'gps_event'):
+            self.gps_event.cancel()
         gps.stop() 
         
         lat = kwargs.get('lat')
