@@ -367,72 +367,106 @@ class FocusFormScreen(MDScreen):
         self.fill_address_fields(addr_data)
 
     def start_location(self):
+        print("VIGIAA DEBUG: =========================================")
+        print("VIGIAA DEBUG: [1] BOTÃO PRESSIONADO - Iniciando busca")
         self.ids.btn_gps.text = "Pedindo permissão..."
         self.ids.btn_gps.icon = "crosshairs-gps"
         self.ids.btn_gps.disabled = True
 
         if platform == 'android':
+            print("VIGIAA DEBUG: [1.1] Plataforma Android detectada. Solicitando permissões...")
             from android.permissions import request_permissions, Permission
             request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
         else:
-            self.mostrar_aviso("O GPS nativo só funciona no celular.")
+            print("VIGIAA DEBUG: [1.2] PC detectado. Indo para IP.")
+            self.mostrar_aviso("Teste no PC: Usando IP.")
             self._reset_gps_btn()
 
     def _on_permissions_result(self, permissions, grants):
+        print(f"VIGIAA DEBUG: [2] Resposta das permissões: {grants}")
         if all(grants):
             try:
+                print("VIGIAA DEBUG: [3] Permissões OK. Configurando o Plyer GPS...")
                 gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
+                
+                print("VIGIAA DEBUG: [4] Dando o comando gps.start(minTime=1000, minDistance=1)...")
                 gps.start(minTime=1000, minDistance=1) 
                 
-                # Começamos com 40 segundos de paciência para o satélite!
                 self.gps_tempo = 40 
                 self.ids.btn_gps.text = f"Buscando satélite ({self.gps_tempo}s)..."
                 
-                # Cria um relógio que roda a cada 1 segundo para atualizar o botão
+                print("VIGIAA DEBUG: [5] Iniciando o cronômetro de 40 segundos.")
                 self.gps_event = Clock.schedule_interval(self._gps_countdown, 1)
                 
             except Exception as e:
+                print(f"VIGIAA DEBUG: [ERRO CRÍTICO] Falha ao iniciar antena: {e}")
                 self.mostrar_aviso(f"Erro no sensor: {e}")
                 self._reset_gps_btn()
         else:
+            print("VIGIAA DEBUG: [ERRO] Usuário negou a permissão.")
             self.mostrar_aviso("Você precisa permitir o uso do GPS!")
             self._reset_gps_btn()
 
     @mainthread
     def _gps_countdown(self, dt):
         self.gps_tempo -= 1
+        if self.gps_tempo % 5 == 0:
+            print(f"VIGIAA DEBUG: [TIMER] Satélite ainda não respondeu. Tempo restante: {self.gps_tempo}s")
+            
         if self.gps_tempo > 0:
-            # Atualiza o texto do botão para o usuário ver o tempo caindo
             self.ids.btn_gps.text = f"Buscando satélite ({self.gps_tempo}s)..."
         else:
-            # Se o cronômetro chegar a zero, nós cancelamos a contagem e fugimos para a memória!
+            print("VIGIAA DEBUG: [6] O TEMPO ACABOU! O Satélite não enviou coordenadas. Cancelando cronômetro.")
             self.gps_event.cancel()
             self._gps_escape_memory(None)
 
     @mainthread
-    def _gps_escape_memory(self, dt):
-        # 3. O SATÉLITE DEMOROU? Fugimos para a memória do Android!
-        if self.ids.btn_gps.text == "Buscando satélite...":
-            gps.stop() # Desliga a antena travada
-            self.ids.btn_gps.text = "Lendo memória do celular..."
+    def _on_gps_location(self, **kwargs):
+        print("VIGIAA DEBUG: [SUCESSO ABSOLUTO] O Satélite (Plyer) disparou a coordenada!")
+        if hasattr(self, 'gps_event'):
+            print("VIGIAA DEBUG: Cancelando o cronômetro visual.")
+            self.gps_event.cancel()
             
-            # THE MAGIC: Pega da memória cruzada (Rede/Antenas da rua)
+        print("VIGIAA DEBUG: Desligando a antena com gps.stop()")
+        gps.stop() 
+        
+        lat = kwargs.get('lat')
+        lon = kwargs.get('lon')
+        print(f"VIGIAA DEBUG: Coordenadas puras recebidas: Lat: {lat}, Lon: {lon}")
+        
+        self.ids.btn_gps.text = "Coordenada Capturada!"
+        self.ids.btn_gps.icon = "check"
+        
+        threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Satélite GPS Nativo"), daemon=True).start()
+
+    @mainthread
+    def _on_gps_status(self, stype, status):
+        print(f"VIGIAA DEBUG: [STATUS DO HARDWARE] Tipo: {stype} | Status: {status}")
+
+    @mainthread
+    def _gps_escape_memory(self, dt):
+        print("VIGIAA DEBUG: [7] Iniciando plano de fuga: Memória PyJnius.")
+        if self.ids.btn_gps.text.startswith("Buscando"):
+            print("VIGIAA DEBUG: [7.1] Parando antena travada do Plyer.")
+            gps.stop()
+            self.ids.btn_gps.text = "Lendo memória..."
+            
+            print("VIGIAA DEBUG: [7.2] Chamando _get_last_known_location_android()")
             lat, lon = self._get_last_known_location_android()
             
             if lat and lon:
+                print(f"VIGIAA DEBUG: [7.3] Memória encontrada! Lat: {lat}, Lon: {lon}")
                 self.ids.btn_gps.text = "Coordenada da Memória!"
                 self.ids.btn_gps.icon = "check"
-                self.mostrar_aviso("Usando localização nativa da rede.")
-                
-                # Manda as coordenadas da memória para o tradutor de ruas!
                 threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Memória do Android"), daemon=True).start()
             else:
+                print("VIGIAA DEBUG: [7.4] A memória também estava vazia. Fim da linha.")
                 self.mostrar_aviso("Memória vazia. Tente ir para um local mais aberto.", "red")
                 self._reset_gps_btn()
 
     def _get_last_known_location_android(self):
-        """ Função secreta que fala direto com o hardware do Android ignorando o Plyer """
         try:
+            print("VIGIAA DEBUG: [JNIUS] Importando classes Java...")
             from jnius import autoclass
             Context = autoclass('android.content.Context')
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
@@ -441,16 +475,19 @@ class FocusFormScreen(MDScreen):
             activity = PythonActivity.mActivity
             lm = activity.getSystemService(Context.LOCATION_SERVICE)
             
-            # Tenta pegar a localização cruzada pelas antenas de operadora e Wi-Fi (Muito rápido e funciona em casa)
+            print("VIGIAA DEBUG: [JNIUS] Tentando NETWORK_PROVIDER (Antenas de Celular)...")
             loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
             if not loc:
-                # Se falhar, tenta pegar a última vez que o GPS do celular esteve ligado noutro app
+                print("VIGIAA DEBUG: [JNIUS] NETWORK vazio. Tentando GPS_PROVIDER (Satélite antigo)...")
                 loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 
             if loc:
+                print("VIGIAA DEBUG: [JNIUS] Localização extraída do Java com sucesso!")
                 return loc.getLatitude(), loc.getLongitude()
+            else:
+                print("VIGIAA DEBUG: [JNIUS] Ambas as memórias retornaram NULL.")
         except Exception as e:
-            print("Erro ao acessar memória do GPS:", e)
+            print(f"VIGIAA DEBUG: [JNIUS ERRO CRÍTICO] {e}")
             
         return None, None
 
