@@ -381,12 +381,13 @@ class FocusFormScreen(MDScreen):
         if all(grants):
             try:
                 gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
-                # A MÁGICA DO SEU TESTE: minDistance=1
+                # IGUAL AO SEU TESTE: minDistance=1 e sem matar o processo cedo!
                 gps.start(minTime=1000, minDistance=1) 
-                self.ids.btn_gps.text = "Satélite conectado. Buscando..."
                 
-                # Mantemos o "Plano B" caso o usuário esteja no subsolo
-                Clock.schedule_once(self._gps_escape_hatch, 15)
+                self.ids.btn_gps.text = "Satélite conectado. Aguarde..."
+                
+                # Mudamos de 15s para 45s! Damos tempo do hardware respirar e achar o satélite.
+                Clock.schedule_once(self._gps_escape_hatch, 45)
                 
             except Exception as e:
                 self.mostrar_aviso(f"Erro no sensor: {e}")
@@ -397,15 +398,16 @@ class FocusFormScreen(MDScreen):
 
     @mainthread
     def _gps_escape_hatch(self, dt):
-        if self.ids.btn_gps.text == "Satélite conectado. Buscando...":
+        # Se depois de longos 45 segundos ele não achar NADA, aí sim ele desiste.
+        if self.ids.btn_gps.text == "Satélite conectado. Aguarde...":
             gps.stop()
-            self.mostrar_aviso("Sinal de satélite fraco. Usando a rede...")
+            self.mostrar_aviso("Sinal de satélite muito fraco. A usar a rede...")
             self.ids.btn_gps.text = "A usar rede aproximada..."
             threading.Thread(target=self._worker_ip_location, daemon=True).start()
 
     @mainthread
     def _on_gps_location(self, **kwargs):
-        # PARA TUDO! Achamos a coordenada!
+        # GPS ACHOU! CANCELA TUDO E PEGA A COORDENADA!
         gps.stop() 
         
         lat = kwargs.get('lat')
@@ -414,13 +416,12 @@ class FocusFormScreen(MDScreen):
         self.ids.btn_gps.text = "Coordenada Capturada!"
         self.ids.btn_gps.icon = "check"
         
-        # Manda as coordenadas para o tradutor de ruas que criamos
         threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Satélite GPS Nativo"), daemon=True).start()
 
     @mainthread
     def _on_gps_status(self, stype, status):
         pass
-
+    
     def _worker_ip_location(self):
         try:
             res = requests.get("http://ip-api.com/json/", timeout=5)
