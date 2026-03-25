@@ -22,6 +22,15 @@ KV_FORGOT_PASSWORD = '''
             padding: ["20dp", "40dp", "20dp", "20dp"]
             spacing: "15dp"
 
+            MDBoxLayout:
+                adaptive_height: True
+                MDIconButton:
+                    icon: "arrow-left"
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    on_release: root.go_back()
+
+
             # IMPORTANTE: Coloque o caminho correto da sua imagem do mosquito aqui!
             Image:
                 source: "assets/images/logo-sem-fundo.png" # <--- Troque pelo nome do seu arquivo de imagem (ex: "assets/images/logo-sem-fundo.png")

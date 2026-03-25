@@ -273,15 +273,39 @@ Builder.load_string(KV_LOGIN)
 # A Lógica da Tela
 class LoginScreen(MDScreen):
     def on_pre_enter(self, *args):
+        from kivy.storage.jsonstore import JsonStore
+        from kivy.clock import Clock
+        from kivymd.app import MDApp
+        
+        app = MDApp.get_running_app()
+
         # 1. Limpa os campos de texto
         if 'email_field' in self.ids:
             self.ids.email_field.text = ""
         if 'password_field' in self.ids:
             self.ids.password_field.text = ""
-            
-        # 2. Apaga a mensagem estática
         if 'error_text' in self.ids:
             self.ids.error_text.text = ""
+        
+        # 2. A BLINDAGEM MÁXIMA (Respeita o botão de Sair!)
+        # Se o botão de Sair foi apertado, a trava estará True
+        if getattr(app, 'force_logout', False):
+            # Nós resetamos a trava para o próximo uso e PARAMOS a função aqui.
+            # O app não vai fazer auto-login!
+            app.force_logout = False
+            return 
+            
+        # 3. Se chegou aqui, é porque o app acabou de abrir normalmente (auto-login padrão)
+        store = JsonStore('vigiaa_storage.json')
+        if store.exists("session"):
+            Clock.schedule_once(self._pular_para_home, 0)
+
+    def _pular_para_home(self, dt):
+        self.manager.current = 'home'
+
+    # Função auxiliar criada apenas para o Clock chamar
+    def _pular_para_home(self, dt):
+        self.manager.current = 'home'
 
     def login_click(self):
         email = self.ids.email_field.text

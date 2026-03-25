@@ -324,16 +324,24 @@ class ProfileTabContent(ScrollView):
 
     # --- AÇÕES DA CONTA ---
     def logout(self):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        
+        # A TRAVA MESTRA: Avisa o app inteiro que estamos forçando a saída!
+        app.force_logout = True 
+
+        # Apaga os arquivos (O seu código perfeito continua aqui)
         if store.exists("session"):
             store.delete("session")
+
+        if store.exists("current_case"):
+            store.delete("current_case")
             
-        # --- A FAXINA (A MÁGICA ACONTECE AQUI) ---
-        # Voltamos tudo para o estado "Carregando..." antes de sair
+        # --- A FAXINA ---
         for field in self.fields_refs.values():
             field.text_value = "Carregando..."
             field.ids.field_input.text = "Carregando..."
             
-        # Oculta o botão de redefinir senha por precaução (caso o próximo seja Google)
         if 'btn_redefinir_senha' in self.ids:
             self.ids.btn_redefinir_senha.opacity = 1
             self.ids.btn_redefinir_senha.disabled = False
@@ -341,8 +349,7 @@ class ProfileTabContent(ScrollView):
             self.ids.sep_redefinir_senha.opacity = 1
             self.ids.sep_redefinir_senha.height = "1dp"
 
-        # Troca para a tela de login
-        MDApp.get_running_app().root.current = 'login'
+        app.root.current = 'login'
 
     def go_to_reset_password(self):
         MDApp.get_running_app().root.current = 'change_password'

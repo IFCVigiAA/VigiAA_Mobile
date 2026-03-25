@@ -22,6 +22,8 @@ from kivy.utils import platform
 from plyer import filechooser, camera
 from kivy.app import App
 import time
+from kivy.properties import StringProperty
+
 
 if platform == 'android':
     from android.permissions import request_permissions, Permission
@@ -29,13 +31,12 @@ if platform == 'android':
 store = JsonStore('vigiaa_storage.json')
 
 KV_FOCUS_FORM = '''
-<ImageCard@MDBoxLayout>:
+<ImageCard>:
+    # Tiramos o @MDBoxLayout e as variáveis 'image_path' e 'image_name' daqui!
     orientation: "horizontal"
     adaptive_height: True
     spacing: "10dp"
     padding: "5dp"
-    image_path: ""
-    image_name: ""
     
     Image:
         source: root.image_path
@@ -54,7 +55,7 @@ KV_FOCUS_FORM = '''
             shorten: True
             shorten_from: "right"
             theme_text_color: "Custom"
-            text_color: 0, 0, 0, 1 # Texto preto
+            text_color: 0, 0, 0, 1
         MDLabel:
             text: "Imagem"
             font_style: "Caption"
@@ -421,6 +422,10 @@ KV_FOCUS_FORM = '''
 
 Builder.load_string(KV_FOCUS_FORM)
 
+class ImageCard(MDBoxLayout):
+    image_path = StringProperty("")
+    image_name = StringProperty("")
+
 class FocusFormScreen(MDScreen):
     neighborhoods_db = {
         "Camboriú": ["Areias", "Braço", "Caetés", "Cedro", "Centro", "Conde Vila Verde", "João da Costa", "Lídia Duarte", "Macacos", "Monte Alegre", "Rio do Meio", "Rio Pequeno", "Santa Regina", "São Francisco de Assis", "Tabuleiro", "Várzea do Ranchinho", "Vila Conceição"], 
@@ -650,17 +655,14 @@ class FocusFormScreen(MDScreen):
 
     @mainthread
     def _on_gps_location(self, **kwargs):
-        print("VIGIAA DEBUG: [SUCESSO ABSOLUTO] O Satélite (Plyer) disparou a coordenada!")
         if hasattr(self, 'gps_event'):
-            print("VIGIAA DEBUG: Cancelando o cronômetro visual.")
             self.gps_event.cancel()
             
-        print("VIGIAA DEBUG: Desligando a antena com gps.stop()")
-        gps.stop() 
+        # O SEGREDO: Atrasar o stop do GPS em 0.5s para o Android não engasgar e fechar o app!
+        Clock.schedule_once(lambda dt: gps.stop(), 0.5) 
         
         lat = kwargs.get('lat')
         lon = kwargs.get('lon')
-        print(f"VIGIAA DEBUG: Coordenadas puras recebidas: Lat: {lat}, Lon: {lon}")
         
         self.ids.btn_gps.text = "Coordenada Capturada!"
         self.ids.btn_gps.icon = "check"
@@ -816,16 +818,16 @@ class FocusFormScreen(MDScreen):
             self.mostrar_aviso("A câmera nativa só funciona no celular.")
 
     def _on_camera_permissions(self, permissions, grants):
-        if all(grants):
-            # Cria um nome único para a foto não sobrepor outras
+        from android.permissions import Permission
+        # Cria um dicionário para ver exatamente o que foi aceito
+        perms_dict = dict(zip(permissions, grants))
+        
+        # Checamos APENAS se a câmera foi permitida!
+        if perms_dict.get(Permission.CAMERA, False):
             nome_arquivo = f"foco_dengue_{int(time.time())}.jpg"
-            
-            # Pega o diretório seguro e privado do próprio aplicativo
             pasta_app = App.get_running_app().user_data_dir
             self.caminho_foto_temp = os.path.join(pasta_app, nome_arquivo)
-            
             try:
-                # Dispara o aplicativo de câmera nativo do celular
                 camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
             except Exception as e:
                 self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
@@ -862,7 +864,7 @@ class FocusFormScreen(MDScreen):
         self.ids.images_container.clear_widgets()
         for path in self.selected_files:
             nome_arquivo = os.path.basename(path)
-            card = Builder.template('ImageCard', image_path=path, image_name=nome_arquivo)
+            card = ImageCard(image_path=path, image_name=nome_arquivo)
             self.ids.images_container.add_widget(card)
 
     def submit_form(self):
