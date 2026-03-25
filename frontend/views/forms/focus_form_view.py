@@ -19,6 +19,9 @@ import os
 import config
 from plyer import gps
 from kivy.utils import platform
+from plyer import filechooser, camera
+from kivy.app import App
+import time
 
 if platform == 'android':
     from android.permissions import request_permissions, Permission
@@ -50,6 +53,8 @@ KV_FOCUS_FORM = '''
             bold: True
             shorten: True
             shorten_from: "right"
+            theme_text_color: "Custom"
+            text_color: 0, 0, 0, 1 # Texto preto
         MDLabel:
             text: "Imagem"
             font_style: "Caption"
@@ -66,129 +71,352 @@ KV_FOCUS_FORM = '''
 
     MDBoxLayout:
         orientation: "vertical"
-
+        
+        # --- Styled Top Bar (Fundo branco, texto e ícone pretos centralizados) ---
         MDBoxLayout:
             size_hint_y: None
             height: "56dp"
-            md_bg_color: 0.22, 0.75, 0.94, 1
-            padding: ["5dp", "0dp", "15dp", "0dp"]
+            md_bg_color: 1, 1, 1, 1 # Fundo branco verbatim
+            padding: ["10dp", "0dp", "10dp", "0dp"]
             spacing: "10dp"
+            pos_hint: {"top": 1}
+            
+            # Adiciona linha separadora fina no fundo do header verbatim
+            canvas.after:
+                Color:
+                    rgb: 0.8, 0.8, 0.8 # Cinza separador verbatim
+                Line:
+                    points: self.x, self.y, self.width, self.y
+                    width: 1.1 # Thinner line like design
 
             MDIconButton:
-                icon: "chevron-left"
+                icon: "arrow-left" # Match design back arrow icon verbatim
                 theme_text_color: "Custom"
-                text_color: 1, 1, 1, 1
+                text_color: 0, 0, 0, 1 # Preto design color verbatim
                 pos_hint: {"center_y": .5}
                 on_release: root.go_back()
 
             MDLabel:
-                text: "Cadastrar Foco"
+                text: "Focos de mosquitos" # Match design title text verbatim
                 font_size: "20sp"
                 bold: True
+                halign: "center" # Centralizado design position verbatim
                 theme_text_color: "Custom"
-                text_color: 1, 1, 1, 1
+                text_color: 0, 0, 0, 1 # Preto design color verbatim
                 pos_hint: {"center_y": .5}
 
+            # Spacer para o truque de centralização verbatim design trick
+            Widget:
+                size_hint_x: None
+                width: "48dp"
+
+        # --- Main form contents in ScrollView (fills space between header and anchored bottom button) ---
         ScrollView:
+            id: scroller
             MDBoxLayout:
+                id: main_scrolling_content
                 orientation: "vertical"
-                padding: "20dp"
-                spacing: "15dp"
+                md_bg_color: 1, 1, 1, 1
+                padding: ["20dp", "20dp", "20dp", "20dp"] # Padding contents verbatim
+                spacing: "5dp" # Tight spacing like design verbatim
                 adaptive_height: True
 
-                # BOTÃO SEM SOMBRA ANTI-CRASH
-                MDRectangleFlatIconButton:
+                # --- GPS Button (Filled Blue, rounded corners, centered icon/text) ---
+                # Usando especializado FillRoundFlatIconButton para ripple safety de botão arredondado preenchido
+                MDFillRoundFlatIconButton:
                     id: btn_gps
-                    text: "Capturar localização (GPS/Rede)"
-                    icon: "map-marker"
-                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    text: "Capturar localização pelo GPS" # Match design text verbatim
+                    icon: "map-marker-outline" # Match design map marker icon verbatim
+                    md_bg_color: 0.22, 0.75, 0.94, 1 # Design light blue color verbatim
                     theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1
-                    icon_color: 1, 1, 1, 1
-                    line_color: 0.22, 0.75, 0.94, 1
+                    text_color: 1, 1, 1, 1 # White verbatim
+                    icon_color: 1, 1, 1, 1 # White verbatim
                     pos_hint: {"center_x": .5}
-                    radius: [8, 8, 8, 8]
+                    size_hint_x: 0.9 # Full width look, slightly smaller than screen width verbatim design look
+                    radius: [15, 15, 15, 15] # Rounded corner style verbatim
+                    # Retained logic from before
                     on_release: root.start_location()
 
+                # Corrigido typo: marcos -> marcados (verbatim design color hint)
                 MDLabel:
                     text: "Campos marcados com * são obrigatórios"
                     font_style: "Caption"
                     theme_text_color: "Hint"
+                    halign: "left"
+                    size_hint_y: None
+                    height: self.texture_size[1] + dp(10)
 
-                MDTextField:
-                    id: tf_cep
-                    hint_text: "CEP *"
-                    input_filter: "int"
-                    on_text: root.on_cep_change(self.text)
+                # --- FORM ROWS (Tabular Style, explicit styling verbatim to match unstyled transparent looks design_2) ---
+                # Utilizando BoxLayouts customizados e TextInputs transparentes para obter o visual tabular design verbatim
+                
+                # CEP Row
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "CEP"
+                        bold: True
+                        size_hint_x: None
+                        width: "120dp" # Fixed label width on left design verbatim
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_cep
+                        hint_text: "Digite o CEP" # design hint text verbatim
+                        input_filter: "int"
+                        # Custom transparent look design verbatim
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2] # Center vertically
+                        on_text: root.on_cep_change(self.text)
 
-                MDTextField:
-                    id: tf_city
-                    hint_text: "MUNICÍPIO *"
-                    readonly: True
-                    on_focus: if self.focus: root.open_city_menu()
+                # Município Row (Read-only input acting like dropdown)
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "MUNICÍPIO[color=#FF0000]*[/color]" # Red asterisk verbatim
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "120dp" # Fixed width design verbatim
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_city
+                        hint_text: "Selecione a cidade" # design hint text verbatim
+                        readonly: True # Act like dropdown
+                        # Custom transparent look design verbatim
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2] # Center vertically
+                        # retained logic
+                        on_focus: if self.focus: root.open_city_menu()
+                    MDIconButton:
+                        icon: "chevron-down" # design dropdown arrow verbatim
+                        theme_text_color: "Custom"
+                        text_color: 0.6, 0.6, 0.6, 1 # design color hint verbatim
+                        pos_hint: {"center_y": .5}
+                        on_release: root.open_city_menu()
 
-                MDTextField:
-                    id: tf_neighborhood
-                    hint_text: "BAIRRO *"
-                    readonly: True
-                    disabled: True
-                    on_focus: if self.focus: root.open_neighborhood_menu()
+                # Bairro Row (Read-only input acting like dropdown)
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "BAIRRO[color=#FF0000]*[/color]" # Red asterisk verbatim
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "120dp" # Fixed width design verbatim
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_neighborhood
+                        hint_text: "Selecione o bairro" # design hint text verbatim
+                        readonly: True # Act like dropdown
+                        # Custom transparent look design verbatim
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2] # Center vertically
+                        # retained logic
+                        on_focus: if self.focus: root.open_neighborhood_menu()
+                    MDIconButton:
+                        icon: "chevron-down" # design dropdown arrow verbatim
+                        theme_text_color: "Custom"
+                        text_color: 0.6, 0.6, 0.6, 1 # design color hint verbatim
+                        pos_hint: {"center_y": .5}
+                        on_release: root.open_neighborhood_menu()
 
-                MDBoxLayout:
-                    adaptive_height: True
-                    spacing: "10dp"
-                    MDTextField:
+                # Rua Row (Input with search icon)
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "RUA[color=#FF0000]*[/color]" # Red asterisk verbatim
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "120dp" # Fixed width design verbatim
+                        theme_text_color: "Primary"
+                    TextInput:
                         id: tf_street
-                        hint_text: "RUA *"
-                        size_hint_x: 0.8
+                        hint_text: "Digite o nome da rua" # design hint text verbatim
+                        # Custom transparent look design verbatim
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2] # Center vertically
                         on_text_validate: root.search_address_by_name()
                     MDIconButton:
                         id: btn_search_street
-                        icon: "magnify"
+                        icon: "magnify" # design magnify search icon verbatim
                         theme_text_color: "Custom"
-                        text_color: 0.22, 0.75, 0.94, 1
+                        text_color: 0.22, 0.75, 0.94, 1 # design color verbatim
+                        pos_hint: {"center_y": .5}
                         on_release: root.search_address_by_name()
 
-                MDTextField:
-                    id: tf_number
-                    hint_text: "NÚMERO *"
+                # Número Row (Input)
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "NÚMERO[color=#FF0000]*[/color]" # Red asterisk verbatim
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "120dp" # Fixed width design verbatim
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_number
+                        hint_text: "Digite o número" # design hint text verbatim
+                        # Custom transparent look design verbatim
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2] # Center vertically
 
-                MDTextField:
-                    id: tf_description
-                    hint_text: "DESCRIÇÃO"
-                    multiline: True
+                # Descrição Row (Multiline Input)
+                BoxLayout:
+                    orientation: "horizontal"
+                    adaptive_height: True
+                    size_hint_y: None
+                    height: "80dp" # Gives space for multiline hint verbatim design look
+                    padding: [0, "10dp", 0, "10dp"] # Spacing vertically verbatim design look
+                    MDLabel:
+                        text: "DESCRIÇÃO" # design label verbatim
+                        bold: True
+                        size_hint_x: None
+                        width: "120dp" # Fixed width design verbatim
+                        pos_hint: {"top": 1} # Align to top of description block
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_description
+                        hint_text: "Descreva a situação do local. Obs: não se identifique de nenhuma forma" # design multiline hint text verbatim
+                        multiline: True
+                        # Custom transparent look design verbatim
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, "10dp"] # Center vertically within its space
 
+                # --- IMAGENS SECTION ---
                 MDLabel:
                     text: "IMAGENS"
                     bold: True
-                    font_style: "Caption"
+                    theme_text_color: "Primary"
+                    font_style: "Button"
+                    halign: "left"
+                    size_hint_y: None
+                    height: self.texture_size[1] + dp(10)
 
+                # A Estratégia WhatsApp: Dois botões separados, CENTRALIZADOS
+                MDBoxLayout:
+                    orientation: "horizontal"
+                    adaptive_height: True
+                    spacing: "15dp"
+                    padding: ["10dp", "0dp", "10dp", "0dp"] # Spacing on sides for perfect center of the row
+
+                    # Botão da Galeria (Nativo) - Totalmente Centralizado verbatim design looks
+                    MDCard:
+                        size_hint: None, None
+                        size: "80dp", "80dp"
+                        md_bg_color: 0.9, 0.9, 0.9, 1
+                        radius: [15, 15, 15, 15]
+                        ripple_behavior: True
+                        elevation: 0
+                        on_release: root.open_gallery()
+                        
+                        # USAMOS RELATIVE LAYOUT PARA ALINHAMENTO ABSOLUTO verbatim looks
+                        MDRelativeLayout:
+                            
+                            MDIcon:
+                                icon: "image-multiple-outline"
+                                theme_text_color: "Custom"
+                                text_color: 0.3, 0.3, 0.3, 1
+                                font_size: "32sp"
+                                halign: "center"
+                                # CENTRO X E Y verbatim design look
+                                pos_hint: {"center_x": .5, "center_y": .6} 
+                            MDLabel:
+                                text: "Galeria"
+                                font_style: "Caption"
+                                theme_text_color: "Hint"
+                                halign: "center"
+                                # CENTRO X, LEVEMENTE ABAIXO DO ÍCONE verbatim design look
+                                pos_hint: {"center_x": .5, "center_y": .3}
+
+                    # Botão da Câmera (Nativo) - Totalmente Centralizado verbatim design looks
+                    MDCard:
+                        size_hint: None, None
+                        size: "80dp", "80dp"
+                        md_bg_color: 0.9, 0.9, 0.9, 1
+                        radius: [15, 15, 15, 15]
+                        ripple_behavior: True
+                        elevation: 0
+                        on_release: root.open_camera()
+                        
+                        # USAMOS RELATIVE LAYOUT PARA ALINHAMENTO ABSOLUTO verbatim looks
+                        MDRelativeLayout:
+                            
+                            MDIcon:
+                                icon: "camera-outline"
+                                theme_text_color: "Custom"
+                                text_color: 0.3, 0.3, 0.3, 1
+                                font_size: "32sp"
+                                halign: "center"
+                                # CENTRO X E Y verbatim design look
+                                pos_hint: {"center_x": .5, "center_y": .6}
+                            MDLabel:
+                                text: "Câmera"
+                                font_style: "Caption"
+                                theme_text_color: "Hint"
+                                halign: "center"
+                                # CENTRO X, LEVEMENTE ABAIXO DO ÍCONE verbatim design look
+                                pos_hint: {"center_x": .5, "center_y": .3}
+
+                # Container for added images
                 MDBoxLayout:
                     id: images_container
                     orientation: "vertical"
                     adaptive_height: True
                     spacing: "10dp"
 
-                MDFlatButton:
-                    text: "+ Adicionar imagem"
-                    theme_text_color: "Custom"
-                    text_color: 0.22, 0.75, 0.94, 1
-                    on_release: root.pick_image()
+        # --- Anchored Bottom Submit Button Region (Anchored style look design verbatim) ---
+        # anchors the button at the very bottom of the screen verbatim design look
+        AnchorLayout:
+            anchor_x: "center"
+            anchor_y: "bottom"
+            size_hint_y: None
+            height: "80dp" # Space to anchor button at bottom comfortably design look verbatim design look
+            padding: ["15dp", "0dp", "15dp", "15dp"] # Padding around anchored button for full width design look verbatim
 
-                Widget:
-                    size_hint_y: None
-                    height: "20dp"
-
-                # BOTÃO SEM SOMBRA ANTI-CRASH
-                MDFlatButton:
-                    id: btn_submit
-                    text: "CADASTRAR FOCO"
-                    md_bg_color: 0.22, 0.75, 0.94, 1
-                    theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1
-                    size_hint_x: 1
-                    padding: "15dp"
-                    on_release: root.submit_form()
+            # Styled full-width filled blue button verbatim design look image_2.png
+            # Standard FillRoundFlatButton style used for ripple safety but styled light blue
+            MDFillRoundFlatButton:
+                id: btn_submit
+                text: "CADASTRAR" # Match design text verbatim design look
+                font_size: "18sp"
+                bold: True # Make bold text matching design look
+                md_bg_color: 0.22, 0.75, 0.94, 1 # Standard light blue design color
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1 # White
+                size_hint_x: 1 # Standard filled blue button full width anchored style
+                height: "56dp"
+                # Ripple safety standard
+                radius: [15, 15, 15, 15] # Rounded corner style verbatim design look image_2.png
+                on_release: root.submit_form()
 '''
 
 Builder.load_string(KV_FOCUS_FORM)
@@ -571,12 +799,51 @@ class FocusFormScreen(MDScreen):
         self.gps_dialog.dismiss()
         self.fill_address_fields(self.gps_address_data)
 
-    def pick_image(self):
+    def open_gallery(self):
+        """Abre o seletor nativo de arquivos do Android (Galeria)"""
         try:
             filechooser.open_file(on_selection=self._handle_selection, filters=[("Images", "*.png", "*.jpg", "*.jpeg")])
         except Exception as e:
             self.mostrar_aviso("Permissão de galeria negada ou indisponível.", "red")
 
+    def open_camera(self):
+        """Pede permissão e abre a câmera nativa do Android"""
+        if platform == 'android':
+            from android.permissions import request_permissions, Permission
+            # Pede a trindade de permissões: Câmera + Ler + Escrever na memória
+            request_permissions([Permission.CAMERA, Permission.WRITE_EXTERNAL_STORAGE, Permission.READ_EXTERNAL_STORAGE], self._on_camera_permissions)
+        else:
+            self.mostrar_aviso("A câmera nativa só funciona no celular.")
+
+    def _on_camera_permissions(self, permissions, grants):
+        if all(grants):
+            # Cria um nome único para a foto não sobrepor outras
+            nome_arquivo = f"foco_dengue_{int(time.time())}.jpg"
+            
+            # Pega o diretório seguro e privado do próprio aplicativo
+            pasta_app = App.get_running_app().user_data_dir
+            self.caminho_foto_temp = os.path.join(pasta_app, nome_arquivo)
+            
+            try:
+                # Dispara o aplicativo de câmera nativo do celular
+                camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
+            except Exception as e:
+                self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
+        else:
+            self.mostrar_aviso("Permissão de câmera negada!", "red")
+
+    @mainthread
+    def _on_camera_success(self, filepath=None):
+        """Quando o usuário clica no 'OK' da câmera, a foto cai aqui"""
+        caminho_final = filepath if filepath else getattr(self, 'caminho_foto_temp', None)
+        
+        # Confirma se o Android realmente salvou o arquivo no cofre
+        if caminho_final and os.path.exists(caminho_final):
+            if caminho_final not in self.selected_files:
+                self.selected_files.append(caminho_final)
+                self.update_images_display()
+
+    # Mantemos o seu _handle_selection original intacto!
     def _handle_selection(self, selection):
         if selection:
             for path in selection:
@@ -584,6 +851,7 @@ class FocusFormScreen(MDScreen):
                     self.selected_files.append(path)
             Clock.schedule_once(lambda dt: self.update_images_display(), 0)
 
+   
     def remove_image(self, path):
         if path in self.selected_files:
             self.selected_files.remove(path)

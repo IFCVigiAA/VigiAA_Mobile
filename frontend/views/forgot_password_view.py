@@ -14,73 +14,87 @@ KV_FORGOT_PASSWORD = '''
     MDBoxLayout:
         orientation: "vertical"
 
-        # --- HEADER (Com botão de voltar) ---
-        MDTopAppBar:
-            title: "Recuperar Senha"
-            md_bg_color: 0.22, 0.75, 0.94, 1  # Azul Ciano (#39BFEF)
-            specific_text_color: 1, 1, 1, 1
-            elevation: 2
-            left_action_items: [["arrow-left", lambda x: root.go_back()]]
+        # --- HEADER CURVADO (COM DEGRADÊ NATIVO IGUAL AO LOGIN) ---
+        GradientRoundedLayout:
+            orientation: "vertical"
+            size_hint_y: None
+            height: "300dp" # Altura para caber o logo e os textos confortavelmente
+            padding: ["20dp", "40dp", "20dp", "20dp"]
+            spacing: "15dp"
 
-        # --- CORPO DA TELA ---
-        ScrollView:
-            MDBoxLayout:
-                orientation: "vertical"
-                padding: "30dp"
-                spacing: "20dp"
+            # IMPORTANTE: Coloque o caminho correto da sua imagem do mosquito aqui!
+            Image:
+                source: "assets/images/logo-sem-fundo.png" # <--- Troque pelo nome do seu arquivo de imagem (ex: "assets/images/logo-sem-fundo.png")
+                size_hint_y: None
+                height: "120dp"
+                allow_stretch: True
+                keep_ratio: True
+                pos_hint: {"center_x": .5}
+
+            MDLabel:
+                text: "VigiAA"
+                font_size: "26sp"
+                bold: True
+                halign: "center"
+                theme_text_color: "Custom"
+                text_color: 0, 0, 0, 1
                 adaptive_height: True
 
-                MDBoxLayout:
-                    size_hint_y: None
-                    height: "10dp"
+            MDLabel:
+                text: "Esqueceu sua senha?"
+                font_size: "18sp"
+                bold: True
+                halign: "center"
+                theme_text_color: "Custom"
+                text_color: 0, 0, 0, 1
+                adaptive_height: True
 
-                # Ícone do cadeado
-                MDIcon:
-                    icon: "lock-reset"
-                    font_size: "80sp"
-                    halign: "center"
+        # --- CORPO DA TELA (Campos e Botão) ---
+        MDBoxLayout:
+            orientation: "vertical"
+            padding: ["30dp", "40dp", "30dp", "20dp"]
+            spacing: "25dp"
+
+            MDLabel:
+                text: "Digite seu email cadastrado para receber o link"
+                theme_text_color: "Hint"
+                halign: "center"
+                font_size: "14sp"
+                adaptive_height: True
+
+            # Campo de Email (Com borda retangular igual à foto)
+            MDTextField:
+                id: email_field
+                hint_text: "Email cadastrado"
+                mode: "rectangle" # Modo de contorno em vez de apenas uma linha
+                font_size: "16sp"
+
+            Widget:
+                size_hint_y: None
+                height: "5dp" # Pequeno respiro antes do botão
+
+            # Botão Preto (Feito com MDCard para design idêntico e sem crash)
+            MDCard:
+                id: btn_send # O crachá do botão
+                size_hint_y: None
+                height: "50dp"
+                md_bg_color: 0, 0, 0, 1 # Preto absoluto
+                radius: [8, 8, 8, 8]
+                ripple_behavior: True
+                elevation: 0
+                on_release: root.send_reset_click()
+
+                MDLabel:
+                    id: btn_send_text # O crachá do texto
+                    text: "Enviar link"
                     theme_text_color: "Custom"
-                    text_color: 0.22, 0.75, 0.94, 1
-
-                MDLabel:
-                    text: "Esqueceu sua senha?"
-                    font_size: "20sp"
+                    text_color: 1, 1, 1, 1 # Texto Branco
+                    halign: "center"
+                    font_size: "16sp"
                     bold: True
-                    halign: "center"
-                    adaptive_height: True
 
-                MDLabel:
-                    text: "Digite seu email para receber o link."
-                    theme_text_color: "Hint"
-                    halign: "center"
-                    adaptive_height: True
-
-                MDBoxLayout:
-                    size_hint_y: None
-                    height: "20dp"
-
-                # Campo de Email
-                MDTextField:
-                    id: email_field
-                    hint_text: "Digite seu email cadastrado"
-                    mode: "round"
-                    fill_color_normal: 1, 1, 1, 1
-                    text_color_normal: 0, 0, 0, 1
-
-                MDBoxLayout:
-                    size_hint_y: None
-                    height: "10dp"
-
-                # Botão de Envio
-                MDRaisedButton:
-                    id: btn_send
-                    text: "Enviar Link"
-                    md_bg_color: 0.22, 0.75, 0.94, 1
-                    text_color: 1, 1, 1, 1
-                    size_hint_x: 1
-                    elevation: 0
-                    padding: "15dp"
-                    on_release: root.send_reset_click()
+            # Este Widget vazio empurra tudo para cima, não deixando o layout se espalhar
+            Widget:
 '''
 Builder.load_string(KV_FORGOT_PASSWORD)
 
@@ -89,7 +103,7 @@ class ForgotPasswordScreen(MDScreen):
     def on_pre_enter(self, *args):
         # A nossa clássica faxina! Limpa a tela antes de você entrar nela
         self.ids.email_field.text = ""
-        self.ids.btn_send.text = "Enviar Link"
+        self.ids.btn_send_text.text = "Enviar link"
         self.ids.btn_send.disabled = False
 
     def go_back(self):

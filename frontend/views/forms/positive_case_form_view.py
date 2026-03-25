@@ -19,100 +19,176 @@ KV_POSITIVE_FORM = '''
     MDBoxLayout:
         orientation: "vertical"
 
+        # --- Top Bar (Fundo branco, setinha preta) verbatim design looks
         MDBoxLayout:
             size_hint_y: None
             height: "56dp"
-            md_bg_color: 0.22, 0.75, 0.94, 1
-            padding: ["5dp", "0dp", "15dp", "0dp"]
+            md_bg_color: 1, 1, 1, 1
+            padding: ["10dp", "0dp", "10dp", "0dp"]
             spacing: "10dp"
+            
+            canvas.after:
+                Color:
+                    rgb: 0.9, 0.9, 0.9
+                Line:
+                    points: self.x, self.y, self.width, self.y
+                    width: 1.1
 
             MDIconButton:
-                icon: "chevron-left"
+                icon: "arrow-left"
                 theme_text_color: "Custom"
-                text_color: 1, 1, 1, 1
+                text_color: 0, 0, 0, 1
                 pos_hint: {"center_y": .5}
                 on_release: root.go_back()
 
             MDLabel:
-                text: "Identificação do Paciente"
+                text: "Casos de dengue"
                 font_size: "20sp"
                 bold: True
+                halign: "center"
                 theme_text_color: "Custom"
-                text_color: 1, 1, 1, 1
+                text_color: 0, 0, 0, 1
                 pos_hint: {"center_y": .5}
 
-        ScrollView:
+            # Spacer verbatim design trick
+            Widget:
+                size_hint_x: None
+                width: "48dp"
+
+        # --- Corpo do Formulário ---
+        # TROCAMOS PARA MDScrollView PARA EVITAR O ERRO 'on_scroll_stop'
+        MDScrollView:
+            id: scroller
             MDBoxLayout:
                 orientation: "vertical"
-                padding: "20dp"
-                spacing: "20dp"
+                padding: ["20dp", "20dp", "20dp", "20dp"]
+                spacing: "5dp"
                 adaptive_height: True
 
-                MDBoxLayout:
-                    orientation: "vertical"
-                    adaptive_height: True
-                    padding: "15dp"
-                    spacing: "10dp"
-                    md_bg_color: 0.88, 0.96, 1, 1 
-                    
+                # --- FORM ROWS (Estilo Tabela) verbatim design looks and functionality
+                
+                # Nome
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
                     MDLabel:
-                        text: "Teste Positivo Confirmado"
+                        text: "Nome[color=#FF0000]*[/color]"
+                        markup: True
                         bold: True
-                        theme_text_color: "Custom"
-                        text_color: 0.1, 0.46, 0.82, 1
-                        halign: "center"
+                        size_hint_x: None
+                        width: "130dp"
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_nome
+                        hint_text: "Digite seu nome"
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
 
+                # CPF
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
                     MDLabel:
-                        text: "Como o caso foi positivo, os dados do paciente são obrigatórios para a vigilância epidemiológica."
-                        theme_text_color: "Hint"
-                        font_style: "Caption"
-                        halign: "center"
+                        text: "CPF"
+                        bold: True
+                        size_hint_x: None
+                        width: "130dp"
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_cpf
+                        hint_text: "000.000.000-00"
+                        input_filter: "int"
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
 
-                MDLabel:
-                    text: "Campos marcados com * são obrigatórios"
-                    font_style: "Caption"
-                    theme_text_color: "Hint"
+                # Telefone
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "Telefone[color=#FF0000]*[/color]"
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "130dp"
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_telefone
+                        hint_text: "(XX) XXXXX-XXXX"
+                        input_filter: "int"
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
 
-                MDTextField:
-                    id: tf_nome
-                    hint_text: "Nome completo *"
-                    icon_left: "account-outline"
-
-                MDTextField:
-                    id: tf_cpf
-                    hint_text: "CPF (Apenas números)"
-                    icon_left: "card-account-details-outline"
-                    input_filter: "int"
-                    max_text_length: 11
-
-                MDTextField:
-                    id: tf_telefone
-                    hint_text: "Telefone com DDD *"
-                    icon_left: "phone-outline"
-                    input_filter: "int"
-                    max_text_length: 11
-
-                MDTextField:
-                    id: tf_local_teste
-                    hint_text: "Local do teste *"
-                    icon_left: "hospital-building"
-                    readonly: True
-                    on_focus: if self.focus: root.open_local_menu()
-
+                # Local do teste
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "Local do teste[color=#FF0000]*[/color]"
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "130dp"
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_local_teste
+                        hint_text: "Selecione o local"
+                        readonly: True
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
+                        on_focus: if self.focus: root.open_local_menu()
+                    MDIconButton:
+                        icon: "chevron-down"
+                        theme_text_color: "Custom"
+                        text_color: 0.6, 0.6, 0.6, 1
+                        pos_hint: {"center_y": .5}
+                        on_release: root.open_local_menu()
+                        
+                # O ESPAÇADOR VITAL PARA O BOTÃO NÃO TAMPAR O FINAL
                 Widget:
                     size_hint_y: None
-                    height: "20dp"
+                    height: "100dp"
 
-                # BOTÃO SEM SOMBRA ANTI-CRASH
-                MDFlatButton:
-                    id: btn_submit
-                    text: "VINCULAR PACIENTE"
-                    md_bg_color: 0.22, 0.75, 0.94, 1
-                    theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1
-                    size_hint_x: 1
-                    padding: "15dp"
-                    on_release: root.submit_form()
+        # --- Botão CADASTRAR fixo no rodapé (Em sobreposição) ---
+        # anchors the button at the very bottom of the screen verbatim design looks
+        AnchorLayout:
+            anchor_x: "center"
+            anchor_y: "bottom"
+            size_hint_y: None
+            height: "80dp"
+            padding: ["15dp", "0dp", "15dp", "15dp"] # Padding around anchored button for full width design feel verbatim design feel
+
+            # Styled full-width filled blue button verbatim design look image_a7d941.png
+            # Standard FillRoundFlatButton style used for ripple safety but styled light blue
+            MDFillRoundFlatButton:
+                id: btn_submit
+                text: "CADASTRAR" # Match design text verbatim design look image_a7d941.png
+                font_size: "18sp"
+                bold: True # Make bold text matching design look
+                md_bg_color: 0.22, 0.75, 0.94, 1 # Standard light blue design color
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1 # White
+                size_hint_x: 1 # Standard filled blue button full width anchored style
+                height: "56dp"
+                # Ripple safety standard
+                radius: [15, 15, 15, 15] # Rounded corner style verbatim design look image_a7d941.png
+                on_release: root.submit_form()
 '''
 
 Builder.load_string(KV_POSITIVE_FORM)
@@ -130,7 +206,7 @@ class PositiveCaseFormScreen(MDScreen):
         self.ids.tf_cpf.text = ""
         self.ids.tf_telefone.text = ""
         self.ids.tf_local_teste.text = ""
-        self.ids.btn_submit.text = "VINCULAR PACIENTE"
+        self.ids.btn_submit.text = "CADASTRAR CASO"
         self.ids.btn_submit.disabled = False
 
     def go_back(self):

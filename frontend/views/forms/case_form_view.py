@@ -15,6 +15,29 @@ from urllib.parse import quote
 import config
 from plyer import gps
 from kivy.utils import platform
+import time
+from kivymd.uix.boxlayout import MDBoxLayout
+
+from kivy.utils import platform
+
+from kivy.properties import VariableListProperty
+from kivymd.uix.button import MDFlatButton, MDTextButton
+
+# Injetamos o 'radius' à força nos botões base se eles não tiverem
+if not hasattr(MDFlatButton, 'radius'):
+    MDFlatButton.radius = VariableListProperty([16, 16, 16, 16])
+if not hasattr(MDTextButton, 'radius'):
+    MDTextButton.radius = VariableListProperty([16, 16, 16, 16])
+
+# Tentamos injetar diretamente na classe secreta de anos do Calendário
+try:
+    from kivymd.uix.pickers.datepicker.datepicker import MDDatePickerItemText
+    if not hasattr(MDDatePickerItemText, 'radius'):
+        MDDatePickerItemText.radius = VariableListProperty([16, 16, 16, 16])
+except ImportError:
+    pass
+
+store = JsonStore('vigiaa_storage.json')
 
 if platform == 'android':
     from android.permissions import request_permissions, Permission
@@ -28,17 +51,25 @@ KV_CASE_FORM = '''
     MDBoxLayout:
         orientation: "vertical"
 
+        # --- Top Bar (Fundo branco, texto e ícone pretos centralizados) ---
         MDBoxLayout:
             size_hint_y: None
             height: "56dp"
-            md_bg_color: 0.22, 0.75, 0.94, 1
-            padding: ["5dp", "0dp", "15dp", "0dp"]
+            md_bg_color: 1, 1, 1, 1
+            padding: ["10dp", "0dp", "10dp", "0dp"]
             spacing: "10dp"
+            
+            canvas.after:
+                Color:
+                    rgb: 0.9, 0.9, 0.9
+                Line:
+                    points: self.x, self.y, self.width, self.y
+                    width: 1.1
 
             MDIconButton:
-                icon: "chevron-left"
+                icon: "arrow-left"
                 theme_text_color: "Custom"
-                text_color: 1, 1, 1, 1
+                text_color: 0, 0, 0, 1
                 pos_hint: {"center_y": .5}
                 on_release: root.go_back()
 
@@ -46,166 +77,304 @@ KV_CASE_FORM = '''
                 text: "Casos de dengue"
                 font_size: "20sp"
                 bold: True
+                halign: "center"
                 theme_text_color: "Custom"
-                text_color: 1, 1, 1, 1
+                text_color: 0, 0, 0, 1
                 pos_hint: {"center_y": .5}
 
-        ScrollView:
+            Widget:
+                size_hint_x: None
+                width: "48dp"
+
+        # --- Corpo do Formulário ---
+        # TROCAMOS PARA MDScrollView PARA EVITAR O ERRO 'on_scroll_stop'
+        MDScrollView:
+            id: scroller
             MDBoxLayout:
                 orientation: "vertical"
-                padding: "20dp"
-                spacing: "15dp"
+                padding: ["20dp", "20dp", "20dp", "20dp"]
+                spacing: "5dp"
                 adaptive_height: True
 
-                # BOTÃO SEM SOMBRA ANTI-CRASH
-                MDRectangleFlatIconButton:
+                # --- Botão GPS ---
+                MDFillRoundFlatIconButton:
                     id: btn_gps
-                    text: "Capturar localização (GPS/Rede)"
-                    icon: "map-marker"
+                    text: "Capturar localização pelo GPS"
+                    icon: "map-marker-outline"
                     md_bg_color: 0.22, 0.75, 0.94, 1
                     theme_text_color: "Custom"
                     text_color: 1, 1, 1, 1
                     icon_color: 1, 1, 1, 1
-                    line_color: 0.22, 0.75, 0.94, 1
                     pos_hint: {"center_x": .5}
+                    size_hint_x: 0.9
+                    radius: [15, 15, 15, 15]
                     on_release: root.start_location()
 
                 MDLabel:
                     text: "Campos marcados com * são obrigatórios"
                     font_style: "Caption"
                     theme_text_color: "Hint"
+                    halign: "left"
+                    size_hint_y: None
+                    height: self.texture_size[1] + dp(10)
 
-                MDBoxLayout:
-                    adaptive_height: True
-                    spacing: "10dp"
-                    MDTextField:
+                # --- FORM ROWS (Estilo Tabela) ---
+
+                # Data da notificação
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "Data da notificação[color=#FF0000]*[/color]"
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "160dp" # Aumentado para o * caber perfeitamente
+                        theme_text_color: "Primary"
+                    TextInput:
                         id: tf_notif_date
-                        hint_text: "Data da notificação *"
+                        hint_text: "Selecione a data"
                         readonly: True
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
                         on_focus: if self.focus: root.show_date_picker('notif')
                     MDIconButton:
-                        icon: "calendar-month"
+                        icon: "chevron-down"
                         theme_text_color: "Custom"
-                        text_color: 0.22, 0.75, 0.94, 1
+                        text_color: 0.6, 0.6, 0.6, 1
+                        pos_hint: {"center_y": .5}
                         on_release: root.show_date_picker('notif')
 
-                MDTextField:
-                    id: tf_cep
-                    hint_text: "CEP *"
-                    input_filter: "int"
-                    on_text: root.on_cep_change(self.text)
+                # CEP
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "CEP"
+                        bold: True
+                        size_hint_x: None
+                        width: "160dp"
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_cep
+                        hint_text: "Digite o CEP"
+                        input_filter: "int"
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
+                        on_text: root.on_cep_change(self.text)
 
-                MDTextField:
-                    id: tf_city
-                    hint_text: "MUNICÍPIO *"
-                    readonly: True
-                    on_focus: if self.focus: root.open_city_menu()
+                # Município
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "MUNICÍPIO[color=#FF0000]*[/color]"
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "160dp"
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_city
+                        hint_text: "Selecione o nome da cidade"
+                        readonly: True
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
+                        on_focus: if self.focus: root.open_city_menu()
+                    MDIconButton:
+                        icon: "chevron-down"
+                        theme_text_color: "Custom"
+                        text_color: 0.6, 0.6, 0.6, 1
+                        pos_hint: {"center_y": .5}
+                        on_release: root.open_city_menu()
 
-                MDTextField:
-                    id: tf_neighborhood
-                    hint_text: "BAIRRO *"
-                    readonly: True
-                    disabled: True
-                    on_focus: if self.focus: root.open_neighborhood_menu()
+                # Bairro
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "BAIRRO[color=#FF0000]*[/color]"
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "160dp"
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_neighborhood
+                        hint_text: "Selecione o nome do bairro"
+                        readonly: True
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
+                        on_focus: if self.focus: root.open_neighborhood_menu()
+                    MDIconButton:
+                        icon: "chevron-down"
+                        theme_text_color: "Custom"
+                        text_color: 0.6, 0.6, 0.6, 1
+                        pos_hint: {"center_y": .5}
+                        on_release: root.open_neighborhood_menu()
 
-                MDBoxLayout:
-                    adaptive_height: True
-                    spacing: "10dp"
-                    MDTextField:
+                # Rua
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "RUA[color=#FF0000]*[/color]"
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "160dp"
+                        theme_text_color: "Primary"
+                    TextInput:
                         id: tf_street
-                        hint_text: "RUA *"
-                        size_hint_x: 0.8
+                        hint_text: "Selecione o nome da rua"
+                        multiline: False
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
                         on_text_validate: root.search_address_by_name()
                     MDIconButton:
                         id: btn_search_street
-                        icon: "magnify"
+                        icon: "chevron-down"
                         theme_text_color: "Custom"
-                        text_color: 0.22, 0.75, 0.94, 1
+                        text_color: 0.6, 0.6, 0.6, 1
+                        pos_hint: {"center_y": .5}
                         on_release: root.search_address_by_name()
 
-                MDTextField:
-                    id: tf_number
-                    hint_text: "NÚMERO *"
-                    input_filter: "int"
+                # Número
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "NÚMERO[color=#FF0000]*[/color]"
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "160dp"
+                        theme_text_color: "Primary"
+                    TextInput:
+                        id: tf_number
+                        hint_text: "Digite o número"
+                        input_filter: "int"
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
 
-                MDBoxLayout:
-                    adaptive_height: True
-                    spacing: "10dp"
-                    MDTextField:
+                # Data de nascimento
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
+                    MDLabel:
+                        text: "Data de nasc.[color=#FF0000]*[/color]"
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "160dp"
+                        theme_text_color: "Primary"
+                    TextInput:
                         id: tf_birth_date
-                        hint_text: "Data de nascimento *"
+                        hint_text: "Selecione a data"
                         readonly: True
+                        hint_text_color: 0.6, 0.6, 0.6, 1
+                        foreground_color: 0, 0, 0, 1
+                        background_normal: ""
+                        background_color: 0, 0, 0, 0
+                        padding: [0, (self.height - self.line_height) / 2]
                         on_focus: if self.focus: root.show_date_picker('birth')
                     MDIconButton:
-                        icon: "calendar-month"
+                        icon: "chevron-down"
                         theme_text_color: "Custom"
-                        text_color: 0.22, 0.75, 0.94, 1
+                        text_color: 0.6, 0.6, 0.6, 1
+                        pos_hint: {"center_y": .5}
                         on_release: root.show_date_picker('birth')
 
-                MDBoxLayout:
-                    adaptive_height: True
-                    spacing: "5dp"
+                # Teste positivo (Checkboxes alinhados)
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: "50dp"
                     MDLabel:
-                        text: "Teste positivo *"
-                        theme_text_color: "Hint"
-                    MDCheckbox:
-                        id: chk_sim
-                        group: 'teste'
-                        size_hint: None, None
-                        size: "48dp", "48dp"
-                    MDLabel:
-                        text: "Sim"
-                        adaptive_width: True
-                    MDCheckbox:
-                        id: chk_nao
-                        group: 'teste'
-                        size_hint: None, None
-                        size: "48dp", "48dp"
-                    MDLabel:
-                        text: "Não"
-                        adaptive_width: True
-
-                MDBoxLayout:
-                    orientation: "vertical"
-                    adaptive_height: True
-                    padding: "15dp"
-                    spacing: "10dp"
-                    md_bg_color: 0.96, 0.96, 0.96, 1
-                    
+                        text: "Teste positivo[color=#FF0000]*[/color]"
+                        markup: True
+                        bold: True
+                        size_hint_x: None
+                        width: "160dp"
+                        theme_text_color: "Primary"
                     MDBoxLayout:
                         adaptive_height: True
-                        spacing: "10dp"
-                        pos_hint: {"center_x": .5}
-                        MDIcon:
-                            icon: "alert-outline"
-                            theme_text_color: "Hint"
+                        pos_hint: {"center_y": .5}
+                        spacing: "0dp"
+                        MDCheckbox:
+                            id: chk_sim
+                            group: 'teste'
+                            size_hint: None, None
+                            size: "40dp", "40dp"
                             pos_hint: {"center_y": .5}
                         MDLabel:
-                            text: "Aviso"
-                            bold: True
-                            theme_text_color: "Hint"
+                            text: "Sim"
+                            adaptive_width: True
                             pos_hint: {"center_y": .5}
-                    
-                    MDLabel:
-                        text: "Nosso objetivo é registrar a ocorrência de casos de dengue.\\n\\nNão identificamos o paciente."
-                        theme_text_color: "Hint"
-                        font_style: "Caption"
-                        halign: "center"
-
+                        Widget:
+                            size_hint_x: None
+                            width: "20dp"
+                        MDCheckbox:
+                            id: chk_nao
+                            group: 'teste'
+                            size_hint: None, None
+                            size: "40dp", "40dp"
+                            pos_hint: {"center_y": .5}
+                        MDLabel:
+                            text: "Não"
+                            adaptive_width: True
+                            pos_hint: {"center_y": .5}
+                            
+                # O ESPAÇADOR VITAL PARA O BOTÃO NÃO TAMPAR O FINAL
                 Widget:
                     size_hint_y: None
-                    height: "10dp"
+                    height: "100dp"
 
-                # BOTÃO SEM SOMBRA ANTI-CRASH
-                MDFlatButton:
-                    id: btn_submit
-                    text: "CADASTRAR"
-                    md_bg_color: 0.22, 0.75, 0.94, 1
-                    theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1
-                    size_hint_x: 1
-                    padding: "15dp"
-                    on_release: root.pre_submit_check()
+        # --- Botão CADASTRAR fixo no rodapé ---
+        AnchorLayout:
+            anchor_x: "center"
+            anchor_y: "bottom"
+            size_hint_y: None  # <-- A CORREÇÃO MÁGICA DO QUADRADO BRANCO
+            height: "80dp"
+            padding: ["15dp", "0dp", "15dp", "15dp"]
+
+            MDFillRoundFlatButton:
+                id: btn_submit
+                text: "CADASTRAR"
+                font_size: "18sp"
+                bold: True
+                md_bg_color: 0.22, 0.75, 0.94, 1
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                size_hint_x: 1
+                height: "56dp"
+                radius: [15, 15, 15, 15]
+                on_release: root.pre_submit_check()
 '''
 
 Builder.load_string(KV_CASE_FORM)
@@ -318,7 +487,9 @@ class CaseFormScreen(MDScreen):
 
     def search_address_by_name(self):
         city = self.ids.tf_city.text
-        street = self.ids.tf_street.text
+        # O .strip() remove qualquer "Enter" ou espaço em branco escondido no início ou fim!
+        street = self.ids.tf_street.text.strip() 
+        
         if not city or len(street) < 3: return
         self.ids.btn_search_street.icon = "timer-sand" 
         threading.Thread(target=self._worker_search_street, args=(city, street), daemon=True).start()
@@ -343,50 +514,138 @@ class CaseFormScreen(MDScreen):
     def open_manual_modal(self, address_list):
         from kivymd.uix.list import TwoLineIconListItem, IconLeftWidget
         from kivy.uix.scrollview import ScrollView
+        from kivymd.uix.boxlayout import MDBoxLayout # <-- A vacina contra o NameError aqui!
+        
         content = ScrollView(size_hint_y=None, height=dp(300))
         box = MDBoxLayout(orientation='vertical', adaptive_height=True)
         for addr in address_list:
-            item = TwoLineIconListItem(text=addr.get("logradouro", ""), secondary_text=f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}", on_release=lambda x, a=addr: self.select_address_manual(a))
+            item = TwoLineIconListItem(
+                text=addr.get("logradouro", ""),
+                secondary_text=f"{addr.get('bairro', '')} - CEP: {addr.get('cep', '')}",
+                on_release=lambda x, a=addr: self.select_address_manual(a)
+            )
             item.add_widget(IconLeftWidget(icon="map-marker"))
             box.add_widget(item)
         content.add_widget(box)
-        self.manual_dialog = MDDialog(title="Selecione a Rua", type="custom", content_cls=content, buttons=[MDFlatButton(text="Fechar", on_release=lambda x: self.manual_dialog.dismiss())])
+
+        self.manual_dialog = MDDialog(
+            title="Selecione a Rua",
+            type="custom",
+            content_cls=content,
+            buttons=[
+                MDFlatButton(
+                    text="Fechar", 
+                    theme_text_color="Custom",
+                    text_color=(0.22, 0.75, 0.94, 1), # Deixei azulzinho para combinar com seu app!
+                    on_release=lambda x: self.manual_dialog.dismiss()
+                )
+            ]
+        )
         self.manual_dialog.open()
 
     def select_address_manual(self, addr_data):
         if self.manual_dialog: self.manual_dialog.dismiss()
         self.fill_address_fields(addr_data)
 
+# -------------------------------------------------------------
+    # LÓGICA DE GPS (IDÊNTICA AO FORMULÁRIO DE FOCOS - COM PYJNIUS)
+    # -------------------------------------------------------------
+    
     def start_location(self):
-        self.ids.btn_gps.text = "Conectando ao Satélite..."
+        self.ids.btn_gps.text = "Pedindo permissão..."
         self.ids.btn_gps.icon = "crosshairs-gps"
         self.ids.btn_gps.disabled = True
 
-        if platform == 'android': request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
-        else: threading.Thread(target=self._worker_ip_location, daemon=True).start()
+        if platform == 'android':
+            from android.permissions import request_permissions, Permission
+            request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
+        else:
+            self.mostrar_aviso("Teste no PC: Usando IP.")
+            threading.Thread(target=self._worker_ip_location, daemon=True).start()
 
     def _on_permissions_result(self, permissions, grants):
         if all(grants):
             try:
                 gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
-                gps.start(minTime=1000, minDistance=0)
+                gps.start(minTime=1000, minDistance=1) 
+                
+                self.gps_tempo = 40 
+                self.ids.btn_gps.text = f"Buscando satélite ({self.gps_tempo}s)..."
+                
+                self.gps_event = Clock.schedule_interval(self._gps_countdown, 1)
+                
             except Exception as e:
-                self.mostrar_aviso("Erro ao ligar a antena do GPS.")
+                self.mostrar_aviso(f"Erro no sensor: {e}")
                 self._reset_gps_btn()
         else:
             self.mostrar_aviso("Você precisa permitir o uso do GPS!")
             self._reset_gps_btn()
 
     @mainthread
+    def _gps_countdown(self, dt):
+        self.gps_tempo -= 1
+        if self.gps_tempo > 0:
+            self.ids.btn_gps.text = f"Buscando satélite ({self.gps_tempo}s)..."
+        else:
+            self.gps_event.cancel()
+            self._gps_escape_memory(None)
+
+    @mainthread
+    def _gps_escape_memory(self, dt):
+        if self.ids.btn_gps.text.startswith("Buscando"):
+            gps.stop() 
+            self.ids.btn_gps.text = "Lendo memória do celular..."
+            
+            # THE MAGIC: Pega da memória cruzada (Rede/Antenas da rua)
+            lat, lon = self._get_last_known_location_android()
+            
+            if lat and lon:
+                self.ids.btn_gps.text = "Coordenada da Memória!"
+                self.ids.btn_gps.icon = "check"
+                self.mostrar_aviso("Usando localização nativa da rede.")
+                threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Memória do Android"), daemon=True).start()
+            else:
+                self.mostrar_aviso("Memória vazia. Tente ir para um local mais aberto.", "red")
+                self._reset_gps_btn()
+
+    def _get_last_known_location_android(self):
+        try:
+            from jnius import autoclass
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            LocationManager = autoclass('android.location.LocationManager')
+            
+            activity = PythonActivity.mActivity
+            lm = activity.getSystemService(Context.LOCATION_SERVICE)
+            
+            loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            if not loc:
+                loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                
+            if loc:
+                return loc.getLatitude(), loc.getLongitude()
+        except Exception as e:
+            print("Erro ao acessar memória do GPS:", e)
+            
+        return None, None
+
+    @mainthread
     def _on_gps_location(self, **kwargs):
+        if hasattr(self, 'gps_event'):
+            self.gps_event.cancel()
+            
+        gps.stop() 
         lat = kwargs.get('lat')
         lon = kwargs.get('lon')
-        gps.stop() 
-        self.ids.btn_gps.text = "Traduzindo coordenadas..."
+        
+        self.ids.btn_gps.text = "Coordenada Capturada!"
+        self.ids.btn_gps.icon = "check"
+        
         threading.Thread(target=self._worker_get_address_from_coords, args=(lat, lon, "Satélite GPS Nativo"), daemon=True).start()
 
     @mainthread
-    def _on_gps_status(self, stype, status): pass
+    def _on_gps_status(self, stype, status):
+        pass
 
     def _worker_ip_location(self):
         try:
@@ -459,18 +718,71 @@ class CaseFormScreen(MDScreen):
 
     @mainthread
     def open_warning_modal(self):
-        self.warning_dialog = MDDialog(
-            title="Aviso Importante",
-            text="Nos casos de teste positivo, o paciente deve ser identificado no próximo passo.",
-            buttons=[
-                MDFlatButton(text="Cancelar", on_release=lambda x: self.warning_dialog.dismiss()),
-                MDFlatButton(text="OK, Continuar", text_color=(1,1,1,1), md_bg_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_positive)
-            ]
+        from kivy.uix.modalview import ModalView
+        from kivymd.uix.card import MDCard
+        from kivymd.uix.boxlayout import MDBoxLayout
+        from kivymd.uix.label import MDLabel, MDIcon
+        from kivy.metrics import dp
+
+        # 1. O Modal Puro (Agora com 260dp de altura para caber o novo texto!)
+        self.warning_dialog = ModalView(
+            size_hint=(0.85, None),
+            height=dp(260), # <--- ALTURA AUMENTADA AQUI
+            auto_dismiss=False,
+            background_color=(0, 0, 0, 0.5)
         )
+
+        # 2. A Caixa Branca Arredondada
+        card = MDCard(
+            orientation="vertical",
+            padding="20dp",
+            spacing="15dp",
+            radius=[15, 15, 15, 15],
+            md_bg_color=(1, 1, 1, 1),
+            elevation=1
+        )
+
+        # 3. O Título Customizado (Ícone + Aviso)
+        title_box = MDBoxLayout(adaptive_size=True, spacing="10dp", pos_hint={"center_x": .5})
+        title_box.add_widget(MDIcon(icon="alert", theme_text_color="Custom", text_color=(0, 0, 0, 1), font_size="24sp"))
+        title_box.add_widget(MDLabel(text="Aviso", bold=True, adaptive_size=True, font_size="20sp"))
+        card.add_widget(title_box)
+
+        # 4. O Novo Texto (Com fonte Body2 para ficar elegante em textos longos)
+        card.add_widget(MDLabel(
+            text="Nos casos de teste positivo o paciente deve ser identificado. A Secretaria de Saúde irá entrar em contato com o número cadastrado para eventuais procedimentos.",
+            halign="center",
+            theme_text_color="Primary",
+            font_style="Body2" # <--- Fonte ideal para textos longos no KivyMD
+        ))
+
+        # 5. O Botão Azul Largo (MDCard blindado)
+        btn = MDCard(
+            size_hint=(0.6, None),
+            height=dp(40),
+            md_bg_color=(0.22, 0.75, 0.94, 1),
+            radius=[10, 10, 10, 10],
+            ripple_behavior=False,
+            pos_hint={"center_x": .5}
+        )
+        btn.bind(on_release=self.confirm_positive)
+        
+        btn.add_widget(MDLabel(
+            text="Ok", 
+            theme_text_color="Custom", 
+            text_color=(1, 1, 1, 1), 
+            halign="center", 
+            bold=True
+        ))
+        
+        card.add_widget(btn)
+
+        self.warning_dialog.add_widget(card)
         self.warning_dialog.open()
 
     def confirm_positive(self, instance):
-        self.warning_dialog.dismiss()
+        if self.warning_dialog:
+            self.warning_dialog.dismiss()
         self.execute_submit(is_positive=True)
 
     def execute_submit(self, is_positive):
