@@ -797,8 +797,8 @@ class FocusFormScreen(MDScreen):
             title="Confirme os Dados:",
             text=texto_dialog,
             buttons=[
-                MDFlatButton(text="Cancelar", text_color=(1,0,0,1), radius=[8, 8, 8, 8], on_release=lambda x: self.gps_dialog.dismiss()),
-                MDFlatButton(text="Confirmar", text_color=(1,1,1,1), md_bg_color=(0.22, 0.75, 0.94, 1), radius=[8, 8, 8, 8], on_release=self.confirm_gps_fill)
+                MDFlatButton(text="Cancelar", text_color=(1,0,0,1), on_release=lambda x: self.gps_dialog.dismiss()),
+                MDFlatButton(text="Confirmar", text_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_gps_fill)
             ]
         )
         self.gps_dialog.open()
@@ -828,34 +828,17 @@ class FocusFormScreen(MDScreen):
         Clock.schedule_once(lambda dt: self._safe_camera_start(permissions, grants), 0)
 
     # Nova função que roda com segurança
+    # Nova função que roda com segurança
     def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
-        from kivy.app import App
-        import os
-        import time
+        from plyer import camera
         
         perms_dict = dict(zip(permissions, grants))
         
         if perms_dict.get(Permission.CAMERA, False):
             try:
-                # --- A BALA DE PRATA SEGURA (Acionada apenas na hora do clique) ---
-                from kivy.utils import platform
-                if platform == 'android':
-                    from jnius import autoclass
-                    StrictMode = autoclass('android.os.StrictMode')
-                    builder = StrictMode.VmPolicy.Builder()
-                    StrictMode.setVmPolicy(builder.build())
-                # -----------------------------------------------------------------
-
-                # Criamos o caminho da foto
-                nome_arquivo = f"foco_dengue_{int(time.time())}.jpg"
-                pasta_app = App.get_running_app().user_data_dir
-                self.caminho_foto_temp = os.path.join(pasta_app, nome_arquivo)
-                
-                # Chamamos a câmera com o caminho!
-                from plyer import camera
-                camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
-                
+                # A MÁGICA DO ANDROID MODERNO: Passamos filename=None!
+                camera.take_picture(filename=None, on_complete=self._on_camera_success)
             except Exception as e:
                 self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
         else:
@@ -863,14 +846,14 @@ class FocusFormScreen(MDScreen):
 
     @mainthread
     def _on_camera_success(self, filepath=None):
-        """Quando o usuário clica no 'OK' da câmera, a foto cai aqui"""
-        caminho_final = filepath if filepath else getattr(self, 'caminho_foto_temp', None)
-        
-        # Confirma se o Android realmente salvou o arquivo no cofre
-        if caminho_final and os.path.exists(caminho_final):
-            if caminho_final not in self.selected_files:
-                self.selected_files.append(caminho_final)
+        """A câmera tira a foto e o Android joga o caminho seguro aqui"""
+        if filepath and os.path.exists(filepath):
+            if filepath not in self.selected_files:
+                self.selected_files.append(filepath)
+                # Atualiza a tela com a foto!
                 self.update_images_display()
+        else:
+            self.mostrar_aviso("Foto cancelada ou não salva.", "orange")
 
     # Mantemos o seu _handle_selection original intacto!
     def _handle_selection(self, selection):
@@ -891,7 +874,8 @@ class FocusFormScreen(MDScreen):
         self.ids.images_container.clear_widgets()
         for path in self.selected_files:
             nome_arquivo = os.path.basename(path)
-            card = ImageCard(image_path=path, image_name=nome_arquivo)
+            # A MÁGICA VOLTOU: O Builder cria a miniatura sem dar NameError!
+            card = Builder.template('ImageCard', image_path=path, image_name=nome_arquivo)
             self.ids.images_container.add_widget(card)
 
     def submit_form(self):
