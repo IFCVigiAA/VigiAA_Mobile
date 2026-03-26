@@ -32,18 +32,19 @@ store = JsonStore('vigiaa_storage.json')
 
 KV_FOCUS_FORM = '''
 <ImageCard>:
-    # Tiramos o @MDBoxLayout e as variáveis 'image_path' e 'image_name' daqui!
     orientation: "horizontal"
-    adaptive_height: True
+    size_hint_y: None
+    height: "80dp"  # <-- TRAVA DE ALTURA: O Kivy não pode mais esmagar o cartão!
     spacing: "10dp"
     padding: "5dp"
     
+    # AQUI ESTÁ A SUA FOTO REAL:
     Image:
         source: root.image_path
         size_hint: None, None
-        size: "60dp", "60dp"
+        size: "70dp", "70dp" # <-- Tamanho exato da miniatura
         allow_stretch: True
-        keep_ratio: False
+        keep_ratio: False    # <-- Preenche o quadrado ignorando bordas vazias
         
     MDBoxLayout:
         orientation: "vertical"
@@ -57,7 +58,7 @@ KV_FOCUS_FORM = '''
             theme_text_color: "Custom"
             text_color: 0, 0, 0, 1
         MDLabel:
-            text: "Imagem"
+            text: "Imagem Anexada"
             font_style: "Caption"
             theme_text_color: "Hint"
             
@@ -617,27 +618,31 @@ class FocusFormScreen(MDScreen):
 
     def _on_permissions_result(self, permissions, grants):
         print(f"VIGIAA DEBUG: [2] Resposta das permissões: {grants}")
-        if all(grants):
+        # A MÁGICA: O Android devolve no fundo, mas nós jogamos a execução para o Fio Principal!
+        Clock.schedule_once(lambda dt: self._safe_gps_start(grants), 0)
+
+    # Nova função que roda com segurança na Main Thread
+    def _safe_gps_start(self, grants):
+        # Aceita se PELO MENOS UMA das permissões (Fina ou Grossa) foi dada
+        if any(grants): 
             try:
                 print("VIGIAA DEBUG: [3] Permissões OK. Configurando o Plyer GPS...")
                 gps.configure(on_location=self._on_gps_location, on_status=self._on_gps_status)
                 
-                print("VIGIAA DEBUG: [4] Dando o comando gps.start(minTime=1000, minDistance=1)...")
+                print("VIGIAA DEBUG: [4] Dando o comando gps.start...")
                 gps.start(minTime=1000, minDistance=1) 
                 
                 self.gps_tempo = 40 
                 self.ids.btn_gps.text = f"Buscando satélite ({self.gps_tempo}s)..."
-                
-                print("VIGIAA DEBUG: [5] Iniciando o cronômetro de 40 segundos.")
                 self.gps_event = Clock.schedule_interval(self._gps_countdown, 1)
                 
             except Exception as e:
                 print(f"VIGIAA DEBUG: [ERRO CRÍTICO] Falha ao iniciar antena: {e}")
-                self.mostrar_aviso(f"Erro no sensor: {e}")
+                self.mostrar_aviso(f"Erro no sensor: {e}", "red")
                 self._reset_gps_btn()
         else:
             print("VIGIAA DEBUG: [ERRO] Usuário negou a permissão.")
-            self.mostrar_aviso("Você precisa permitir o uso do GPS!")
+            self.mostrar_aviso("Você precisa permitir o uso do GPS!", "red")
             self._reset_gps_btn()
 
     @mainthread
@@ -659,6 +664,7 @@ class FocusFormScreen(MDScreen):
             self.gps_event.cancel()
             
         # O SEGREDO: Atrasar o stop do GPS em 0.5s para o Android não engasgar e fechar o app!
+        from kivy.clock import Clock
         Clock.schedule_once(lambda dt: gps.stop(), 0.5) 
         
         lat = kwargs.get('lat')
@@ -818,11 +824,17 @@ class FocusFormScreen(MDScreen):
             self.mostrar_aviso("A câmera nativa só funciona no celular.")
 
     def _on_camera_permissions(self, permissions, grants):
+        # Jogamos a execução da câmera para o Fio Principal!
+        Clock.schedule_once(lambda dt: self._safe_camera_start(permissions, grants), 0)
+
+    # Nova função que roda com segurança
+    def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
-        # Cria um dicionário para ver exatamente o que foi aceito
+        from kivy.app import App
+        
         perms_dict = dict(zip(permissions, grants))
         
-        # Checamos APENAS se a câmera foi permitida!
+        # Checamos apenas se a Câmera foi aceita (ignorando o storage que é restrito no Android 11+)
         if perms_dict.get(Permission.CAMERA, False):
             nome_arquivo = f"foco_dengue_{int(time.time())}.jpg"
             pasta_app = App.get_running_app().user_data_dir

@@ -4,6 +4,7 @@ from kivy.lang import Builder
 from views.tabs.home_tab import HomeTabContent
 from views.tabs.new_tab import NewTabContent
 from views.tabs.explore_tab import ExploreTabContent
+from kivy.clock import mainthread
 
 KV_HOME_VIEW = '''
 # A MAGIA DO KIVY PARA MODULARIZAÇÃO:
@@ -91,9 +92,64 @@ Builder.load_string(KV_HOME_VIEW)
 
 class HomeScreen(MDScreen):
     def on_pre_enter(self, *args):
-        # 1. Força o aplicativo a voltar para a primeira aba (Início)
-        self.ids.bottom_nav.switch_tab('tab_home')
+        # 1. Quando o usuário entra na Home, disparamos o segurança silencioso!
+        import threading
+        from kivy.storage.jsonstore import JsonStore
         
-        # 2. Manda a aba de perfil carregar os dados silenciosamente no fundo
-        if 'profile_tab' in self.ids:
-            self.ids.profile_tab.refresh_data()
+        store = JsonStore('vigiaa_storage.json')
+        if store.exists("session"):
+            token = store.get("session")["token"]
+            # Manda a thread secundária checar o token sem travar a tela
+            threading.Thread(target=self._seguranca_silencioso, args=(token,), daemon=True).start()
+        else:
+            # Se não tem sessão, chuta pro login
+            self._chutar_para_login()
+
+    def _seguranca_silencioso(self, token):
+        import requests
+        import config 
+        from kivy.clock import Clock
+        
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            
+            # ATENÇÃO: Se você souber a rota correta para validar o token, troque aqui.
+            url = f"{config.API_URL}/api/user/profile/" 
+            
+            res = requests.get(url, headers=headers, timeout=5)
+            
+            # O SEGURANÇA INTELIGENTE:
+            if res.status_code in [401, 403]:
+                # Token realmente inválido ou vencido -> EXPULSA!
+                print(f"VIGIAA DEBUG: Segurança barrou! Token Inválido (Erro {res.status_code})")
+                Clock.schedule_once(lambda dt: self._chutar_para_login(), 0)
+                
+            elif res.status_code == 404:
+                # A URL está errada! O Django não achou essa rota.
+                print("VIGIAA DEBUG: [ALERTA DESENVOLVEDOR] A rota da API não existe (Erro 404). O Token está salvo, mas a URL de checagem está errada!")
+                # Não expulsamos o usuário, pois o erro é na rota, não no token dele.
+                
+            elif res.status_code in [200, 201]:
+                print("VIGIAA DEBUG: Token validado com sucesso na porta da frente!")
+                
+        except Exception as e:
+            # Sem internet ou servidor desligado -> Deixa passar (modo offline)
+            print(f"VIGIAA DEBUG: Servidor inalcançável. Liberado offline. Erro: {e}")
+
+    @mainthread
+    def _chutar_para_login(self, *args):
+        from kivymd.app import MDApp
+        from kivy.storage.jsonstore import JsonStore
+        from kivymd.toast import toast
+        
+        app = MDApp.get_running_app()
+        store = JsonStore('vigiaa_storage.json')
+        
+        # A Trava Mestra!
+        app.force_logout = True
+        
+        if store.exists("session"):
+            store.delete("session")
+            
+        app.root.current = 'login'
+        toast("Sessão expirada. Faça login novamente.")

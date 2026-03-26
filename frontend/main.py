@@ -3,6 +3,14 @@ import os
 import sys
 import textwrap
 from kivymd.app import MDApp
+from kivy.storage.jsonstore import JsonStore
+store = JsonStore('vigiaa_storage.json')
+
+if platform == 'android':
+    from jnius import autoclass
+    StrictMode = autoclass('android.os.StrictMode')
+    builder = StrictMode.VmPolicy.Builder()
+    StrictMode.setVmPolicy(builder.build())
 
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
