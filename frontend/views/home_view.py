@@ -92,17 +92,31 @@ Builder.load_string(KV_HOME_VIEW)
 
 class HomeScreen(MDScreen):
     def on_pre_enter(self, *args):
-        # 1. Quando o usuário entra na Home, disparamos o segurança silencioso!
-        import threading
+        from kivymd.app import MDApp
         from kivy.storage.jsonstore import JsonStore
+        import threading
         
+        app = MDApp.get_running_app()
         store = JsonStore('vigiaa_storage.json')
-        if store.exists("session"):
-            token = store.get("session")["token"]
-            # Manda a thread secundária checar o token sem travar a tela
-            threading.Thread(target=self._seguranca_silencioso, args=(token,), daemon=True).start()
+        
+        # 1. Puxa a chave
+        token_seguro = getattr(app, "vigiaa_token", None)
+        if not token_seguro and store.exists("session"):
+            token_seguro = store.get("session")["token"]
+            app.vigiaa_token = token_seguro 
+
+        if token_seguro:
+            # A NOVA REGRA: O Segurança só trabalha UMA VEZ por aplicativo aberto!
+            if getattr(app, 'seguranca_ja_verificou', False):
+                # Se já verificou hoje, deixa a detetive trabalhar em paz!
+                return 
+                
+            # Se ainda não verificou, marca que verificou e manda o segurança ir olhar
+            app.seguranca_ja_verificou = True
+            print("VIGIAA DEBUG: [HOME] Primeira entrada. Segurança indo checar o token...")
+            threading.Thread(target=self._seguranca_silencioso, args=(token_seguro,), daemon=True).start()
         else:
-            # Se não tem sessão, chuta pro login
+            print("VIGIAA DEBUG: [HOME FATAL] Cofre realmente vazio. Chutando pro login...")
             self._chutar_para_login()
 
     def _seguranca_silencioso(self, token):
@@ -138,6 +152,7 @@ class HomeScreen(MDScreen):
 
     @mainthread
     def _chutar_para_login(self, *args):
+        print("🚨🚨 ALARME: Fui expulsa pela função da HOME! 🚨🚨")
         from kivymd.app import MDApp
         from kivy.storage.jsonstore import JsonStore
         from kivymd.toast import toast
@@ -145,8 +160,10 @@ class HomeScreen(MDScreen):
         app = MDApp.get_running_app()
         store = JsonStore('vigiaa_storage.json')
         
-        # A Trava Mestra!
+        # Reseta as memórias do cérebro do app
         app.force_logout = True
+        app.vigiaa_token = None
+        app.seguranca_ja_verificou = False  # <--- ADICIONE ISTO AQUI
         
         if store.exists("session"):
             store.delete("session")

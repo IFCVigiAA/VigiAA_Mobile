@@ -154,8 +154,14 @@ REST_FRAMEWORK = {
 
 from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    # Tempo de vida do token de acesso (Aqui coloquei 30 dias para você não ter mais dor de cabeça)
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
+    
+    # Tempo de vida do token de renovação
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=60),
+    
+    # Opcional: Garante que o header seja "Bearer <token>"
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
 # Configurações do Allauth (Nova Sintaxe)

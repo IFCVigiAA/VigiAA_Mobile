@@ -831,16 +831,31 @@ class FocusFormScreen(MDScreen):
     def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
         from kivy.app import App
+        import os
+        import time
         
         perms_dict = dict(zip(permissions, grants))
         
-        # Checamos apenas se a Câmera foi aceita (ignorando o storage que é restrito no Android 11+)
         if perms_dict.get(Permission.CAMERA, False):
-            nome_arquivo = f"foco_dengue_{int(time.time())}.jpg"
-            pasta_app = App.get_running_app().user_data_dir
-            self.caminho_foto_temp = os.path.join(pasta_app, nome_arquivo)
             try:
+                # --- A BALA DE PRATA SEGURA (Acionada apenas na hora do clique) ---
+                from kivy.utils import platform
+                if platform == 'android':
+                    from jnius import autoclass
+                    StrictMode = autoclass('android.os.StrictMode')
+                    builder = StrictMode.VmPolicy.Builder()
+                    StrictMode.setVmPolicy(builder.build())
+                # -----------------------------------------------------------------
+
+                # Criamos o caminho da foto
+                nome_arquivo = f"foco_dengue_{int(time.time())}.jpg"
+                pasta_app = App.get_running_app().user_data_dir
+                self.caminho_foto_temp = os.path.join(pasta_app, nome_arquivo)
+                
+                # Chamamos a câmera com o caminho!
+                from plyer import camera
                 camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
+                
             except Exception as e:
                 self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
         else:

@@ -270,17 +270,46 @@ class ProfileTabContent(ScrollView):
             self.ids.fields_container.add_widget(field)
 
     def load_user_data(self):
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
         store = JsonStore('vigiaa_storage.json')
-        if not store.exists("session"): return
-        token = store.get("session")["token"]
         
+        # 1. Tenta pegar do cérebro (RAM) ou do cofre
+        token = getattr(app, "vigiaa_token", None)
+        if not token and store.exists("session"):
+            token = store.get("session")["token"]
+            
+        if not token:
+            print("VIGIAA DEBUG: [PERFIL] Nenhum token encontrado.")
+            return
+            
         try:
-            res = requests.get(f"{config.API_URL}/api/profile/", headers={"Authorization": f"Bearer {token}"})
+            # ATENÇÃO: Verifique se no seu Django (urls.py) a rota é /api/profile/ mesmo!
+            url = f"{config.API_URL}/api/profile/"
+            res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+            
             if res.status_code == 200:
+                # SUCESSO! A API devolveu os dados
                 data = res.json()
-                self.update_ui_fields(data)
-        except Exception as ex:
-            print(f"Erro ao carregar perfil: {ex}")
+                Clock.schedule_once(lambda dt: self.update_ui_fields(data), 0)
+                
+            elif res.status_code in [401, 403]:
+                # A TRAVA DE SEGURANÇA! O Token era fantasma/vencido.
+                print(f"VIGIAA DEBUG: [PERFIL] Token rejeitado pela API (Erro {res.status_code}). Expulsando...")
+                Clock.schedule_once(lambda dt: self.mostrar_aviso("Sessão inválida. Faça login novamente."), 0)
+                Clock.schedule_once(lambda dt: self.logout(), 0) # Usa a sua própria função de logout perfeito!
+                
+            elif res.status_code == 404:
+                print("VIGIAA DEBUG: [PERFIL] Rota não encontrada (Erro 404). A URL da API está errada no código!")
+                Clock.schedule_once(lambda dt: self.mostrar_aviso("Erro: Rota da API não existe."), 0)
+                
+            else:
+                print(f"VIGIAA DEBUG: [PERFIL] Erro desconhecido: {res.status_code}")
+                Clock.schedule_once(lambda dt: self.mostrar_aviso("Erro ao buscar dados."), 0)
+                
+        except requests.exceptions.RequestException as ex:
+            print(f"Erro de conexão no perfil: {ex}")
+            Clock.schedule_once(lambda dt: self.mostrar_aviso("Sem conexão com a internet."), 0)
 
     @mainthread
     def update_ui_fields(self, data):
