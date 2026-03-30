@@ -852,21 +852,20 @@ class FocusFormScreen(MDScreen):
         
         if perms_dict.get(Permission.CAMERA, False):
             try:
-                # --- A BALA DE PRATA (Desliga o bloqueio JVM do Android moderno) ---
+                # --- A BALA DE PRATA CORRIGIDA (Com '$' para o PyJnius) ---
                 from kivy.utils import platform
                 if platform == 'android':
                     from jnius import autoclass
                     StrictMode = autoclass('android.os.StrictMode')
-                    builder = StrictMode.VmPolicy.Builder()
-                    StrictMode.setVmPolicy(builder.build())
-                # -------------------------------------------------------------------
+                    # Aqui está o segredo: usar o $ para achar a classe interna!
+                    VmPolicyBuilder = autoclass('android.os.StrictMode$VmPolicy$Builder')
+                    StrictMode.setVmPolicy(VmPolicyBuilder().build())
+                # -----------------------------------------------------------
 
-                # CRIAMOS O CAMINHO EM TEXTO (Evita o erro de NoneType)
                 pasta_app = App.get_running_app().user_data_dir
                 nome_arquivo = f"foco_dengue_{int(time.time())}.jpg"
                 self.caminho_foto_temp = os.path.join(pasta_app, nome_arquivo)
                 
-                # Chamamos a câmera enviando o texto válido!
                 camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
                 
             except Exception as e:
