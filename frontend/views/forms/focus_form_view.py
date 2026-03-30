@@ -702,7 +702,6 @@ class FocusFormScreen(MDScreen):
 
     def _get_last_known_location_android(self):
         try:
-            print("VIGIAA DEBUG: [JNIUS] Importando classes Java...")
             from jnius import autoclass
             Context = autoclass('android.content.Context')
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
@@ -711,19 +710,17 @@ class FocusFormScreen(MDScreen):
             activity = PythonActivity.mActivity
             lm = activity.getSystemService(Context.LOCATION_SERVICE)
             
-            print("VIGIAA DEBUG: [JNIUS] Tentando NETWORK_PROVIDER (Antenas de Celular)...")
-            loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            # MUDANÇA: Tenta o GPS (Satélite de ALTA precisão) PRIMEIRO!
+            loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            
             if not loc:
-                print("VIGIAA DEBUG: [JNIUS] NETWORK vazio. Tentando GPS_PROVIDER (Satélite antigo)...")
-                loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                # Se estiver vazio, tenta a Rede (Antena de celular/Wi-Fi de BAIXA precisão)
+                loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                 
             if loc:
-                print("VIGIAA DEBUG: [JNIUS] Localização extraída do Java com sucesso!")
                 return loc.getLatitude(), loc.getLongitude()
-            else:
-                print("VIGIAA DEBUG: [JNIUS] Ambas as memórias retornaram NULL.")
         except Exception as e:
-            print(f"VIGIAA DEBUG: [JNIUS ERRO CRÍTICO] {e}")
+            print(f"VIGIAA DEBUG: [JNIUS ERRO] {e}")
             
         return None, None
 
@@ -844,13 +841,48 @@ class FocusFormScreen(MDScreen):
         else:
             self.mostrar_aviso("Permissão de câmera negada!", "red")
 
+    def _safe_camera_start(self, permissions, grants):
+        from android.permissions import Permission
+        from kivy.app import App
+        from plyer import camera
+        import os
+        import time
+        
+        perms_dict = dict(zip(permissions, grants))
+        
+        if perms_dict.get(Permission.CAMERA, False):
+            try:
+                # --- A BALA DE PRATA (Desliga o bloqueio JVM do Android moderno) ---
+                from kivy.utils import platform
+                if platform == 'android':
+                    from jnius import autoclass
+                    StrictMode = autoclass('android.os.StrictMode')
+                    builder = StrictMode.VmPolicy.Builder()
+                    StrictMode.setVmPolicy(builder.build())
+                # -------------------------------------------------------------------
+
+                # CRIAMOS O CAMINHO EM TEXTO (Evita o erro de NoneType)
+                pasta_app = App.get_running_app().user_data_dir
+                nome_arquivo = f"foco_dengue_{int(time.time())}.jpg"
+                self.caminho_foto_temp = os.path.join(pasta_app, nome_arquivo)
+                
+                # Chamamos a câmera enviando o texto válido!
+                camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
+                
+            except Exception as e:
+                self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
+        else:
+            self.mostrar_aviso("Permissão de câmera negada!", "red")
+
     @mainthread
     def _on_camera_success(self, filepath=None):
-        """A câmera tira a foto e o Android joga o caminho seguro aqui"""
-        if filepath and os.path.exists(filepath):
-            if filepath not in self.selected_files:
-                self.selected_files.append(filepath)
-                # Atualiza a tela com a foto!
+        """Quando o usuário clica no 'OK' da câmera, a foto cai aqui"""
+        # O Android pode não devolver o filepath, então puxamos o caminho que nós mesmos criamos
+        caminho_final = filepath if filepath else getattr(self, 'caminho_foto_temp', None)
+        
+        if caminho_final and os.path.exists(caminho_final):
+            if caminho_final not in self.selected_files:
+                self.selected_files.append(caminho_final)
                 self.update_images_display()
         else:
             self.mostrar_aviso("Foto cancelada ou não salva.", "orange")
@@ -874,8 +906,10 @@ class FocusFormScreen(MDScreen):
         self.ids.images_container.clear_widgets()
         for path in self.selected_files:
             nome_arquivo = os.path.basename(path)
-            # A MÁGICA VOLTOU: O Builder cria a miniatura sem dar NameError!
-            card = Builder.template('ImageCard', image_path=path, image_name=nome_arquivo)
+            
+            # A forma definitiva e correta: Instanciar a classe Python diretamente!
+            card = ImageCard(image_path=path, image_name=nome_arquivo)
+            
             self.ids.images_container.add_widget(card)
 
     def submit_form(self):
