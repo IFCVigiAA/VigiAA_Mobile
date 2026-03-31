@@ -28,7 +28,7 @@ from kivy.properties import StringProperty
 if platform == 'android':
     from android.permissions import request_permissions, Permission
 
-store = JsonStore('vigiaa_storage.json')
+store = JsonStore('sessao_app.json')
 
 KV_FOCUS_FORM = '''
 <ImageCard>:
@@ -843,7 +843,6 @@ class FocusFormScreen(MDScreen):
 
     def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
-        from kivy.app import App
         from plyer import camera
         import os
         import time
@@ -852,20 +851,28 @@ class FocusFormScreen(MDScreen):
         
         if perms_dict.get(Permission.CAMERA, False):
             try:
-                # --- A BALA DE PRATA CORRIGIDA (Com '$' para o PyJnius) ---
                 from kivy.utils import platform
                 if platform == 'android':
                     from jnius import autoclass
+                    
+                    # 1. A BALA DE PRATA (Libera a passagem do caminho)
                     StrictMode = autoclass('android.os.StrictMode')
-                    # Aqui está o segredo: usar o $ para achar a classe interna!
                     VmPolicyBuilder = autoclass('android.os.StrictMode$VmPolicy$Builder')
                     StrictMode.setVmPolicy(VmPolicyBuilder().build())
-                # -----------------------------------------------------------
+                    
+                    # 2. O NOVO ENDEREÇO DA FOTO (Pasta Pública de Imagens do Android)
+                    Environment = autoclass('android.os.Environment')
+                    pasta_fotos = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsolutePath()
+                else:
+                    # Se for teste no PC, usa a pasta normal do app
+                    from kivy.app import App
+                    pasta_fotos = App.get_running_app().user_data_dir
 
-                pasta_app = App.get_running_app().user_data_dir
-                nome_arquivo = f"foco_dengue_{int(time.time())}.jpg"
-                self.caminho_foto_temp = os.path.join(pasta_app, nome_arquivo)
+                # Montamos o caminho final
+                nome_arquivo = f"foco_{int(time.time())}.jpg"
+                self.caminho_foto_temp = os.path.join(pasta_fotos, nome_arquivo)
                 
+                # Chamamos a câmera!
                 camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
                 
             except Exception as e:

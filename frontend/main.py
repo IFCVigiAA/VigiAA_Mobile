@@ -4,7 +4,7 @@ import sys
 import textwrap
 from kivymd.app import MDApp
 from kivy.storage.jsonstore import JsonStore
-store = JsonStore('vigiaa_storage.json')
+store = JsonStore('sessao_app.json')
 
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))

@@ -8,7 +8,7 @@ import requests
 import threading
 import config
 
-store = JsonStore('vigiaa_storage.json')
+store = JsonStore('sessao_app.json')
 
 KV_CHANGE_PASSWORD = '''
 <ChangePasswordScreen>:

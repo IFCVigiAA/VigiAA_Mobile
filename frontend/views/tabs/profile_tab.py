@@ -13,7 +13,7 @@ import requests
 import threading
 import config
 
-store = JsonStore('vigiaa_storage.json')
+store = JsonStore('sessao_app.json')
 
 KV_PROFILE_TAB = '''
 <ProfileField>:
@@ -272,7 +272,7 @@ class ProfileTabContent(ScrollView):
     def load_user_data(self):
         from kivymd.app import MDApp
         app = MDApp.get_running_app()
-        store = JsonStore('vigiaa_storage.json')
+        store = JsonStore('sessao_app.json')
         
         # 1. Tenta pegar do cérebro (RAM) ou do cofre
         token = getattr(app, "vigiaa_token", None)
@@ -331,7 +331,7 @@ class ProfileTabContent(ScrollView):
         threading.Thread(target=self._worker_save, args=(api_key, novo_valor, field_instance)).start()
 
     def _worker_save(self, api_key, novo_valor, field_instance):
-        store = JsonStore('vigiaa_storage.json')
+        store = JsonStore('sessao_app.json')
         if not store.exists("session"): return
         token = store.get("session")["token"]
         
@@ -400,7 +400,7 @@ class ProfileTabContent(ScrollView):
         threading.Thread(target=self._worker_delete).start()
 
     def _worker_delete(self):
-        store = JsonStore('vigiaa_storage.json')
+        store = JsonStore('sessao_app.json')
         if not store.exists("session"): return
         token = store.get("session")["token"]
         try:

@@ -12,7 +12,7 @@ import uuid
 import webbrowser
 import config  # Garanta que o config.py está acessível
 
-store = JsonStore('vigiaa_storage.json')
+store = JsonStore('sessao_app.json')
 HEADERS = {"ngrok-skip-browser-warning": "true"}
 
 # --- A MÁGICA DO DEGRADÊ NATIVO (COM MÁSCARA DE RECORTE) ---
@@ -296,7 +296,7 @@ class LoginScreen(MDScreen):
             return 
             
         # 3. Se chegou aqui, é porque o app acabou de abrir normalmente (auto-login padrão)
-        store = JsonStore('vigiaa_storage.json')
+        store = JsonStore('sessao_app.json')
         if store.exists("session"):
             Clock.schedule_once(self._pular_para_home, 0)
 

@@ -37,12 +37,12 @@ try:
 except ImportError:
     pass
 
-store = JsonStore('vigiaa_storage.json')
+store = JsonStore('sessao_app.json')
 
 if platform == 'android':
     from android.permissions import request_permissions, Permission
 
-store = JsonStore('vigiaa_storage.json')
+store = JsonStore('sessao_app.json')
 
 KV_CASE_FORM = '''
 <CaseFormScreen>:

@@ -97,7 +97,7 @@ class HomeScreen(MDScreen):
         import threading
         
         app = MDApp.get_running_app()
-        store = JsonStore('vigiaa_storage.json')
+        store = JsonStore('sessao_app.json')
         
         # 1. Puxa a chave
         token_seguro = getattr(app, "vigiaa_token", None)
@@ -158,7 +158,7 @@ class HomeScreen(MDScreen):
         from kivymd.toast import toast
         
         app = MDApp.get_running_app()
-        store = JsonStore('vigiaa_storage.json')
+        store = JsonStore('sessao_app.json')
         
         # Reseta as memórias do cérebro do app
         app.force_logout = True
