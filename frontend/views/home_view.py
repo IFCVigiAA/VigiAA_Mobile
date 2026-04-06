@@ -1,93 +1,117 @@
 from kivymd.uix.screen import MDScreen
 from kivy.lang import Builder
-# Importamos a classe para o Python conhecer, e pro KV importar
-from views.tabs.home_tab import HomeTabContent
-from views.tabs.new_tab import NewTabContent
-from views.tabs.explore_tab import ExploreTabContent
-from kivy.clock import mainthread
+from kivy.clock import mainthread, Clock
+from kivy.graphics.texture import Texture
+from kivy.graphics import Rectangle, Color 
+from kivy.properties import ListProperty
+from kivy.uix.boxlayout import BoxLayout 
+from kivymd.uix.boxlayout import MDBoxLayout
 
+# Importação segura das abas
+try:
+    from views.tabs.home_tab import HomeTabContent
+    from views.tabs.new_tab import NewTabContent
+    from views.tabs.explore_tab import ExploreTabContent
+    from views.tabs.profile_tab import ProfileTabContent
+except ImportError as e:
+    print(f"ERRO DE IMPORTAÇÃO NAS ABAS: {e}")
+
+class HorizontalGradientLayout(BoxLayout):
+    color_left = ListProperty([0.22, 0.75, 0.94, 1]) 
+    color_right = ListProperty([0.15, 0.91, 0.74, 1]) 
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas.before:
+            Color(1, 1, 1, 1) 
+            self.rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self.update_rect, size=self.update_rect)
+        self.create_gradient()
+
+    def create_gradient(self):
+        texture = Texture.create(size=(2, 1), colorfmt='rgba')
+        p1 = [int(c * 255) for c in self.color_left]
+        p2 = [int(c * 255) for c in self.color_right]
+        buf = bytes(p1 + p2)
+        texture.blit_buffer(buf, colorfmt='rgba', bufferfmt='ubyte')
+        self.rect.texture = texture
+
+    def update_rect(self, *args):
+        self.rect.pos = self.pos
+        self.rect.size = self.size
+
+# O KV agora fica no final para garantir que as classes acima já existam
 KV_HOME_VIEW = '''
-# A MAGIA DO KIVY PARA MODULARIZAÇÃO:
-#:import HomeTabContent views.tabs.home_tab.HomeTabContent
-#:import ProfileTabContent views.tabs.profile_tab.ProfileTabContent
-
 <HomeScreen>:
     md_bg_color: 0.96, 0.96, 0.96, 1
 
     MDBoxLayout:
         orientation: "vertical"
 
-        # 1. O HEADER (Cabeçalho superior)
-        MDBoxLayout:
+        HorizontalGradientLayout:
             size_hint_y: None   
-            height: "60dp"
+            height: "80dp" 
             padding: ["15dp", "0dp", "15dp", "0dp"]
-            md_bg_color: 0.22, 0.75, 0.94, 1  # Cor #39BFEF
 
-            Image:
-                source: "assets/images/logo-sem-fundo.png"
-                size_hint: None, None
-                size: "40dp", "40dp"
+            MDBoxLayout:
+                orientation: "horizontal"
+                adaptive_height: True
                 pos_hint: {"center_y": .5}
+                md_bg_color: 0, 0, 0, 0 
 
-            MDLabel:
-                text: "VigiAA"
-                font_size: "22sp"
-                bold: True
-                theme_text_color: "Custom"
-                text_color: 0, 0, 0, 1
-                valign: "center"
-                padding_x: "10dp"
+                Image:
+                    source: "assets/images/logo-sem-fundo.png"
+                    size_hint: None, None
+                    size: "40dp", "40dp"
 
-            MDIconButton:
-                icon: "bell-outline"
-                theme_text_color: "Custom"
-                text_color: 0, 0, 0, 1
-                pos_hint: {"center_y": .5}
+                MDLabel:
+                    text: "VigiAA"
+                    font_size: "22sp"
+                    bold: True
+                    theme_text_color: "Custom"
+                    text_color: 0, 0, 0, 1
+                    valign: "center"
+                    padding_x: "10dp"
 
-        # 2. A NAVEGAÇÃO INFERIOR
+                MDIconButton:
+                    icon: "bell-outline"
+                    theme_text_color: "Custom"
+                    text_color: 0, 0, 0, 1
+
         MDBottomNavigation:
             id: bottom_nav
+            panel_color: 0.22, 0.75, 0.94, 1
             selected_color_background: 0, 0, 0, 0
-            text_color_active: 0.22, 0.75, 0.94, 1  # Azul ciano quando selecionado
+            text_color_active: 0, 0, 0, 1  
+            text_color_normal: 0, 0, 0, 0.5 
 
-            # ABA 1: INÍCIO
             MDBottomNavigationItem:
                 name: 'tab_home'
                 text: 'Início'
                 icon: 'home'
-                
-                # INJETAMOS O ARQUIVO EXTERNO AQUI (Lego)
                 HomeTabContent:
 
-            # ABA 2: NOVO
             MDBottomNavigationItem:
                 name: 'tab_new'
                 text: 'Novo'
                 icon: 'plus-circle-outline'
-                
-                # INJETAMOS OS NOSSOS CARTÕES AQUI
                 NewTabContent:
 
-            # ABA EXPLORAR (Pode ser a Aba 3 no seu código)
             MDBottomNavigationItem:
                 name: 'tab_explore'
                 text: 'Explorar'
                 icon: 'compass'
-
-                # INJETAMOS A NOSSA ABA NOVA AQUI
                 ExploreTabContent:
 
-            # ABA 4: PERFIL
             MDBottomNavigationItem:
                 name: 'tab_profile'
                 text: 'Perfil'
                 icon: 'account'
                 on_tab_release: profile_tab.refresh_data()
-
                 ProfileTabContent:
                     id: profile_tab
 '''
+
 Builder.load_string(KV_HOME_VIEW)
 
 class HomeScreen(MDScreen):
@@ -128,7 +152,7 @@ class HomeScreen(MDScreen):
             headers = {"Authorization": f"Bearer {token}"}
             
             # ATENÇÃO: Se você souber a rota correta para validar o token, troque aqui.
-            url = f"{config.API_URL}/api/user/profile/" 
+            url = f"{config.API_URL}/api/profile/" 
             
             res = requests.get(url, headers=headers, timeout=5)
             

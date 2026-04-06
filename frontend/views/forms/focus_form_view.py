@@ -913,9 +913,13 @@ class FocusFormScreen(MDScreen):
         for path in self.selected_files:
             nome_arquivo = os.path.basename(path)
             
-            # A forma definitiva e correta: Instanciar a classe Python diretamente!
-            card = ImageCard(image_path=path, image_name=nome_arquivo)
+            # --- O AJUSTE PARA A FOTO APARECER ---
+            caminho_para_exibir = path
+            if platform == 'android':
+                # No Android, adicionamos 'file://' no início do caminho
+                caminho_para_exibir = "file://" + path
             
+            card = ImageCard(image_path=caminho_para_exibir, image_name=nome_arquivo)
             self.ids.images_container.add_widget(card)
 
     def submit_form(self):

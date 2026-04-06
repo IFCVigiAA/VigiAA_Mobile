@@ -233,10 +233,12 @@ KV_LOGIN = '''
                 radius: [8, 8, 8, 8]  # <-- A cura da ondinha!
                 on_release: root.login_google()
 
+            # 1. Espaço para separar dos botões de login acima
             Widget:
                 size_hint_y: None
-                height: "10dp"
+                height: "20dp"
 
+            # Texto de Termos
             MDLabel:
                 text: "Ao clicar em continuar, você aceita nossos\\n[b]Termos de Serviço[/b] e [b]Política de Privacidade[/b]"
                 markup: True
@@ -245,6 +247,13 @@ KV_LOGIN = '''
                 theme_text_color: "Hint"
                 font_size: "11.5sp"
 
+            # --- O "RESPIRO" VITAL ---
+            # 2. Espaço entre os Termos e o "Crie sua conta"
+            Widget:
+                size_hint_y: None
+                height: "15dp" # Ajuste aqui se quiser mais ou menos espaço entre eles
+
+            # Linha de Cadastro
             MDBoxLayout:
                 orientation: "horizontal"
                 adaptive_size: True
@@ -266,6 +275,12 @@ KV_LOGIN = '''
                     bold: True
                     pos_hint: {"center_y": .5}
                     on_release: root.go_register()
+            
+            # --- A DISTÂNCIA DO CHÃO ---
+            # 3. Espaço final para não ficar no limite da tela
+            Widget:
+                size_hint_y: None
+                height: "40dp" # Se ficar muito baixo, aumente para 50 ou 60
 '''
 # O Builder carrega o visual para a memória
 Builder.load_string(KV_LOGIN)

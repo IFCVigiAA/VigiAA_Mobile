@@ -2,8 +2,8 @@ from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.lang import Builder
 from kivymd.app import MDApp
+from kivy.metrics import dp
 
-# O Visual da Aba "Novo"
 KV_NEW_TAB = '''
 <NewTabContent>:
     md_bg_color: 1, 1, 1, 1
@@ -16,7 +16,7 @@ KV_NEW_TAB = '''
 
         MDLabel:
             text: "Cadastro"
-            font_size: "24sp"
+            font_style: "H5"
             bold: True
             theme_text_color: "Custom"
             text_color: 0, 0, 0, 1
@@ -28,45 +28,50 @@ KV_NEW_TAB = '''
             size_hint_y: None
             height: "260dp"
             radius: [15, 15, 15, 15]
-            elevation: 2
+            elevation: 1
             md_bg_color: 1, 1, 1, 1
             on_release: root.go_to_foco()
 
-            # Imagem no topo do card
             FitImage:
                 source: "assets/images/focos.jpg"
                 size_hint_y: 0.55
                 radius: [15, 15, 0, 0]
 
-            # Área de texto e botão do card
             MDRelativeLayout:
                 size_hint_y: 0.45
                 
+                # Bloco de Texto CENTRALIZADO VERTICALMENTE
                 MDBoxLayout:
                     orientation: "vertical"
-                    padding: ["15dp", "10dp", "60dp", "10dp"] # Espaço na direita pro botão flutuar
-                    spacing: "5dp"
+                    adaptive_height: True
+                    pos_hint: {"center_y": .5}
+                    padding: ["15dp", "0dp", "80dp", "0dp"]
+                    spacing: "2dp"
 
                     MDLabel:
                         text: "Cadastrar novo foco"
-                        font_size: "16sp"
+                        font_size: "17sp"
                         bold: True
                         adaptive_height: True
 
                     MDLabel:
-                        text: "Forneça informações sobre um local com possíveis focos do mosquito."
-                        theme_text_color: "Hint"
+                        text: "Forneça informações sobre focos do mosquito."
+                        theme_text_color: "Secondary"
                         font_size: "13sp"
                         adaptive_height: True
                         
-                # Botão Redondo (+) flutuando em cima da borda
-                MDFloatingActionButton:
+                # A BOLA AZUL PERFEITA (+)
+                MDIconButton:
                     icon: "plus"
-                    md_bg_color: 0.22, 0.75, 0.94, 1 # Azul Ciano
+                    user_font_size: "24sp"
                     theme_text_color: "Custom"
                     text_color: 1, 1, 1, 1
-                    elevation: 1
-                    pos_hint: {"right": 0.95, "center_y": 0.5}
+                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    size_hint: None, None
+                    size: "50dp", "50dp"
+                    # O segredo da bola: radius é a metade da altura
+                    radius: [25, 25, 25, 25] 
+                    pos_hint: {"right": 0.96, "center_y": 0.5}
                     on_release: root.go_to_foco()
 
         # --- CARD 2: PACIENTE ---
@@ -75,59 +80,59 @@ KV_NEW_TAB = '''
             size_hint_y: None
             height: "260dp"
             radius: [15, 15, 15, 15]
-            elevation: 2
+            elevation: 1
             md_bg_color: 1, 1, 1, 1
             on_release: root.go_to_caso()
 
-            # Imagem no topo do card
             FitImage:
                 source: "assets/images/paciente.jpg"
                 size_hint_y: 0.55
                 radius: [15, 15, 0, 0]
 
-            # Área de texto e botão do card
             MDRelativeLayout:
                 size_hint_y: 0.45
                 
                 MDBoxLayout:
                     orientation: "vertical"
-                    padding: ["15dp", "10dp", "60dp", "10dp"]
-                    spacing: "5dp"
+                    adaptive_height: True
+                    pos_hint: {"center_y": .5}
+                    padding: ["15dp", "0dp", "80dp", "0dp"]
+                    spacing: "2dp"
 
                     MDLabel:
                         text: "Cadastrar novo paciente"
-                        font_size: "16sp"
+                        font_size: "17sp"
                         bold: True
                         adaptive_height: True
 
                     MDLabel:
-                        text: "Forneça informações necessárias para o cadastro de um paciente."
-                        theme_text_color: "Hint"
+                        text: "Forneça informações para o cadastro de um paciente."
+                        theme_text_color: "Secondary"
                         font_size: "13sp"
                         adaptive_height: True
                         
-                # Botão Redondo (+) flutuando em cima da borda
-                MDFloatingActionButton:
+                MDIconButton:
                     icon: "plus"
-                    md_bg_color: 0.22, 0.75, 0.94, 1 # Azul Ciano
+                    user_font_size: "24sp"
                     theme_text_color: "Custom"
                     text_color: 1, 1, 1, 1
-                    elevation: 1
-                    pos_hint: {"right": 0.95, "center_y": 0.5}
+                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    size_hint: None, None
+                    size: "50dp", "50dp"
+                    radius: [25, 25, 25, 25]
+                    pos_hint: {"right": 0.96, "center_y": 0.5}
                     on_release: root.go_to_caso()
 
-        # Espaçamento no fundo para o menu inferior não engolir o último card
-        MDBoxLayout:
+        Widget:
             size_hint_y: None
-            height: "80dp"
+            height: "100dp"
 '''
+
 Builder.load_string(KV_NEW_TAB)
 
 class NewTabContent(ScrollView):
     def go_to_foco(self):
-        # Acha o maestro do app e manda mudar para a tela de Formulário de Foco
         MDApp.get_running_app().root.current = 'form_foco'
 
     def go_to_caso(self):
-        # Acha o maestro do app e manda mudar para a tela de Formulário de Paciente
         MDApp.get_running_app().root.current = 'form_caso'

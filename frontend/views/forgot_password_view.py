@@ -14,35 +14,32 @@ KV_FORGOT_PASSWORD = '''
     MDBoxLayout:
         orientation: "vertical"
 
-        # --- HEADER CURVADO (COM DEGRADÊ NATIVO IGUAL AO LOGIN) ---
+        # --- HEADER CURVADO ---
         GradientRoundedLayout:
             orientation: "vertical"
             size_hint_y: None
-            height: "300dp" # Altura para caber o logo e os textos confortavelmente
-            padding: ["20dp", "40dp", "20dp", "20dp"]
-            spacing: "15dp"
+            height: "300dp" 
+            padding: ["10dp", "20dp", "20dp", "20dp"]
+            spacing: "10dp"
+            radius: [0, 0, 60, 60] 
 
             MDBoxLayout:
                 adaptive_height: True
                 MDIconButton:
                     icon: "arrow-left"
                     theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1
+                    text_color: 0, 0, 0, 1
                     on_release: root.go_back()
 
-
-            # IMPORTANTE: Coloque o caminho correto da sua imagem do mosquito aqui!
             Image:
-                source: "assets/images/logo-sem-fundo.png" # <--- Troque pelo nome do seu arquivo de imagem (ex: "assets/images/logo-sem-fundo.png")
-                size_hint_y: None
-                height: "120dp"
-                allow_stretch: True
-                keep_ratio: True
+                source: "assets/images/logo-sem-fundo.png"
+                size_hint: None, None
+                size: "90dp", "90dp"
                 pos_hint: {"center_x": .5}
 
             MDLabel:
                 text: "VigiAA"
-                font_size: "26sp"
+                font_style: "H4"
                 bold: True
                 halign: "center"
                 theme_text_color: "Custom"
@@ -51,59 +48,59 @@ KV_FORGOT_PASSWORD = '''
 
             MDLabel:
                 text: "Esqueceu sua senha?"
-                font_size: "18sp"
+                font_style: "Subtitle1"
                 bold: True
                 halign: "center"
                 theme_text_color: "Custom"
                 text_color: 0, 0, 0, 1
                 adaptive_height: True
 
-        # --- CORPO DA TELA (Campos e Botão) ---
+        # --- CORPO DA TELA ---
         MDBoxLayout:
             orientation: "vertical"
             padding: ["30dp", "40dp", "30dp", "20dp"]
-            spacing: "25dp"
+            spacing: "20dp"
 
             MDLabel:
-                text: "Digite seu email cadastrado para receber o link"
-                theme_text_color: "Hint"
+                text: "Digite seu email cadastrado para receber o link de recuperação."
+                theme_text_color: "Secondary"
                 halign: "center"
                 font_size: "14sp"
                 adaptive_height: True
 
-            # Campo de Email (Com borda retangular igual à foto)
             MDTextField:
                 id: email_field
                 hint_text: "Email cadastrado"
-                mode: "rectangle" # Modo de contorno em vez de apenas uma linha
+                mode: "rectangle"
+                line_color_normal: 0.8, 0.8, 0.8, 1
+                radius: [12, 12, 12, 12]
                 font_size: "16sp"
 
             Widget:
                 size_hint_y: None
-                height: "5dp" # Pequeno respiro antes do botão
+                height: "10dp"
 
-            # Botão Preto (Feito com MDCard para design idêntico e sem crash)
             MDCard:
-                id: btn_send # O crachá do botão
+                id: btn_send
                 size_hint_y: None
                 height: "50dp"
-                md_bg_color: 0, 0, 0, 1 # Preto absoluto
-                radius: [8, 8, 8, 8]
+                md_bg_color: 0, 0, 0, 1
+                radius: [12, 12, 12, 12]
                 ripple_behavior: True
                 elevation: 0
                 on_release: root.send_reset_click()
 
                 MDLabel:
-                    id: btn_send_text # O crachá do texto
+                    id: btn_send_text
                     text: "Enviar link"
                     theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1 # Texto Branco
+                    text_color: 1, 1, 1, 1
                     halign: "center"
                     font_size: "16sp"
                     bold: True
 
-            # Este Widget vazio empurra tudo para cima, não deixando o layout se espalhar
             Widget:
+                # Este cara empurra tudo para cima
 '''
 Builder.load_string(KV_FORGOT_PASSWORD)
 

@@ -16,21 +16,20 @@ KV_REGISTER = '''
         # PARTE SUPERIOR (Arredondada COM O SEU DEGRADÊ NATIVO)
         GradientRoundedLayout:
             orientation: "vertical"
-            size_hint_y: 0.35
+            size_hint_y: 0.38  # Ajuste leve para acomodar bem os labels
             padding: "20dp"
-            spacing: "10dp"
-            # Se o seu componente aceitar radius no KV, mantemos aqui para garantir a curva:
+            spacing: "8dp"
             radius: [0, 0, 60, 60] 
 
             Image:
                 source: "assets/images/logo-sem-fundo.png"
                 size_hint: None, None
-                size: "90dp", "90dp"
+                size: "90dp", "90dp"  # Tamanho idêntico ao login
                 pos_hint: {"center_x": .5}
 
             MDLabel:
                 text: "VigiAA"
-                font_style: "H4"  # O mesmo tamanho do login
+                font_style: "H4"
                 bold: True
                 halign: "center"
                 adaptive_height: True
@@ -39,7 +38,7 @@ KV_REGISTER = '''
 
             MDLabel:
                 text: "Crie sua conta"
-                font_style: "Subtitle1"  # O mesmo tamanho do login
+                font_style: "Subtitle1"
                 bold: True
                 halign: "center"
                 adaptive_height: True
@@ -50,48 +49,60 @@ KV_REGISTER = '''
         ScrollView:
             MDBoxLayout:
                 orientation: "vertical"
-                padding: "20dp"
-                spacing: "15dp"
+                padding: ["25dp", "20dp", "25dp", "20dp"]
+                spacing: "12dp"
                 adaptive_height: True
 
-                # Mantivemos os campos com 'mode: "rectangle"' para bater com a sua foto
+                # Inputs discretos e arredondados no modo rectangle
                 MDTextField:
                     id: tf_nome
                     hint_text: "Nome"
                     mode: "rectangle"
+                    line_color_normal: 0.8, 0.8, 0.8, 1  # Cinza claro/discreto
+                    radius: [12, 12, 12, 12]
                     
                 MDTextField:
                     id: tf_sobrenome
                     hint_text: "Sobrenome"
                     mode: "rectangle"
+                    line_color_normal: 0.8, 0.8, 0.8, 1
+                    radius: [12, 12, 12, 12]
 
                 MDTextField:
                     id: tf_usuario
                     hint_text: "Usuário"
                     mode: "rectangle"
+                    line_color_normal: 0.8, 0.8, 0.8, 1
+                    radius: [12, 12, 12, 12]
 
                 MDTextField:
                     id: tf_email
                     hint_text: "Email"
                     mode: "rectangle"
+                    line_color_normal: 0.8, 0.8, 0.8, 1
+                    radius: [12, 12, 12, 12]
 
                 MDTextField:
                     id: tf_senha
                     hint_text: "Senha"
                     password: True
                     mode: "rectangle"
+                    line_color_normal: 0.8, 0.8, 0.8, 1
+                    radius: [12, 12, 12, 12]
 
                 MDTextField:
                     id: tf_confirma_senha
                     hint_text: "Confirmar senha"
                     password: True
                     mode: "rectangle"
+                    line_color_normal: 0.8, 0.8, 0.8, 1
+                    radius: [12, 12, 12, 12]
 
                 Widget:
                     size_hint_y: None
                     height: "10dp"
 
-                # BOTÃO PRETO BLINDADO ANTI-CRASH
+                # BOTÃO PRETO BLINDADO
                 MDFlatButton:
                     id: btn_register
                     text: "Cadastrar"
@@ -99,15 +110,16 @@ KV_REGISTER = '''
                     theme_text_color: "Custom"
                     text_color: 1, 1, 1, 1
                     size_hint_x: 1
-                    padding: "15dp"
-                    radius: [8, 8, 8, 8]
+                    height: "50dp"
+                    radius: [12, 12, 12, 12]
                     on_release: root.register_click()
 
-                # RODAPÉ (Preto e Azul com funcionalidade de link)
+                # RODAPÉ
                 MDBoxLayout:
                     adaptive_size: True
                     pos_hint: {"center_x": .5}
-                    spacing: "5dp"
+                    spacing: "2dp"
+                    padding: [0, "10dp", 0, "20dp"]
 
                     MDLabel:
                         text: "Já possui uma conta?"
@@ -123,8 +135,6 @@ KV_REGISTER = '''
                         text_color: 0.1, 0.46, 0.82, 1
                         font_size: "13sp"
                         bold: True
-                        md_bg_color: 0, 0, 0, 0
-                        radius: [8, 8, 8, 8]
                         pos_hint: {"center_y": .5}
                         on_release: root.go_to_login()
 '''
