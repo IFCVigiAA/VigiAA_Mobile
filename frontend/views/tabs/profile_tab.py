@@ -19,33 +19,42 @@ KV_PROFILE_TAB = '''
 <ProfileField>:
     orientation: "horizontal"
     adaptive_height: True
-    padding: ["0dp", "5dp", "0dp", "5dp"]
+    # Padding lateral reduzido para expandir o conteúdo horizontalmente
+    padding: ["4dp", "8dp", "4dp", "8dp"]
+    spacing: "10dp"
     
     MDLabel:
         text: root.label_text
         bold: True
-        size_hint_x: 0.35
+        # Proporção reduzida para 30% para dar mais espaço ao valor
+        size_hint_x: 0.3 
         font_size: "14sp"
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
+        halign: "left"
         
     MDTextField:
         id: field_input
         text: root.text_value
         readonly: True
-        size_hint_x: 0.45
-        font_size: "14sp"
-        text_color_normal: 0.5, 0.5, 0.5, 1  # Cinza quando bloqueado
-        line_color_normal: 0, 0, 0, 0        # Sem linha quando bloqueado
+        # Proporção aumentada para 50% para o dado não ficar "espremido"
+        size_hint_x: 0.5 
+        font_size: "15sp"
+        text_color_normal: 0.4, 0.4, 0.4, 1
+        line_color_normal: 0, 0, 0, 0 # Invisível por padrão
+        # Garante que o texto use o espaço horizontal
+        multiline: False
         
     MDBoxLayout:
+        # Espaço para os botões ocupando os 20% restantes
         size_hint_x: 0.2
         adaptive_width: True
         spacing: "2dp"
+        pos_hint: {"center_y": .5}
         
         MDIconButton:
             id: btn_edit
-            icon: "pencil"
+            icon: "pencil-outline"
             icon_size: "20sp"
             theme_text_color: "Custom"
             text_color: 0.5, 0.5, 0.5, 1
@@ -75,11 +84,13 @@ KV_PROFILE_TAB = '''
 
 <ActionRow@MDCard>:
     size_hint_y: None
-    height: "50dp"
+    height: "56dp"
+    size_hint_x: 1 # Força o card a usar toda a largura
     elevation: 0
     md_bg_color: 1, 1, 1, 1
     ripple_behavior: True
-    padding: ["10dp", "0dp", "10dp", "0dp"]
+    # Padding lateral interno para os ícones não encostarem na borda do celular
+    padding: ["12dp", "0dp", "12dp", "0dp"]
     
     text_label: ""
     icon_name: "chevron-right"
@@ -91,6 +102,7 @@ KV_PROFILE_TAB = '''
         font_size: "16sp"
         theme_text_color: "Custom"
         text_color: root.text_color
+        halign: "left"
         
     MDIcon:
         icon: root.icon_name
@@ -103,39 +115,41 @@ KV_PROFILE_TAB = '''
 
     MDBoxLayout:
         orientation: "vertical"
-        padding: "20dp"
-        spacing: "10dp"
+        # Padding horizontal de 12dp é o ideal para mobile (equilíbrio entre borda e espaço)
+        padding: ["12dp", "10dp", "12dp", "20dp"]
+        spacing: "8dp"
         adaptive_height: True
 
         # AVATAR
         MDFloatLayout:
             size_hint_y: None
-            height: "100dp"
+            height: "110dp"
             
             MDCard:
                 size_hint: None, None
-                size: "80dp", "80dp"
+                size: "90dp", "90dp"
                 pos_hint: {"center_x": .5, "center_y": .5}
-                radius: [40, 40, 40, 40]
-                md_bg_color: 0.9, 0.9, 0.9, 1
+                radius: [45, 45, 45, 45]
+                md_bg_color: 0.95, 0.95, 0.95, 1
                 elevation: 0
                 
                 MDIcon:
                     icon: "account"
-                    font_size: "50sp"
+                    font_size: "60sp"
                     theme_text_color: "Custom"
-                    text_color: 0, 0, 0, 1
+                    text_color: 0.22, 0.75, 0.94, 1 # Azul VigiAA no Avatar
                     pos_hint: {"center_x": .5, "center_y": .5}
 
         # SWITCH DE EXIBIÇÃO
         MDBoxLayout:
             adaptive_height: True
-            padding: ["0dp", "10dp", "0dp", "10dp"]
+            padding: ["4dp", "10dp", "4dp", "10dp"]
             
             MDLabel:
                 text: "Modo de exibição"
                 bold: True
                 font_size: "16sp"
+                size_hint_x: 0.8
             
             MDSwitch:
                 active: False
@@ -151,23 +165,26 @@ KV_PROFILE_TAB = '''
             id: fields_container
             orientation: "vertical"
             adaptive_height: True
-            spacing: "5dp"
+            spacing: "2dp"
+            size_hint_x: 1
 
         # BOTÕES DE AÇÃO
         MDBoxLayout:
             orientation: "vertical"
             adaptive_height: True
-            spacing: "5dp"
+            spacing: "2dp"
             padding: ["0dp", "10dp", "0dp", "0dp"]
+            size_hint_x: 1
 
             ActionRow:
                 id: btn_redefinir_senha
                 text_label: "Redefinir senha"
-                icon_name: "chevron-right"
+                icon_name: "key-outline"
                 on_release: root.go_to_reset_password()
 
             MDSeparator:
                 id: sep_redefinir_senha
+                height: "1dp"
 
             ActionRow:
                 text_label: "Sair da conta"
@@ -175,12 +192,16 @@ KV_PROFILE_TAB = '''
                 on_release: root.logout()
 
             MDSeparator:
+                height: "1dp"
 
             ActionRow:
                 text_label: "Excluir conta"
-                icon_name: "delete-forever"
+                icon_name: "delete-forever-outline"
                 text_color: 1, 0, 0, 1
                 on_release: root.open_delete_dialog()
+
+            MDSeparator:
+                height: "1dp"
 '''
 Builder.load_string(KV_PROFILE_TAB)
 

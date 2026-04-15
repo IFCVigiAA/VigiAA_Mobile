@@ -1,29 +1,51 @@
-from kivymd.uix.screen import MDScreen
+# --- 1. IMPORTS BÁSICOS E MÉTRICAS ---
+import config
+from kivy.metrics import dp
+from kivy.properties import VariableListProperty, StringProperty
 from kivy.lang import Builder
 from kivy.clock import mainthread, Clock
 from kivy.storage.jsonstore import JsonStore
+from kivy.utils import platform
+from kivy.uix.image import Image
+from kivy.uix.boxlayout import BoxLayout 
+import os
+import time
+import threading
+import requests
+import unicodedata
+from urllib.parse import quote
+
+# --- 2. COMPONENTES KIVYMD (Importação Única) ---
+from kivymd.uix.screen import MDScreen
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.button import MDFlatButton, MDRectangleFlatIconButton
 from kivymd.uix.list import OneLineListItem
-from kivy.metrics import dp
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivy.uix.image import Image
-from plyer import filechooser
-import requests
-import threading
-import unicodedata
-from urllib.parse import quote
-import os
-import config
-from plyer import gps
-from kivy.utils import platform
-from plyer import filechooser, camera
-from kivy.app import App
-import time
-from kivy.properties import StringProperty
+from kivymd.app import MDApp
 
+# --- 3. IMPORTAÇÃO DE BOTÕES (Apenas esta vez!) ---
+from kivymd.uix.button import (
+    MDFlatButton, 
+    MDRectangleFlatIconButton, 
+    MDRaisedButton, 
+    MDFillRoundFlatButton, 
+    MDFillRoundFlatIconButton,
+    MDIconButton
+)
+
+# --- 4. A VACINA (Corrigida) ---
+classes_para_vacinar = [
+    MDFlatButton, MDRectangleFlatIconButton, MDRaisedButton, 
+    MDFillRoundFlatButton, MDFillRoundFlatIconButton, MDIconButton # <-- Era aqui o erro!
+]
+
+for cls in classes_para_vacinar:
+    if not hasattr(cls, 'radius'):
+        cls.radius = VariableListProperty([dp(0), dp(0), dp(0), dp(0)])
+
+# --- 5. COMPONENTES PLYER E SISTEMA ---
+from plyer import filechooser, camera, gps
 
 if platform == 'android':
     from android.permissions import request_permissions, Permission
@@ -251,6 +273,8 @@ KV_FOCUS_FORM = '''
                     TextInput:
                         id: tf_street
                         hint_text: "Digite o nome da rua" # design hint text verbatim
+                        multiline: False # OBRIGATÓRIO: Se for True, o enter apenas pula linha
+                        write_tab: False # Evita que o tab insira espaços
                         # Custom transparent look design verbatim
                         hint_text_color: 0.6, 0.6, 0.6, 1
                         foreground_color: 0, 0, 0, 1
@@ -592,7 +616,7 @@ class FocusFormScreen(MDScreen):
             title="Selecione a Rua",
             type="custom",
             content_cls=content,
-            buttons=[MDFlatButton(text="Fechar", radius=[8, 8, 8, 8], on_release=lambda x: self.manual_dialog.dismiss())]
+            buttons=[MDFlatButton(text="Fechar", on_release=lambda x: self.manual_dialog.dismiss())]
         )
         self.manual_dialog.open()
 
@@ -824,22 +848,6 @@ class FocusFormScreen(MDScreen):
         # Jogamos a execução da câmera para o Fio Principal!
         Clock.schedule_once(lambda dt: self._safe_camera_start(permissions, grants), 0)
 
-    # Nova função que roda com segurança
-    # Nova função que roda com segurança
-    def _safe_camera_start(self, permissions, grants):
-        from android.permissions import Permission
-        from plyer import camera
-        
-        perms_dict = dict(zip(permissions, grants))
-        
-        if perms_dict.get(Permission.CAMERA, False):
-            try:
-                # A MÁGICA DO ANDROID MODERNO: Passamos filename=None!
-                camera.take_picture(filename=None, on_complete=self._on_camera_success)
-            except Exception as e:
-                self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
-        else:
-            self.mostrar_aviso("Permissão de câmera negada!", "red")
 
     def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
@@ -942,38 +950,39 @@ class FocusFormScreen(MDScreen):
         threading.Thread(target=self._worker_submit, args=(token,), daemon=True).start()
 
     def _worker_submit(self, token):
-        try:
-            data = {
-                "cep": self.ids.tf_cep.text, 
-                "city": self.ids.tf_city.text, 
-                "neighborhood": self.ids.tf_neighborhood.text, 
-                "street": self.ids.tf_street.text, 
-                "number": self.ids.tf_number.text, 
-                "description": self.ids.tf_description.text, 
-                "latitude": self.gps_address_data.get("lat", "-27.000"), 
-                "longitude": self.gps_address_data.get("lon", "-48.000")
-            }
+        data = {
+            "cep": self.ids.tf_cep.text, 
+            "city": self.ids.tf_city.text, 
+            "neighborhood": self.ids.tf_neighborhood.text, 
+            "street": self.ids.tf_street.text, 
+            "number": self.ids.tf_number.text, 
+            "description": self.ids.tf_description.text, 
+            "latitude": self.gps_address_data.get("lat", "-27.000"), 
+            "longitude": self.gps_address_data.get("lon", "-48.000")
+        }
             
-            files = []
-            file_handles = []
-            for path in self.selected_files:
-                f = open(path, 'rb')
-                file_handles.append(f)
-                files.append(('uploaded_images', (os.path.basename(path), f, 'image/jpeg')))
-                
+        files = []
+        file_handles = []
+        for path in self.selected_files:
+            f = open(path, 'rb')
+            file_handles.append(f)
+            files.append(('uploaded_images', (os.path.basename(path), f, 'image/jpeg')))
+            
+        try:
             headers = {"Authorization": f"Bearer {token}"}
-            res = requests.post(f"{config.API_URL}/api/report-focus/", data=data, files=files, headers=headers)
+            res = requests.post(f"{config.API_URL}/api/report-focus/", data=data, files=files, headers=headers, timeout=20)
             
             for f in file_handles: f.close()
             
-            if res.status_code in [200, 201]: 
+            if res.status_code in [200, 201]:
                 Clock.schedule_once(lambda dt: self.open_success_modal(), 0)
-            else: 
-                self.mostrar_aviso(f"Erro no servidor. Código: {res.status_code}", "red")
+            else:
+                self.mostrar_aviso(f"Erro {res.status_code} ao salvar.")
                 
-        except Exception as ex: 
-            self.mostrar_aviso("Erro de comunicação com o sistema.", "red")
-            
+        except Exception as e:
+            self.mostrar_aviso(f"Erro de conexão: {e}")
+        
+        # AGORA SIM: A linha está dentro da função e o 'self' vai funcionar!
         Clock.schedule_once(lambda dt: self._reset_submit_btn(), 0)
 
     @mainthread
@@ -983,14 +992,27 @@ class FocusFormScreen(MDScreen):
 
     @mainthread
     def open_success_modal(self):
-        self.success_dialog = MDDialog(
-            title="Sucesso!",
-            text="Foco de dengue cadastrado com sucesso!",
-            buttons=[
-                MDFlatButton(text="OK", text_color=(1,1,1,1), md_bg_color=(0, 0.7, 0, 1), radius=[8, 8, 8, 8], on_release=self.close_success_modal)
-            ]
-        )
-        self.success_dialog.open()
+        self.dialog = MDDialog(
+                title="Foco Registrado!",
+                text="Os dados foram enviados com sucesso.",
+                buttons=[MDFlatButton(text="OK", on_release=self.finish_and_go_home)]
+            )
+        self.dialog.open()
+
+    def finish_and_go_home(self, *args):
+        # 1. Fecha o diálogo de sucesso
+        if self.dialog:
+            self.dialog.dismiss()
+        
+        # 2. Volta para a tela principal (que se chama 'home')
+        self.manager.current = 'home'
+        
+        # 3. Manda a barra de navegação focar na aba de "Novo" (Cadastro)
+        # Assim o usuário já cai na tela de escolha de formulários de novo
+        try:
+            self.manager.get_screen('home').ids.bottom_nav.switch_tab('tab_new')
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Não consegui resetar a aba: {e}")
 
     def close_success_modal(self, instance):
         self.success_dialog.dismiss()

@@ -3,9 +3,19 @@ from kivy.lang import Builder
 from kivy.clock import mainthread, Clock
 from kivy.graphics.texture import Texture
 from kivy.graphics import Rectangle, Color 
-from kivy.properties import ListProperty
+from kivy.properties import ListProperty, VariableListProperty
+# Importações cruciais para o degradê
 from kivy.uix.boxlayout import BoxLayout 
 from kivymd.uix.boxlayout import MDBoxLayout
+from kivy.metrics import dp
+
+# Vacina preventiva para os ícones da Home (sininho, etc)
+from kivymd.uix.button import MDIconButton
+if not hasattr(MDIconButton, 'radius'):
+    MDIconButton.radius = VariableListProperty([dp(0), dp(0), dp(0), dp(0)])
+
+# Importação segura das abas...
+# (resto do seu código segue igual)
 
 # Importação segura das abas
 try:
@@ -176,7 +186,7 @@ class HomeScreen(MDScreen):
 
     @mainthread
     def _chutar_para_login(self, *args):
-        print("🚨🚨 ALARME: Fui expulsa pela função da HOME! 🚨🚨")
+        print("🚨🚨 ALARME: Expulsão detectada! Limpando rastros... 🚨🚨")
         from kivymd.app import MDApp
         from kivy.storage.jsonstore import JsonStore
         from kivymd.toast import toast
@@ -184,10 +194,14 @@ class HomeScreen(MDScreen):
         app = MDApp.get_running_app()
         store = JsonStore('sessao_app.json')
         
-        # Reseta as memórias do cérebro do app
+        # 1. Resetar a barra de navegação para a primeira aba (Início)
+        # Isso garante que ao entrar de novo, o app não abra no Perfil.
+        self.ids.bottom_nav.switch_tab('tab_home')
+        
+        # 2. Reseta as memórias do cérebro do app
         app.force_logout = True
         app.vigiaa_token = None
-        app.seguranca_ja_verificou = False  # <--- ADICIONE ISTO AQUI
+        app.seguranca_ja_verificou = False 
         
         if store.exists("session"):
             store.delete("session")
