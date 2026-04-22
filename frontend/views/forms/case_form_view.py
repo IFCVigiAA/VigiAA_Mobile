@@ -97,109 +97,125 @@ KV_CASE_FORM = '''
                     size_hint_y: None
                     height: dp(30)
 
-                # --- CAMPOS TABULARES ---
-                
-                # Data Notificação
+                # --- CAMPOS TABULARES (Ajustados para não sobrepor) ---
+
+                # --- DATA NOTIFICAÇÃO ---
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint_y: None
                     height: "50dp"
+                    padding: ["5dp", 0, "5dp", 0]
                     MDLabel:
                         text: "Notificação[color=#FF0000]*[/color]"
                         markup: True
                         bold: True
-                        size_hint_x: None
-                        width: "120dp"
+                        size_hint_x: 0.35  # Proporção em vez de largura fixa
+                        font_size: "14sp"
                     TextInput:
                         id: tf_notif_date
                         hint_text: "Selecionar"
                         readonly: True
+                        size_hint_x: 0.55
                         background_color: 0,0,0,0
+                        cursor_color: 0,0,0,0
                         padding: [0, (self.height - self.line_height) / 2]
-                        on_focus: if self.focus: root.show_date_picker('notif')
+                        on_touch_down: if self.collide_point(*args[1].pos): root.show_date_picker('notif')
                     MDIconButton:
                         icon: "calendar-month"
+                        size_hint_x: 0.1
                         pos_hint: {"center_y": .5}
                         on_release: root.show_date_picker('notif')
 
-                # CEP
+                # --- CEP ---
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint_y: None
                     height: "50dp"
+                    padding: ["5dp", 0, "5dp", 0]
                     MDLabel:
                         text: "CEP"
                         bold: True
-                        size_hint_x: None
-                        width: "120dp"
+                        size_hint_x: 0.35
+                        font_size: "14sp"
                     TextInput:
                         id: tf_cep
                         hint_text: "Digite o CEP"
+                        size_hint_x: 0.65
                         input_filter: "int"
                         background_color: 0,0,0,0
                         padding: [0, (self.height - self.line_height) / 2]
                         on_text: root.on_cep_change(self.text)
 
-                # Município
+                # --- MUNICÍPIO ---
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint_y: None
                     height: "50dp"
+                    padding: ["5dp", 0, "5dp", 0]
                     MDLabel:
-                        text: "MUNICÍPIO[color=#FF0000]*[/color]"
+                        text: "Município[color=#FF0000]*[/color]"
                         markup: True
                         bold: True
-                        size_hint_x: None
-                        width: "120dp"
+                        size_hint_x: 0.35
+                        font_size: "14sp"
                     TextInput:
                         id: tf_city
                         hint_text: "Selecionar"
                         readonly: True
+                        size_hint_x: 0.55
                         background_color: 0,0,0,0
+                        cursor_color: 0,0,0,0
                         padding: [0, (self.height - self.line_height) / 2]
-                        on_focus: if self.focus: root.open_city_menu()
+                        on_touch_down: if self.collide_point(*args[1].pos): root.open_city_menu()
                     MDIconButton:
                         icon: "chevron-down"
+                        size_hint_x: 0.1
                         pos_hint: {"center_y": .5}
                         on_release: root.open_city_menu()
 
-                # Bairro
+                # --- BAIRRO ---
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint_y: None
                     height: "50dp"
+                    padding: ["5dp", 0, "5dp", 0]
                     MDLabel:
-                        text: "BAIRRO[color=#FF0000]*[/color]"
+                        text: "Bairro[color=#FF0000]*[/color]"
                         markup: True
                         bold: True
-                        size_hint_x: None
-                        width: "120dp"
+                        size_hint_x: 0.35
+                        font_size: "14sp"
                     TextInput:
                         id: tf_neighborhood
                         hint_text: "Selecionar"
                         readonly: True
+                        size_hint_x: 0.55
                         background_color: 0,0,0,0
+                        cursor_color: 0,0,0,0
                         padding: [0, (self.height - self.line_height) / 2]
-                        on_focus: if self.focus: root.open_neighborhood_menu()
+                        on_touch_down: if self.collide_point(*args[1].pos): root.open_neighborhood_menu()
                     MDIconButton:
                         icon: "chevron-down"
+                        size_hint_x: 0.1
                         pos_hint: {"center_y": .5}
                         on_release: root.open_neighborhood_menu()
 
-                # Rua (Com Enter para Pesquisar)
+                # --- RUA ---
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint_y: None
                     height: "50dp"
+                    padding: ["5dp", 0, "5dp", 0]
                     MDLabel:
-                        text: "RUA[color=#FF0000]*[/color]"
+                        text: "Rua[color=#FF0000]*[/color]"
                         markup: True
                         bold: True
-                        size_hint_x: None
-                        width: "120dp"
+                        size_hint_x: 0.35
+                        font_size: "14sp"
                     TextInput:
                         id: tf_street
                         hint_text: "Digite a rua"
+                        size_hint_x: 0.55
                         multiline: False
                         background_color: 0,0,0,0
                         padding: [0, (self.height - self.line_height) / 2]
@@ -207,60 +223,70 @@ KV_CASE_FORM = '''
                     MDIconButton:
                         id: btn_search_street
                         icon: "magnify"
+                        size_hint_x: 0.1
+                        pos_hint: {"center_y": .5}
                         on_release: root.search_address_by_name()
 
-                # Número
+                # --- NÚMERO ---
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint_y: None
                     height: "50dp"
+                    padding: ["5dp", 0, "5dp", 0]
                     MDLabel:
-                        text: "NÚMERO[color=#FF0000]*[/color]"
+                        text: "Número[color=#FF0000]*[/color]"
                         markup: True
                         bold: True
-                        size_hint_x: None
-                        width: "120dp"
+                        size_hint_x: 0.35
+                        font_size: "14sp"
                     TextInput:
                         id: tf_number
-                        hint_text: "Número"
+                        hint_text: "Digite o nº"
+                        size_hint_x: 0.65
                         background_color: 0,0,0,0
                         padding: [0, (self.height - self.line_height) / 2]
 
-                # Data Nascimento
+                # --- DATA NASCIMENTO ---
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint_y: None
                     height: "50dp"
+                    padding: ["5dp", 0, "5dp", 0]
                     MDLabel:
                         text: "Nascimento[color=#FF0000]*[/color]"
                         markup: True
                         bold: True
-                        size_hint_x: None
-                        width: "120dp"
+                        size_hint_x: 0.35
+                        font_size: "14sp"
                     TextInput:
                         id: tf_birth_date
                         hint_text: "Selecionar"
                         readonly: True
+                        size_hint_x: 0.55
                         background_color: 0,0,0,0
+                        cursor_color: 0,0,0,0
                         padding: [0, (self.height - self.line_height) / 2]
-                        on_focus: if self.focus: root.show_date_picker('birth')
+                        on_touch_down: if self.collide_point(*args[1].pos): root.show_date_picker('birth')
                     MDIconButton:
                         icon: "calendar-month"
+                        size_hint_x: 0.1
                         pos_hint: {"center_y": .5}
                         on_release: root.show_date_picker('birth')
 
-                # Teste Positivo
+                # --- TESTE POSITIVO ---
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint_y: None
                     height: "50dp"
+                    padding: ["5dp", 0, "5dp", 0]
                     MDLabel:
                         text: "Teste positivo[color=#FF0000]*[/color]"
                         markup: True
                         bold: True
-                        size_hint_x: None
-                        width: "120dp"
+                        size_hint_x: 0.35
+                        font_size: "14sp"
                     MDBoxLayout:
+                        size_hint_x: 0.65
                         adaptive_height: True
                         pos_hint: {"center_y": .5}
                         MDCheckbox:
@@ -273,7 +299,7 @@ KV_CASE_FORM = '''
                             adaptive_width: True
                         Widget:
                             size_hint_x: None
-                            width: "10dp"
+                            width: "15dp"
                         MDCheckbox:
                             id: chk_nao
                             group: 'teste'
@@ -548,16 +574,28 @@ class CaseFormScreen(MDScreen):
         try:
             url = f"{config.API_URL}/api/report-case/"
             res = requests.post(url, json=payload, headers={"Authorization": f"Bearer {token}"}, timeout=15)
+            
             if res.status_code in [200, 201]:
+                # Captura o ID que o Django mandou de volta
+                case_id = res.json().get('id')
+                
                 if payload["positive_test"]:
-                    store.put("current_case", id=res.json().get('id'))
+                    # --- A MÁGICA AQUI: Salva no App principal ---
+                    from kivymd.app import MDApp
+                    MDApp.get_running_app().current_case_id = case_id
+                    
+                    # Salva no store também como backup
+                    store.put("current_case", id=case_id)
+                    
+                    # Muda para a tela do paciente
                     Clock.schedule_once(lambda dt: setattr(self.manager, 'current', 'form_caso_positivo'), 0.2)
                 else:
                     Clock.schedule_once(lambda dt: self.open_success_modal(), 0)
-            else: self.mostrar_aviso(f"Erro {res.status_code}")
-        except: self.mostrar_aviso("Erro de conexão.")
+            else:
+                self.mostrar_aviso(f"Erro {res.status_code}")
+        except:
+            self.mostrar_aviso("Erro de conexão.")
         
-        # RESET DENTRO DO WORKER (Indentaçao correta)
         Clock.schedule_once(lambda dt: self._reset_submit_btn(), 0)
 
     @mainthread

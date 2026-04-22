@@ -56,17 +56,19 @@ KV_FOCUS_FORM = '''
 <ImageCard>:
     orientation: "horizontal"
     size_hint_y: None
-    height: "80dp"  # <-- TRAVA DE ALTURA: O Kivy não pode mais esmagar o cartão!
-    spacing: "10dp"
-    padding: "5dp"
+    height: "80dp"  
+    spacing: "12dp" # Aumentamos um pouco o espaço para o ícone respirar
+    padding: "8dp"
     
-    # AQUI ESTÁ A SUA FOTO REAL:
-    Image:
-        source: root.image_path
-        size_hint: None, None
-        size: "70dp", "70dp" # <-- Tamanho exato da miniatura
-        allow_stretch: True
-        keep_ratio: False    # <-- Preenche o quadrado ignorando bordas vazias
+    # --- O NOVO ÍCONE DE FOTO À ESQUERDA ---
+    MDIcon:
+        icon: "camera-outline"
+        theme_text_color: "Custom"
+        text_color: 0.22, 0.75, 0.94, 1 # O azul padrão do VigiAA
+        pos_hint: {"center_y": .5}
+        size_hint_x: None
+        width: "24dp"
+        font_size: "24sp"
         
     MDBoxLayout:
         orientation: "vertical"
@@ -911,9 +913,16 @@ class FocusFormScreen(MDScreen):
 
    
     def remove_image(self, path):
-        if path in self.selected_files:
-            self.selected_files.remove(path)
+        # A MÁGICA: Removemos o 'file://' para que o Python encontre o caminho real na lista
+        caminho_limpo = path.replace("file://", "")
+        
+        if caminho_limpo in self.selected_files:
+            self.selected_files.remove(caminho_limpo)
+            # Atualiza a tela para sumir o card
             self.update_images_display()
+            print(f"VIGIAA DEBUG: Imagem removida com sucesso: {caminho_limpo}")
+        else:
+            print(f"VIGIAA DEBUG: Erro ao remover. Caminho não encontrado: {caminho_limpo}")
 
     @mainthread
     def update_images_display(self):
@@ -921,12 +930,12 @@ class FocusFormScreen(MDScreen):
         for path in self.selected_files:
             nome_arquivo = os.path.basename(path)
             
-            # --- O AJUSTE PARA A FOTO APARECER ---
+            # No Android, usamos o prefixo apenas para o widget Image conseguir ler
             caminho_para_exibir = path
             if platform == 'android':
-                # No Android, adicionamos 'file://' no início do caminho
                 caminho_para_exibir = "file://" + path
             
+            # Criamos o card passando o caminho (que pode ter o file://)
             card = ImageCard(image_path=caminho_para_exibir, image_name=nome_arquivo)
             self.ids.images_container.add_widget(card)
 

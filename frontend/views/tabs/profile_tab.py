@@ -3,12 +3,14 @@ from kivy.uix.scrollview import ScrollView
 from kivy.lang import Builder
 from kivy.properties import StringProperty, BooleanProperty, ObjectProperty
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.button import MDFlatButton
+from kivymd.uix.button import MDFlatButton, MDIconButton
 from kivymd.uix.snackbar import MDSnackbar
 from kivymd.uix.label import MDLabel
+from kivymd.uix.card import MDCard
 from kivymd.app import MDApp
 from kivy.clock import mainthread, Clock
 from kivy.storage.jsonstore import JsonStore
+from kivy.metrics import dp
 import requests
 import threading
 import config
@@ -19,15 +21,14 @@ KV_PROFILE_TAB = '''
 <ProfileField>:
     orientation: "horizontal"
     adaptive_height: True
-    # Padding lateral reduzido para expandir o conteúdo horizontalmente
-    padding: ["4dp", "8dp", "4dp", "8dp"]
+    size_hint_x: 1
+    padding: ["8dp", "8dp", "8dp", "8dp"]
     spacing: "10dp"
     
     MDLabel:
         text: root.label_text
         bold: True
-        # Proporção reduzida para 30% para dar mais espaço ao valor
-        size_hint_x: 0.3 
+        size_hint_x: 0.28
         font_size: "14sp"
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
@@ -37,17 +38,14 @@ KV_PROFILE_TAB = '''
         id: field_input
         text: root.text_value
         readonly: True
-        # Proporção aumentada para 50% para o dado não ficar "espremido"
-        size_hint_x: 0.5 
+        size_hint_x: 0.57
         font_size: "15sp"
-        text_color_normal: 0.4, 0.4, 0.4, 1
-        line_color_normal: 0, 0, 0, 0 # Invisível por padrão
-        # Garante que o texto use o espaço horizontal
+        text_color_normal: 0.3, 0.3, 0.3, 1
+        line_color_normal: 0, 0, 0, 0
         multiline: False
         
     MDBoxLayout:
-        # Espaço para os botões ocupando os 20% restantes
-        size_hint_x: 0.2
+        size_hint_x: 0.15
         adaptive_width: True
         spacing: "2dp"
         pos_hint: {"center_y": .5}
@@ -85,11 +83,10 @@ KV_PROFILE_TAB = '''
 <ActionRow@MDCard>:
     size_hint_y: None
     height: "56dp"
-    size_hint_x: 1 # Força o card a usar toda a largura
+    size_hint_x: 1
     elevation: 0
     md_bg_color: 1, 1, 1, 1
     ripple_behavior: True
-    # Padding lateral interno para os ícones não encostarem na borda do celular
     padding: ["12dp", "0dp", "12dp", "0dp"]
     
     text_label: ""
@@ -115,21 +112,22 @@ KV_PROFILE_TAB = '''
 
     MDBoxLayout:
         orientation: "vertical"
-        # Padding horizontal de 12dp é o ideal para mobile (equilíbrio entre borda e espaço)
+        size_hint_x: 1
         padding: ["12dp", "10dp", "12dp", "20dp"]
-        spacing: "8dp"
+        spacing: "10dp"
         adaptive_height: True
 
-        # AVATAR
-        MDFloatLayout:
+        # AVATAR CENTRALIZADO COM ANCHOR (Segurança total contra desalinhamento)
+        AnchorLayout:
+            anchor_x: "center"
             size_hint_y: None
-            height: "110dp"
-            
+            height: "120dp"
+            padding: [0, "10dp", 0, "10dp"]
+
             MDCard:
                 size_hint: None, None
-                size: "90dp", "90dp"
-                pos_hint: {"center_x": .5, "center_y": .5}
-                radius: [45, 45, 45, 45]
+                size: "100dp", "100dp"
+                radius: [50, 50, 50, 50]
                 md_bg_color: 0.95, 0.95, 0.95, 1
                 elevation: 0
                 
@@ -137,13 +135,14 @@ KV_PROFILE_TAB = '''
                     icon: "account"
                     font_size: "60sp"
                     theme_text_color: "Custom"
-                    text_color: 0.22, 0.75, 0.94, 1 # Azul VigiAA no Avatar
+                    text_color: 0.22, 0.75, 0.94, 1
                     pos_hint: {"center_x": .5, "center_y": .5}
 
-        # SWITCH DE EXIBIÇÃO
+        # SWITCH DE EXIBIÇÃO (Recuperado!)
         MDBoxLayout:
             adaptive_height: True
             padding: ["4dp", "10dp", "4dp", "10dp"]
+            size_hint_x: 1
             
             MDLabel:
                 text: "Modo de exibição"
@@ -154,7 +153,6 @@ KV_PROFILE_TAB = '''
             MDSwitch:
                 active: False
                 pos_hint: {"center_y": .5}
-                icon_active: "check"
                 thumb_color_active: 0.22, 0.75, 0.94, 1
                 track_color_active: 0.22, 0.75, 0.94, 0.5
 
@@ -168,7 +166,7 @@ KV_PROFILE_TAB = '''
             spacing: "2dp"
             size_hint_x: 1
 
-        # BOTÕES DE AÇÃO
+        # BOTÕES DE AÇÃO (Recuperados!)
         MDBoxLayout:
             orientation: "vertical"
             adaptive_height: True
@@ -199,11 +197,14 @@ KV_PROFILE_TAB = '''
                 icon_name: "delete-forever-outline"
                 text_color: 1, 0, 0, 1
                 on_release: root.open_delete_dialog()
-
-            MDSeparator:
-                height: "1dp"
 '''
+
 Builder.load_string(KV_PROFILE_TAB)
+
+class ActionRow(MDCard):
+    text_label = StringProperty("")
+    icon_name = StringProperty("chevron-right")
+    text_color = ObjectProperty([0, 0, 0, 1])
 
 class ProfileField(MDBoxLayout):
     label_text = StringProperty("")
@@ -219,8 +220,8 @@ class ProfileField(MDBoxLayout):
     def start_edit(self):
         self.original_value = self.ids.field_input.text
         self.ids.field_input.readonly = False
-        self.ids.field_input.text_color_normal = (0, 0, 0, 1) # Fica preto
-        self.ids.field_input.line_color_normal = (0.5, 0.5, 0.5, 1) # Mostra a linha
+        self.ids.field_input.text_color_normal = (0, 0, 0, 1)
+        self.ids.field_input.line_color_normal = (0.5, 0.5, 0.5, 1)
         self.ids.field_input.focus = True
         
         self.ids.btn_edit.opacity = 0
@@ -236,7 +237,6 @@ class ProfileField(MDBoxLayout):
 
     def save_edit(self):
         if self.callback_save:
-            # Chama a função lá na tela principal para ir na internet
             self.callback_save(self.api_key, self.ids.field_input.text, self)
 
     def _lock_field(self):
@@ -259,20 +259,17 @@ class ProfileTabContent(ScrollView):
         self.fields_refs = {}
         self.dialog = None
         Clock.schedule_once(self.setup_fields, 0)
-        # Trocamos a chamada antiga por essa nova que pode ser repetida:
         Clock.schedule_once(lambda dt: self.refresh_data(), 0.5)
 
     @mainthread
     def refresh_data(self):
-        # Volta tudo para 'Carregando...' visualmente
         for field in self.fields_refs.values():
             field.text_value = "Carregando..."
             field.ids.field_input.text = "Carregando..."
-            
-        # Manda a thread buscar os dados novos na internet
-        threading.Thread(target=self.load_user_data).start()
+        threading.Thread(target=self.load_user_data, daemon=True).start()
 
     def setup_fields(self, dt):
+        self.ids.fields_container.clear_widgets()
         config_campos = [
             {"label": "Nome", "key": "first_name", "email": False},
             {"label": "Sobrenome", "key": "last_name", "email": False},
@@ -291,68 +288,43 @@ class ProfileTabContent(ScrollView):
             self.ids.fields_container.add_widget(field)
 
     def load_user_data(self):
-        from kivymd.app import MDApp
         app = MDApp.get_running_app()
-        store = JsonStore('sessao_app.json')
-        
-        # 1. Tenta pegar do cérebro (RAM) ou do cofre
         token = getattr(app, "vigiaa_token", None)
         if not token and store.exists("session"):
             token = store.get("session")["token"]
             
-        if not token:
-            print("VIGIAA DEBUG: [PERFIL] Nenhum token encontrado.")
-            return
+        if not token: return
             
         try:
-            # ATENÇÃO: Verifique se no seu Django (urls.py) a rota é /api/profile/ mesmo!
             url = f"{config.API_URL}/api/profile/"
             res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
             
             if res.status_code == 200:
-                # SUCESSO! A API devolveu os dados
                 data = res.json()
                 Clock.schedule_once(lambda dt: self.update_ui_fields(data), 0)
-                
             elif res.status_code in [401, 403]:
-                # A TRAVA DE SEGURANÇA! O Token era fantasma/vencido.
-                print(f"VIGIAA DEBUG: [PERFIL] Token rejeitado pela API (Erro {res.status_code}). Expulsando...")
-                Clock.schedule_once(lambda dt: self.mostrar_aviso("Sessão inválida. Faça login novamente."), 0)
-                Clock.schedule_once(lambda dt: self.logout(), 0) # Usa a sua própria função de logout perfeito!
-                
-            elif res.status_code == 404:
-                print("VIGIAA DEBUG: [PERFIL] Rota não encontrada (Erro 404). A URL da API está errada no código!")
-                Clock.schedule_once(lambda dt: self.mostrar_aviso("Erro: Rota da API não existe."), 0)
-                
-            else:
-                print(f"VIGIAA DEBUG: [PERFIL] Erro desconhecido: {res.status_code}")
-                Clock.schedule_once(lambda dt: self.mostrar_aviso("Erro ao buscar dados."), 0)
-                
-        except requests.exceptions.RequestException as ex:
-            print(f"Erro de conexão no perfil: {ex}")
-            Clock.schedule_once(lambda dt: self.mostrar_aviso("Sem conexão com a internet."), 0)
+                Clock.schedule_once(lambda dt: self.logout(), 0)
+        except:
+            pass
 
     @mainthread
     def update_ui_fields(self, data):
-        print("DADOS DA API:", data)
         for key, field in self.fields_refs.items():
             if key in data:
-                field.text_value = data.get(key, "")
-                field.ids.field_input.text = data.get(key, "")
+                val = data.get(key, "")
+                field.text_value = val
+                field.ids.field_input.text = val
 
-            if data.get("tem_senha") is False:
-                self.ids.btn_redefinir_senha.opacity = 0
-                self.ids.btn_redefinir_senha.disabled = True
-                self.ids.btn_redefinir_senha.height = "0dp" 
-                
-                self.ids.sep_redefinir_senha.opacity = 0
-                self.ids.sep_redefinir_senha.height = "0dp"
+        if data.get("tem_senha") is False:
+            self.ids.btn_redefinir_senha.opacity = 0
+            self.ids.btn_redefinir_senha.disabled = True
+            self.ids.btn_redefinir_senha.height = "0dp" 
+            self.ids.sep_redefinir_senha.height = "0dp"
 
     def salvar_na_api(self, api_key, novo_valor, field_instance):
-        threading.Thread(target=self._worker_save, args=(api_key, novo_valor, field_instance)).start()
+        threading.Thread(target=self._worker_save, args=(api_key, novo_valor, field_instance), daemon=True).start()
 
     def _worker_save(self, api_key, novo_valor, field_instance):
-        store = JsonStore('sessao_app.json')
         if not store.exists("session"): return
         token = store.get("session")["token"]
         
@@ -363,83 +335,50 @@ class ProfileTabContent(ScrollView):
                 headers={"Authorization": f"Bearer {token}"}
             )
             if res.status_code == 200:
-                self.mostrar_aviso(f"{field_instance.label_text} atualizado com sucesso!")
+                self.mostrar_aviso(f"{field_instance.label_text} atualizado!")
                 Clock.schedule_once(lambda dt: field_instance._lock_field(), 0)
             else:
-                self.mostrar_aviso("Erro ao salvar dados.")
+                self.mostrar_aviso("Erro ao salvar.")
                 Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
-        except Exception as e:
-            self.mostrar_aviso(f"Erro de conexão: {e}")
+        except:
+            self.mostrar_aviso("Erro de conexão.")
             Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
 
-    # --- AÇÕES DA CONTA ---
     def logout(self):
-        from kivymd.app import MDApp
         app = MDApp.get_running_app()
-        
-        # A TRAVA MESTRA: Avisa o app inteiro que estamos forçando a saída!
-        app.force_logout = True 
-
-        # Apaga os arquivos (O seu código perfeito continua aqui)
-        if store.exists("session"):
-            store.delete("session")
-
-        if store.exists("current_case"):
-            store.delete("current_case")
-            
-        # --- A FAXINA ---
-        for field in self.fields_refs.values():
-            field.text_value = "Carregando..."
-            field.ids.field_input.text = "Carregando..."
-            
-        if 'btn_redefinir_senha' in self.ids:
-            self.ids.btn_redefinir_senha.opacity = 1
-            self.ids.btn_redefinir_senha.disabled = False
-            self.ids.btn_redefinir_senha.height = "50dp"
-            self.ids.sep_redefinir_senha.opacity = 1
-            self.ids.sep_redefinir_senha.height = "1dp"
-
+        if store.exists("session"): store.delete("session")
+        if store.exists("current_case"): store.delete("current_case")
         app.root.current = 'login'
 
     def go_to_reset_password(self):
         MDApp.get_running_app().root.current = 'change_password'
 
     def open_delete_dialog(self):
-        if not self.dialog:
-            self.dialog = MDDialog(
-                title="Excluir Conta",
-                text="Tem certeza? Isso desativará sua conta permanentemente.",
-                buttons=[
-                    MDFlatButton(text="Cancelar", on_release=lambda x: self.dialog.dismiss()),
-                    MDFlatButton(text="Sim, Excluir", text_color=(1, 0, 0, 1), on_release=self.delete_account_action)
-                ],
-            )
+        self.dialog = MDDialog(
+            title="Excluir Conta",
+            text="Deseja desativar sua conta permanentemente?",
+            buttons=[
+                MDFlatButton(text="Cancelar", on_release=lambda x: self.dialog.dismiss()),
+                MDFlatButton(text="Confirmar", text_color=(1, 0, 0, 1), on_release=self.delete_account_action)
+            ],
+        )
         self.dialog.open()
 
     def delete_account_action(self, *args):
         self.dialog.dismiss()
-        threading.Thread(target=self._worker_delete).start()
+        threading.Thread(target=self._worker_delete, daemon=True).start()
 
     def _worker_delete(self):
-        store = JsonStore('sessao_app.json')
         if not store.exists("session"): return
         token = store.get("session")["token"]
         try:
             res = requests.delete(f"{config.API_URL}/api/delete-account/", headers={"Authorization": f"Bearer {token}"})
             if res.status_code == 200:
-                self.mostrar_aviso("Conta desativada com sucesso.")
+                self.mostrar_aviso("Conta excluída.")
                 Clock.schedule_once(lambda dt: self.logout(), 0)
-            else:
-                self.mostrar_aviso("Erro ao desativar conta.")
-        except Exception as e:
-            self.mostrar_aviso("Sem conexão com a internet.")
+        except:
+            pass
 
     @mainthread
     def mostrar_aviso(self, texto):
-        MDSnackbar(
-            MDLabel(
-                text=texto,
-                theme_text_color="Custom",
-                text_color=(1, 1, 1, 1) # Letra branca para ficar visível no fundo escuro
-            )
-        ).open()
+        MDSnackbar(MDLabel(text=texto, theme_text_color="Custom", text_color=(1, 1, 1, 1))).open()

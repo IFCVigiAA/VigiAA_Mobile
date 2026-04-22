@@ -180,7 +180,7 @@ KV_POSITIVE_FORM = '''
 Builder.load_string(KV_POSITIVE_FORM)
 
 class PositiveCaseFormScreen(MDScreen):
-    opcoes_locais = ["Posto de Saúde", "Farmácia", "Hospital", "Laboratório", "Outros"]
+    opcoes_locais = ["Posto de Saúde", "Farmácia", "Hospital", "Laboratório"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -212,19 +212,30 @@ class PositiveCaseFormScreen(MDScreen):
             self.manager.current = 'login'
             return
             
-        if not store.exists("current_case"):
-            toast("Erro: Caso base não encontrado.")
-            self.manager.current = 'home'
+        # 1. Tenta buscar o ID direto do App (Global)
+        from kivymd.app import MDApp
+        app = MDApp.get_running_app()
+        case_id = getattr(app, 'current_case_id', None)
+
+        # 2. Se não estiver no App, tenta o Store (como última tentativa)
+        if not case_id and store.exists("current_case"):
+            case_id = store.get("current_case")["id"]
+
+        # Se ainda assim não achar, aí sim dá o erro
+        if not case_id:
+            toast("Erro: Identificador do caso não encontrado.")
             return
 
         # Captura e limpeza de dados
         payload = {
-            "dengue_case": int(store.get("current_case")["id"]), # Garante que é Inteiro
+            "dengue_case": int(case_id), # O Django exige INTEIRO para ForeignKeys
             "patient_name": self.ids.tf_nome.text.strip(),
             "cpf": self.ids.tf_cpf.text.strip(),
             "phone": self.ids.tf_telefone.text.strip(),
             "test_location": self.ids.tf_local_teste.text
         }
+        
+        # ... resto do código (validação e thread) continua igual
 
         if not all([payload["patient_name"], payload["phone"], payload["test_location"]]):
             toast("Preencha os campos obrigatórios (*)")
