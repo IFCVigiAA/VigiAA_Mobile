@@ -59,6 +59,8 @@ jobs:
           android.minapi = 24
           android.archs = arm64-v8a
           android.allow_backup = False
+          android.manifest.application_fullBackupContent = false
+
           p4a.branch = master
           
           [buildozer]

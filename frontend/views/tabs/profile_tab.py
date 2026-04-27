@@ -7,6 +7,7 @@ from kivymd.uix.button import MDFlatButton, MDIconButton
 from kivymd.uix.snackbar import MDSnackbar
 from kivymd.uix.label import MDLabel
 from kivymd.uix.card import MDCard
+from kivymd.uix.fitimage import FitImage
 from kivymd.app import MDApp
 from kivy.clock import mainthread, Clock
 from kivy.storage.jsonstore import JsonStore
@@ -14,41 +15,54 @@ from kivy.metrics import dp
 import requests
 import threading
 import config
+import os
 
 store = JsonStore('sessao_app.json')
 
 KV_PROFILE_TAB = '''
 <ProfileField>:
     orientation: "horizontal"
-    adaptive_height: True
+    size_hint_y: None
+    height: "50dp"
     size_hint_x: 1
-    padding: ["8dp", "8dp", "8dp", "8dp"]
+    # Lápis colado na borda direita
+    padding: ["12dp", 0, "2dp", 0]
     spacing: "10dp"
     
+    canvas.before:
+        Color:
+            rgba: 0.9, 0.9, 0.9, 1
+        Line:
+            points: self.x + dp(10), self.y, self.width - dp(10), self.y
+            width: 1
+
     MDLabel:
         text: root.label_text
         bold: True
-        size_hint_x: 0.28
+        size_hint_x: None
+        width: "80dp"
         font_size: "14sp"
-        theme_text_color: "Custom"
-        text_color: 0, 0, 0, 1
-        halign: "left"
+        pos_hint: {"center_y": .5}
         
-    MDTextField:
+    TextInput:
         id: field_input
         text: root.text_value
         readonly: True
-        size_hint_x: 0.57
+        size_hint_x: 1 
         font_size: "15sp"
-        text_color_normal: 0.3, 0.3, 0.3, 1
-        line_color_normal: 0, 0, 0, 0
+        foreground_color: (0, 0, 0, 1) if not self.readonly else (0.4, 0.4, 0.4, 1)
+        background_color: 0, 0, 0, 0
+        padding: [0, (self.height - self.line_height) / 2]
         multiline: False
-        
-    MDBoxLayout:
-        size_hint_x: 0.15
-        adaptive_width: True
-        spacing: "2dp"
         pos_hint: {"center_y": .5}
+        cursor_color: 0.22, 0.75, 0.94, 1
+
+    MDBoxLayout:
+        size_hint_x: None
+        width: "80dp" if btn_save.opacity > 0 else "38dp"
+        adaptive_width: True
+        pos_hint: {"center_y": .5}
+        spacing: "2dp"
         
         MDIconButton:
             id: btn_edit
@@ -56,8 +70,9 @@ KV_PROFILE_TAB = '''
             icon_size: "20sp"
             theme_text_color: "Custom"
             text_color: 0.5, 0.5, 0.5, 1
-            opacity: 0 if root.is_email else 1
-            disabled: root.is_email
+            opacity: 1 if not root.is_email and btn_save.opacity == 0 else 0
+            disabled: root.is_email or btn_save.opacity > 0
+            pos_hint: {"center_y": .5}
             on_release: root.start_edit()
             
         MDIconButton:
@@ -68,6 +83,7 @@ KV_PROFILE_TAB = '''
             text_color: 0, 0.7, 0, 1
             opacity: 0
             disabled: True
+            pos_hint: {"center_y": .5}
             on_release: root.save_edit()
             
         MDIconButton:
@@ -78,6 +94,7 @@ KV_PROFILE_TAB = '''
             text_color: 1, 0, 0, 1
             opacity: 0
             disabled: True
+            pos_hint: {"center_y": .5}
             on_release: root.cancel_edit()
 
 <ActionRow@MDCard>:
@@ -109,70 +126,62 @@ KV_PROFILE_TAB = '''
 
 <ProfileTabContent>:
     md_bg_color: 1, 1, 1, 1
-
     MDBoxLayout:
         orientation: "vertical"
         size_hint_x: 1
-        padding: ["12dp", "10dp", "12dp", "20dp"]
-        spacing: "10dp"
+        padding: ["5dp", "20dp", "5dp", "20dp"]
+        spacing: "12dp"
         adaptive_height: True
 
-        # AVATAR CENTRALIZADO COM ANCHOR (Segurança total contra desalinhamento)
+        # --- ÁREA DA FOTO COM CÂMERA ---
         AnchorLayout:
             anchor_x: "center"
             size_hint_y: None
-            height: "120dp"
-            padding: [0, "10dp", 0, "10dp"]
-
-            MDCard:
+            height: "130dp"
+            
+            MDFloatLayout:
                 size_hint: None, None
-                size: "100dp", "100dp"
-                radius: [50, 50, 50, 50]
-                md_bg_color: 0.95, 0.95, 0.95, 1
-                elevation: 0
+                size: "110dp", "110dp"
                 
-                MDIcon:
-                    icon: "account"
-                    font_size: "60sp"
-                    theme_text_color: "Custom"
-                    text_color: 0.22, 0.75, 0.94, 1
+                MDCard:
+                    size_hint: None, None
+                    size: "110dp", "110dp"
+                    radius: [55,]
+                    md_bg_color: 0.9, 0.9, 0.9, 1
+                    elevation: 0
                     pos_hint: {"center_x": .5, "center_y": .5}
+                    clip_to_bounds: True
+                    
+                    FitImage:
+                        id: avatar_image
+                        source: root.avatar_source
+                        radius: [55,]
 
-        # SWITCH DE EXIBIÇÃO (Recuperado!)
-        MDBoxLayout:
-            adaptive_height: True
-            padding: ["4dp", "10dp", "4dp", "10dp"]
-            size_hint_x: 1
-            
-            MDLabel:
-                text: "Modo de exibição"
-                bold: True
-                font_size: "16sp"
-                size_hint_x: 0.8
-            
-            MDSwitch:
-                active: False
-                pos_hint: {"center_y": .5}
-                thumb_color_active: 0.22, 0.75, 0.94, 1
-                track_color_active: 0.22, 0.75, 0.94, 0.5
-
-        MDSeparator:
+                MDIconButton:
+                    icon: "camera"
+                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    size_hint: None, None
+                    size: "36dp", "36dp"
+                    pos_hint: {"center_x": .85, "center_y": .15}
+                    on_release: root.open_gallery()
 
         # DADOS DO USUÁRIO
         MDBoxLayout:
             id: fields_container
             orientation: "vertical"
             adaptive_height: True
-            spacing: "2dp"
             size_hint_x: 1
+            spacing: "2dp"
 
-        # BOTÕES DE AÇÃO (Recuperados!)
+        # BOTÕES DE AÇÃO
         MDBoxLayout:
             orientation: "vertical"
             adaptive_height: True
-            spacing: "2dp"
-            padding: ["0dp", "10dp", "0dp", "0dp"]
             size_hint_x: 1
+            padding: ["10dp", "20dp", "10dp", "0dp"]
+            spacing: "5dp"
 
             ActionRow:
                 id: btn_redefinir_senha
@@ -220,10 +229,7 @@ class ProfileField(MDBoxLayout):
     def start_edit(self):
         self.original_value = self.ids.field_input.text
         self.ids.field_input.readonly = False
-        self.ids.field_input.text_color_normal = (0, 0, 0, 1)
-        self.ids.field_input.line_color_normal = (0.5, 0.5, 0.5, 1)
         self.ids.field_input.focus = True
-        
         self.ids.btn_edit.opacity = 0
         self.ids.btn_edit.disabled = True
         self.ids.btn_save.opacity = 1
@@ -241,19 +247,18 @@ class ProfileField(MDBoxLayout):
 
     def _lock_field(self):
         self.ids.field_input.readonly = True
-        self.ids.field_input.text_color_normal = (0.5, 0.5, 0.5, 1)
-        self.ids.field_input.line_color_normal = (0, 0, 0, 0)
         self.ids.field_input.focus = False
-        
-        self.ids.btn_edit.opacity = 1
-        self.ids.btn_edit.disabled = False
         self.ids.btn_save.opacity = 0
         self.ids.btn_save.disabled = True
         self.ids.btn_cancel.opacity = 0
         self.ids.btn_cancel.disabled = True
-
+        if not self.is_email:
+            self.ids.btn_edit.opacity = 1
+            self.ids.btn_edit.disabled = False
 
 class ProfileTabContent(ScrollView):
+    avatar_source = StringProperty("https://cdn-icons-png.flaticon.com/512/149/149071.png")
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.fields_refs = {}
@@ -264,7 +269,6 @@ class ProfileTabContent(ScrollView):
     @mainthread
     def refresh_data(self):
         for field in self.fields_refs.values():
-            field.text_value = "Carregando..."
             field.ids.field_input.text = "Carregando..."
         threading.Thread(target=self.load_user_data, daemon=True).start()
 
@@ -276,78 +280,88 @@ class ProfileTabContent(ScrollView):
             {"label": "Usuário", "key": "username", "email": False},
             {"label": "Email", "key": "email", "email": True},
         ]
-        
         for c in config_campos:
-            field = ProfileField(
-                label_text=c["label"], 
-                api_key=c["key"], 
-                is_email=c["email"],
-                callback_save=self.salvar_na_api
-            )
+            field = ProfileField(label_text=c["label"], api_key=c["key"], is_email=c["email"], callback_save=self.salvar_na_api)
             self.fields_refs[c["key"]] = field
             self.ids.fields_container.add_widget(field)
 
-    def load_user_data(self):
-        app = MDApp.get_running_app()
-        token = getattr(app, "vigiaa_token", None)
-        if not token and store.exists("session"):
-            token = store.get("session")["token"]
-            
+    def open_gallery(self):
+        try:
+            from plyer import filechooser
+            filechooser.open_file(
+                title="Escolha sua foto de perfil",
+                filters=[("Imagens", "*.png", "*.jpg", "*.jpeg")],
+                on_selection=self.process_selection
+            )
+        except:
+            self.mostrar_aviso("Erro ao abrir galeria.")
+
+    def process_selection(self, selection):
+        if selection:
+            path = selection[0]
+            self.avatar_source = path
+            threading.Thread(target=self._worker_upload_avatar, args=(path,), daemon=True).start()
+
+    def _worker_upload_avatar(self, file_path):
+        token = store.get("session")["token"] if store.exists("session") else None
         if not token: return
-            
+        try:
+            url = f"{config.API_URL}/api/profile/"
+            with open(file_path, 'rb') as f:
+                files = {'photo': f}
+                res = requests.patch(url, headers={"Authorization": f"Bearer {token}"}, files=files, timeout=20)
+            if res.status_code == 200:
+                self.mostrar_aviso("Foto atualizada!")
+        except:
+            self.mostrar_aviso("Erro de conexão no upload.")
+
+    def load_user_data(self):
+        token = store.get("session")["token"] if store.exists("session") else None
+        if not token: return
         try:
             url = f"{config.API_URL}/api/profile/"
             res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
-            
             if res.status_code == 200:
                 data = res.json()
                 Clock.schedule_once(lambda dt: self.update_ui_fields(data), 0)
-            elif res.status_code in [401, 403]:
-                Clock.schedule_once(lambda dt: self.logout(), 0)
-        except:
-            pass
+        except: pass
 
     @mainthread
     def update_ui_fields(self, data):
         for key, field in self.fields_refs.items():
             if key in data:
-                val = data.get(key, "")
-                field.text_value = val
-                field.ids.field_input.text = val
+                field.ids.field_input.text = str(data.get(key, ""))
+        
+        if data.get("photo"):
+            foto_url = data.get("photo")
+            if not foto_url.startswith('http'):
+                foto_url = f"{config.API_URL}{foto_url}"
+            self.avatar_source = foto_url
 
         if data.get("tem_senha") is False:
             self.ids.btn_redefinir_senha.opacity = 0
             self.ids.btn_redefinir_senha.disabled = True
-            self.ids.btn_redefinir_senha.height = "0dp" 
+            self.ids.btn_redefinir_senha.height = "0dp"
             self.ids.sep_redefinir_senha.height = "0dp"
 
     def salvar_na_api(self, api_key, novo_valor, field_instance):
         threading.Thread(target=self._worker_save, args=(api_key, novo_valor, field_instance), daemon=True).start()
 
     def _worker_save(self, api_key, novo_valor, field_instance):
-        if not store.exists("session"): return
         token = store.get("session")["token"]
-        
         try:
-            res = requests.patch(
-                f"{config.API_URL}/api/profile/",
-                json={api_key: novo_valor},
-                headers={"Authorization": f"Bearer {token}"}
-            )
+            res = requests.patch(f"{config.API_URL}/api/profile/", json={api_key: novo_valor}, headers={"Authorization": f"Bearer {token}"})
             if res.status_code == 200:
                 self.mostrar_aviso(f"{field_instance.label_text} atualizado!")
                 Clock.schedule_once(lambda dt: field_instance._lock_field(), 0)
             else:
-                self.mostrar_aviso("Erro ao salvar.")
                 Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
         except:
-            self.mostrar_aviso("Erro de conexão.")
             Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
 
     def logout(self):
         app = MDApp.get_running_app()
         if store.exists("session"): store.delete("session")
-        if store.exists("current_case"): store.delete("current_case")
         app.root.current = 'login'
 
     def go_to_reset_password(self):
@@ -369,16 +383,14 @@ class ProfileTabContent(ScrollView):
         threading.Thread(target=self._worker_delete, daemon=True).start()
 
     def _worker_delete(self):
-        if not store.exists("session"): return
         token = store.get("session")["token"]
         try:
             res = requests.delete(f"{config.API_URL}/api/delete-account/", headers={"Authorization": f"Bearer {token}"})
             if res.status_code == 200:
                 self.mostrar_aviso("Conta excluída.")
                 Clock.schedule_once(lambda dt: self.logout(), 0)
-        except:
-            pass
+        except: pass
 
     @mainthread
     def mostrar_aviso(self, texto):
-        MDSnackbar(MDLabel(text=texto, theme_text_color="Custom", text_color=(1, 1, 1, 1))).open()
+        MDSnackbar(MDLabel(text=texto, theme_text_color="Custom", text_color=(1,1,1,1))).open()

@@ -150,7 +150,7 @@ KV_POSITIVE_FORM = '''
                         readonly: True
                         background_color: 0,0,0,0
                         padding: [0, (self.height - self.line_height) / 2]
-                        on_focus: if self.focus: root.open_local_menu()
+                        on_touch_down: if self.collide_point(*args[1].pos): root.open_local_menu()
                     MDIconButton:
                         icon: "chevron-down"
                         on_release: root.open_local_menu()

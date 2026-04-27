@@ -76,7 +76,7 @@ KV_FOCUS_FORM = '''
         MDLabel:
             text: root.image_name
             font_style: "Caption"
-            bold: True
+            bold: True  
             shorten: True
             shorten_from: "right"
             theme_text_color: "Custom"
