@@ -169,7 +169,7 @@ KV_POSITIVE_FORM = '''
 
             MDFillRoundFlatButton:
                 id: btn_submit
-                text: "FINALIZAR VINCULAÇÃO"
+                text: "Cadastrar caso positivo"
                 md_bg_color: 0.22, 0.75, 0.94, 1
                 size_hint_x: 1
                 height: "56dp"

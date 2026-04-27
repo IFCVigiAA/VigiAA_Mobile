@@ -339,6 +339,7 @@ class CaseFormScreen(MDScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.gps_address_data = {}
+        self.gps_dialog = None  # Variável para o aviso do GPS
         self.dialog = None
 
     def on_pre_enter(self, *args):
@@ -508,13 +509,47 @@ class CaseFormScreen(MDScreen):
 
     @mainthread
     def open_gps_modal(self, source):
-        self._reset_gps_btn()
-        self.dialog = MDDialog(title="Confirmar Local?", text=f"Rua: {self.gps_address_data.get('logradouro')}\\nBairro: {self.gps_address_data.get('bairro')}",
-            buttons=[MDFlatButton(text="OK", text_color=(0.22,0.75,0.94,1), on_release=self.confirm_gps_fill)])
-        self.dialog.open()
+        # TRAVA ANTI-SPAM: Não abre se já tiver um aberto
+        if self.gps_dialog:
+            return
 
-    def confirm_gps_fill(self, x):
-        self.dialog.dismiss()
+        self._reset_gps_btn()
+        
+        rua = self.gps_address_data.get("logradouro") or "Rua não detectada"
+        bairro = self.gps_address_data.get("bairro") or "Bairro não detectado"
+        cidade = self.gps_address_data.get("localidade") or "Cidade não detectada"
+        
+        texto_dialog = f"[b]Rua:[/b] {rua}\n[b]Bairro:[/b] {bairro}\n[b]Cidade:[/b] {cidade}\n\n[i]Fonte: {source}[/i]"
+        
+        self.gps_dialog = MDDialog(
+            title="Confirme os Dados:",
+            text=texto_dialog,
+            auto_dismiss=False, # Obriga a clicar no botão
+            buttons=[
+                MDFlatButton(
+                    text="CANCELAR", 
+                    text_color=(1, 0, 0, 1), 
+                    on_release=self.cancelar_gps_fill
+                ),
+                MDRaisedButton(
+                    text="CONFIRMAR", 
+                    md_bg_color=(0.22, 0.75, 0.94, 1), 
+                    on_release=self.confirm_gps_fill
+                )
+            ]
+        )
+        self.gps_dialog.open()
+
+    def cancelar_gps_fill(self, *args):
+        if self.gps_dialog:
+            self.gps_dialog.dismiss()
+            self.gps_dialog = None
+
+    def confirm_gps_fill(self, *args):
+        if self.gps_dialog:
+            self.gps_dialog.dismiss()
+            self.gps_dialog = None
+        # Preenche os campos do formulário
         self.fill_address_fields(self.gps_address_data)
 
     def _reset_gps_btn(self):

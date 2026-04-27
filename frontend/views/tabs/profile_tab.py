@@ -1,3 +1,4 @@
+import certifi
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.lang import Builder
@@ -268,6 +269,11 @@ class ProfileTabContent(ScrollView):
 
     @mainthread
     def refresh_data(self):
+        # Limpa o cache da imagem para forçar o Kivy a baixar a nova
+        from kivy.cache import Cache
+        Cache.remove('kv.loader')
+        Cache.remove('kv.image')
+        
         for field in self.fields_refs.values():
             field.ids.field_input.text = "Carregando..."
         threading.Thread(target=self.load_user_data, daemon=True).start()
@@ -303,17 +309,42 @@ class ProfileTabContent(ScrollView):
             threading.Thread(target=self._worker_upload_avatar, args=(path,), daemon=True).start()
 
     def _worker_upload_avatar(self, file_path):
-        token = store.get("session")["token"] if store.exists("session") else None
+        session = store.get("session") if store.exists("session") else None
+        token = session["token"] if session else None
         if not token: return
+        
         try:
+            # 2. A CORREÇÃO DO SSL (O segredo para funcionar no Android)
+            os.environ['SSL_CERT_FILE'] = certifi.where()
+            
             url = f"{config.API_URL}/api/profile/"
+            
+            # 3. VERIFICAÇÃO DE ARQUIVO
+            if not os.path.exists(file_path):
+                 self.mostrar_aviso("Erro: Arquivo não acessível.")
+                 return
+
             with open(file_path, 'rb') as f:
                 files = {'photo': f}
-                res = requests.patch(url, headers={"Authorization": f"Bearer {token}"}, files=files, timeout=20)
+                # Adicionamos o 'verify=certifi.where()' para garantir o HTTPS
+                res = requests.patch(
+                    url, 
+                    headers={"Authorization": f"Bearer {token}"}, 
+                    files=files, 
+                    timeout=30,
+                    verify=certifi.where() 
+                )
+                
             if res.status_code == 200:
                 self.mostrar_aviso("Foto atualizada!")
-        except:
-            self.mostrar_aviso("Erro de conexão no upload.")
+                # Força a atualização da imagem na tela
+                Clock.schedule_once(lambda dt: self.refresh_data(), 0.5)
+            else:
+                self.mostrar_aviso(f"Erro no servidor: {res.status_code}")
+                
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Erro detalhado: {str(e)}")
+            self.mostrar_aviso("Erro ao processar imagem.")
 
     def load_user_data(self):
         token = store.get("session")["token"] if store.exists("session") else None

@@ -807,6 +807,11 @@ class FocusFormScreen(MDScreen):
 
     @mainthread
     def open_gps_modal(self, source):
+        # --- TRAVA ANTI-SPAM ---
+        # Se o diálogo já existir (estiver aberto), não cria outro
+        if self.gps_dialog:
+            return
+
         self.ids.btn_gps.text = "Localização Encontrada!"
         self.ids.btn_gps.icon = "check"
         self.ids.btn_gps.disabled = False
@@ -819,15 +824,31 @@ class FocusFormScreen(MDScreen):
         self.gps_dialog = MDDialog(
             title="Confirme os Dados:",
             text=texto_dialog,
+            auto_dismiss=False, # OBRIGATÓRIO: Impede fechar ao clicar fora
             buttons=[
-                MDFlatButton(text="Cancelar", text_color=(1,0,0,1), on_release=lambda x: self.gps_dialog.dismiss()),
-                MDFlatButton(text="Confirmar", text_color=(0.22, 0.75, 0.94, 1), on_release=self.confirm_gps_fill)
+                MDFlatButton(
+                    text="Cancelar", 
+                    text_color=(1, 0, 0, 1), 
+                    on_release=self.fechar_gps_dialog # Função unificada para fechar
+                ),
+                MDFlatButton(
+                    text="Confirmar", 
+                    text_color=(0.22, 0.75, 0.94, 1), 
+                    on_release=self.confirm_gps_fill # Confirmar e fechar
+                )
             ]
         )
         self.gps_dialog.open()
+    
+    def fechar_gps_dialog(self, *args):
+        """Fecha o diálogo e limpa a referência para evitar duplicatas"""
+        if self.gps_dialog:
+            self.gps_dialog.dismiss()
+            self.gps_dialog = None # Mata a instância na memória
 
-    def confirm_gps_fill(self, instance):
-        self.gps_dialog.dismiss()
+    def confirm_gps_fill(self, *args):
+        """Confirma os dados e limpa o diálogo"""
+        self.fechar_gps_dialog() # Primeiro fecha
         self.fill_address_fields(self.gps_address_data)
 
     def open_gallery(self):

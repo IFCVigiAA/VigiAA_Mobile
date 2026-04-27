@@ -1,124 +1,167 @@
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.lang import Builder
-from kivymd.app import MDApp
-from kivy.properties import BooleanProperty
+from kivy.properties import BooleanProperty, StringProperty
+from kivymd.uix.fitimage import FitImage
+from kivymd.uix.swiper import MDSwiper, MDSwiperItem
+from kivy.factory import Factory
 
-# O Visual da Aba "Explorar"
+# Textos formatados
+LINK_COLOR = "0077B6"
+SHORT_INFO_TEXT = f"A [b]dengue[/b] é uma arbovirose... [ref=more][color={LINK_COLOR}]ler mais...[/color][/ref]"
+FULL_INFO_TEXT = f"A [b]dengue[/b] é uma arbovirose causada pelo mosquito Aedes aegypti. [ref=less][color={LINK_COLOR}]ler menos[/color][/ref]"
+
+Factory.register('MDSwiper', cls=MDSwiper)
+Factory.register('MDSwiperItem', cls=MDSwiperItem)
+
 KV_EXPLORE_TAB = '''
 <ExploreTabContent>:
     md_bg_color: 1, 1, 1, 1
+    orientation: "vertical"
 
     ScrollView:
+        do_scroll_x: False
         MDBoxLayout:
             orientation: "vertical"
-            padding: "20dp"
-            spacing: "25dp"
+            padding: "15dp"
+            spacing: "20dp"
             adaptive_height: True
 
-            # 1. Banner do Topo
-            MDCard:
+            # --- CARROSSEL COM DESIGN AJUSTADO ---
+            MDRelativeLayout:
                 size_hint_y: None
                 height: "180dp"
-                radius: [15, 15, 15, 15]
-                elevation: 2
                 
-                FitImage:
-                    source: "assets/images/banner1.jpeg"
-                    radius: [15, 15, 15, 15]
+                MDCard:
+                    size_hint: 1, 1
+                    radius: [20, 20, 20, 20]
+                    elevation: 1
+                    padding: 0
+                    clip_to_bounds: True # Corta o conteúdo na curva
+                    md_bg_color: 1, 1, 1, 1
 
-            # 2. Caixa de Texto Azul (Informativo da Dengue)
+                    MDSwiper:
+                        id: swiper
+                        size_hint: 1, 1
+                        width_mult: 1
+                        items_spacing: 0
+                        show_pagination: True
+                        radius: [20, 20, 20, 20]
+
+                        # --- SLIDE 1 ---
+                        MDSwiperItem:
+                            size_hint: 1, 1
+                            MDRelativeLayout:
+                                FitImage:
+                                    source: "assets/images/banner1.jpeg"
+                                    size_hint: 1, 1
+                                    radius: [20, 20, 20, 20]
+                                
+                                MDBoxLayout:
+                                    size_hint_y: None
+                                    height: "50dp"
+                                    pos_hint: {"bottom": 0}
+                                    md_bg_color: 0, 0, 0, 0.6
+                                    # Acompanha o radius inferior do card
+                                    radius: [0, 0, 20, 20] 
+                                    padding: ["60dp", 0, "10dp", 0] 
+                                    
+                                    MDLabel:
+                                        text: "O mosquito não descansa!"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 1, 1, 1
+                                        bold: True
+                                        halign: "left"
+                                        valign: "center"
+                                        text_size: self.size
+
+                        # --- SLIDE 2 ---
+                        MDSwiperItem:
+                            size_hint: 1, 1
+                            MDRelativeLayout:
+                                FitImage:
+                                    source: "assets/images/agentes.jpeg"
+                                    size_hint: 1, 1
+                                    radius: [20, 20, 20, 20]
+                                
+                                MDBoxLayout:
+                                    size_hint_y: None
+                                    height: "50dp"
+                                    pos_hint: {"bottom": 0}
+                                    md_bg_color: 0, 0, 0, 0.6
+                                    # Acompanha o radius inferior do card
+                                    radius: [0, 0, 20, 20]
+                                    # Texto ainda mais para a direita para segurança total
+                                    padding: ["60dp", 0, "10dp", 0]
+                                    
+                                    MDLabel:
+                                        text: "Agentes em combate"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 1, 1, 1
+                                        bold: True
+                                        halign: "left"
+                                        valign: "center"
+                                        text_size: self.size
+
+                # SETAS LATERAIS
+                MDIconButton:
+                    icon: "chevron-left"
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    md_bg_color: 0, 0, 0, 0.3
+                    pos_hint: {"left": 0, "center_y": .5}
+                    on_release: swiper.swipe_left()
+
+                MDIconButton:
+                    icon: "chevron-right"
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    md_bg_color: 0, 0, 0, 0.3
+                    pos_hint: {"right": 1, "center_y": .5}
+                    on_release: swiper.swipe_right()
+
+            # --- BOX INFORMATIVO ---
             MDBoxLayout:
                 orientation: "vertical"
                 adaptive_height: True
-                padding: "20dp"
-                spacing: "5dp"
+                padding: "15dp"
                 radius: [15, 15, 15, 15]
-                md_bg_color: 0.88, 0.97, 0.98, 1 # Azul claro (#E0F7FA)
-
+                md_bg_color: 0.88, 0.97, 0.98, 1
                 MDLabel:
-                    id: text_description
-                    text: "A dengue é uma arbovirose causada por vírus transmitidos principalmente pelo mosquito Aedes aegypti. Os principais sintomas são febre alta, erupções cutâneas e dores musculares e articulares. Em casos graves, pode haver hemorragia profusa e choque, podendo ser fatal. O tratamento inclui ingestão de líquidos e analgésicos."
-                    font_size: "15sp"
-                    theme_text_color: "Custom"
-                    text_color: 0.22, 0.28, 0.31, 1 # Cinza Escuro (#37474F)
-                    # Lógica para mostrar tudo ou apenas 3 linhas
-                    shorten: not root.is_expanded
-                    shorten_from: "right"
-                    max_lines: 3 if not root.is_expanded else 0
+                    text: root.info_text
+                    markup: True
                     adaptive_height: True
+                    on_ref_press: root.process_info_link_press(args[1])
 
-                MDTextButton:
-                    id: btn_read_more
-                    text: "ler mais..." if not root.is_expanded else "ler menos"
-                    theme_text_color: "Custom"
-                    text_color: 0, 0.47, 0.71, 1 # Azul link (#0077B6)
-                    font_size: "14sp"
-                    on_release: root.toggle_read_more()
-
-            # 3. Lista de Acesso Rápido
+            # --- LISTA ---
             MDList:
-                id: list_container
-                spacing: "10dp"
-
-                # Item 1: Sintomas
                 TwoLineAvatarIconListItem:
                     text: "Sintomas"
                     secondary_text: "Conheça os sinais"
                     on_release: root.go_to_route('sintomas')
-                    
                     IconLeftWidget:
-                        # Usando um FitImage no lugar de um ícone genérico
-                        FitImage:
-                            source: "assets/images/termometro.jpg"
-                            radius: [30, 30, 30, 30] # Deixa a imagem redondinha
-                            
+                        icon: "thermometer"
                     IconRightWidget:
                         icon: "chevron-right"
 
-                # Item 2: Prevenção
-                TwoLineAvatarIconListItem:
-                    text: "Conheça as formas de prevenção"
-                    secondary_text: "Saiba como se proteger"
-                    on_release: root.go_to_route('prevencao')
-                    
-                    IconLeftWidget:
-                        FitImage:
-                            source: "assets/images/mosquito_proibido.png"
-                            radius: [30, 30, 30, 30]
-                            
-                    IconRightWidget:
-                        icon: "chevron-right"
-
-                # Item 3: Campanhas
-                TwoLineAvatarIconListItem:
-                    text: "Campanhas"
-                    secondary_text: "Ações da prefeitura"
-                    on_release: root.go_to_route('campanhas')
-                    
-                    IconLeftWidget:
-                        FitImage:
-                            source: "assets/images/agentes.jpeg"
-                            radius: [30, 30, 30, 30]
-                            
-                    IconRightWidget:
-                        icon: "chevron-right"
-
-            # Espaçamento no fundo para o menu inferior não engolir o último item
-            MDBoxLayout:
+            Widget:
                 size_hint_y: None
                 height: "80dp"
 '''
+
 Builder.load_string(KV_EXPLORE_TAB)
 
 class ExploreTabContent(MDBoxLayout):
-    # Controla o botão "ler mais"
     is_expanded = BooleanProperty(False)
+    info_text = StringProperty(SHORT_INFO_TEXT)
 
-    def toggle_read_more(self):
-        self.is_expanded = not self.is_expanded
+    def process_info_link_press(self, ref_name):
+        if ref_name == "more":
+            self.info_text = FULL_INFO_TEXT
+            self.is_expanded = True
+        else:
+            self.info_text = SHORT_INFO_TEXT
+            self.is_expanded = False
 
-    def go_to_route(self, route_name):
-        # Aqui você vai plugar as futuras telas de informações
-        # Exemplo: MDApp.get_running_app().root.current = route_name
-        print(f"Navegando para a rota: {route_name}")
+    def go_to_route(self, route):
+        print(f"DEBUG: Navegando para: {route}")
