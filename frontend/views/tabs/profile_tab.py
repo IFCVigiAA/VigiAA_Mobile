@@ -17,6 +17,9 @@ import requests
 import threading
 import config
 import os
+from kivy.utils import platform
+import time  # <--- ADICIONE ESTE
+from kivy.utils import platform  # <--- ADICIONE ESTE
 
 store = JsonStore('sessao_app.json')
 
@@ -309,49 +312,69 @@ class ProfileTabContent(ScrollView):
             threading.Thread(target=self._preparar_e_subir, args=(path,), daemon=True).start()
 
     def _preparar_e_subir(self, path):
-        caminho_acessivel = self.copiar_para_pasta_app(path)
-        if caminho_acessivel:
-            # Atualiza a UI no fio principal
-            Clock.schedule_once(lambda dt: setattr(self, 'avatar_source', caminho_acessivel))
-            self._worker_upload_avatar(caminho_acessivel)
+        # 1. Faz a cópia para a pasta segura do app
+        caminho_interno = self.copiar_para_pasta_app(path)
+        
+        if caminho_interno:
+            print(f"VIGIAA DEBUG: Caminho pronto para exibir: {caminho_interno}")
+            
+            # 2. LIMPEZA DE CACHE FORÇADA (O segredo para a foto aparecer)
+            from kivy.cache import Cache
+            Cache.remove('kv.image')
+            Cache.remove('kv.loader')
+            
+            # 3. Atualiza a UI no Fio Principal com o prefixo file://
+            @mainthread
+            def atualizar_ui(dt):
+                # No Android, usamos o prefixo file://
+                prefixo = "file://" if platform == "android" else ""
+                
+                # IMPORTANTE: Removi o "?t=..." daqui! 
+                # Arquivos locais não aceitam parâmetros de URL.
+                self.avatar_source = f"{prefixo}{caminho_interno}"
+                
+                print(f"VIGIAA DEBUG: Carregando localmente: {self.avatar_source}")
+            
+            Clock.schedule_once(atualizar_ui, 0.1)
 
     def copiar_para_pasta_app(self, uri_origem):
-        """Usa a API do Android para copiar o arquivo para onde o Python tem acesso"""
+        """Abre o arquivo do Android e salva na pasta do VigiAA"""
         from kivy.utils import platform
+        from kivy.app import App
+        import os
+
+        app_folder = App.get_running_app().user_data_dir
+        dest_path = os.path.join(app_folder, "perfil_local.jpg")
+
         if platform != 'android':
-            return uri_origem
+            import shutil
+            shutil.copy2(uri_origem, dest_path)
+            return dest_path
 
         try:
             from jnius import autoclass
-            from kivy.app import App
-            import shutil
-
-            # Classes do Android
-            Context = autoclass('android.content.Context')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
             Uri = autoclass('android.net.Uri')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
             
             activity = PythonActivity.mActivity
             content_resolver = activity.getContentResolver()
             uri = Uri.parse(uri_origem)
             
-            # Cria o destino na pasta interna do VigiAA
-            app_folder = App.get_running_app().user_data_dir
-            dest_path = os.path.join(app_folder, "perfil_temp.jpg")
-            
-            # Abre o fluxo de dados (InputStream) do Android
+            # Abre o fluxo de entrada do Android
             input_stream = content_resolver.openInputStream(uri)
-            with open(dest_path, 'wb') as output_file:
-                # Copia em blocos de 1MB para não estourar a RAM
-                buffer = input_stream.read(1024 * 1024)
-                while buffer:
-                    output_file.write(buffer)
-                    buffer = input_stream.read(1024 * 1024)
-            input_stream.close()
             
+            # Escreve os bytes no destino
+            with open(dest_path, 'wb') as output_file:
+                # Buffer de 128kb para ser rápido e seguro
+                chunk = input_stream.read(128 * 1024)
+                while chunk:
+                    output_file.write(chunk)
+                    chunk = input_stream.read(128 * 1024)
+            
+            input_stream.close()
             return dest_path
         except Exception as e:
-            print(f"VIGIAA DEBUG: Falha crítica na cópia: {e}")
+            print(f"VIGIAA DEBUG ERROR: Falha na cópia: {e}")
             return None
 
     def garantir_arquivo_acessivel(self, original_path):
