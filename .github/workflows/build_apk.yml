@@ -49,18 +49,21 @@ jobs:
           source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf
           version = 1.0
           
-          # A MÁGICA FINAL: Adicionamos o combo de rede exato do seu teste (PoC)!
           requirements = python3,kivy==2.3.0,kivymd==1.2.0,pillow,requests,urllib3,charset-normalizer,idna,certifi,https://github.com/kivy/plyer/archive/master.zip
           
           orientation = portrait
-          android.permissions = INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, CAMERA, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
+          # ADICIONADO: READ_MEDIA_IMAGES para Android 13+
+          android.permissions = INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, CAMERA, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, READ_MEDIA_IMAGES
           android.accept_sdk_license = True
           android.api = 33
           android.minapi = 24
           android.archs = arm64-v8a
           android.allow_backup = False
-          android.manifest.application_fullBackupContent = false
-
+          
+          # MOVIDO PARA O LUGAR CORRETO ([app])
+          android.manifest.launch_mode = singleTask
+          android.low_memory_killer = False
+          
           p4a.branch = master
           
           [buildozer]

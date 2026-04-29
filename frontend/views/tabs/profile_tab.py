@@ -305,8 +305,31 @@ class ProfileTabContent(ScrollView):
     def process_selection(self, selection):
         if selection:
             path = selection[0]
-            self.avatar_source = path
-            threading.Thread(target=self._worker_upload_avatar, args=(path,), daemon=True).start()
+            # A MÁGICA: Copiamos para a pasta interna do app antes de tudo
+            readable_path = self.garantir_arquivo_acessivel(path)
+            
+            if readable_path:
+                self.avatar_source = readable_path
+                threading.Thread(target=self._worker_upload_avatar, args=(readable_path,), daemon=True).start()
+
+    def garantir_arquivo_acessivel(self, original_path):
+        """Copia a imagem para a pasta do app para que o Python consiga ler"""
+        import shutil
+        from kivy.app import App
+        
+        try:
+            # Caminho da pasta interna do app
+            app_folder = App.get_running_app().user_data_dir
+            ext = original_path.split('.')[-1]
+            dest_path = os.path.join(app_folder, f"temp_profile_upload.{ext}")
+            
+            # Se for um caminho 'content://', o Plyer já tentou converter, 
+            # mas o shutil.copy2 garante que o binário seja movido para onde temos permissão.
+            shutil.copy2(original_path, dest_path)
+            return dest_path
+        except Exception as e:
+            print(f"ERRO AO COPIAR ARQUIVO: {e}")
+            return original_path # tenta o original se falhar
 
     def _worker_upload_avatar(self, file_path):
         session = store.get("session") if store.exists("session") else None

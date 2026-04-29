@@ -13,6 +13,7 @@ import time
 import threading
 import requests
 import unicodedata
+import shutil
 from urllib.parse import quote
 
 # --- 2. COMPONENTES KIVYMD (Importação Única) ---
@@ -913,16 +914,29 @@ class FocusFormScreen(MDScreen):
 
     @mainthread
     def _on_camera_success(self, filepath=None):
-        """Quando o usuário clica no 'OK' da câmera, a foto cai aqui"""
-        # O Android pode não devolver o filepath, então puxamos o caminho que nós mesmos criamos
         caminho_final = filepath if filepath else getattr(self, 'caminho_foto_temp', None)
         
         if caminho_final and os.path.exists(caminho_final):
-            if caminho_final not in self.selected_files:
-                self.selected_files.append(caminho_final)
-                self.update_images_display()
-        else:
-            self.mostrar_aviso("Foto cancelada ou não salva.", "orange")
+            tamanho = os.path.getsize(caminho_final) / (1024 * 1024)
+            if tamanho > 10:
+                self.mostrar_aviso("Imagem muito grande! Tente outra.")
+                return
+
+            # --- A SOLUÇÃO AQUI ---
+            # Copiamos o arquivo da galeria/câmera para a pasta interna do VigiAA
+            try:
+                app_folder = MDApp.get_running_app().user_data_dir
+                nome_seguro = f"upload_temp_{int(time.time())}.jpg"
+                caminho_acessivel = os.path.join(app_folder, nome_seguro)
+                
+                shutil.copy2(caminho_final, caminho_acessivel)
+                
+                # Agora usamos o caminho_acessivel para a lista e o upload
+                if caminho_acessivel not in self.selected_files:
+                    self.selected_files.append(caminho_acessivel)
+                    self.update_images_display()
+            except Exception as e:
+                self.mostrar_aviso("Erro ao processar imagem para upload.")
 
     # Mantemos o seu _handle_selection original intacto!
     def _handle_selection(self, selection):
