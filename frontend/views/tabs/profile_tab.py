@@ -305,12 +305,54 @@ class ProfileTabContent(ScrollView):
     def process_selection(self, selection):
         if selection:
             path = selection[0]
-            # A MÁGICA: Copiamos para a pasta interna do app antes de tudo
-            readable_path = self.garantir_arquivo_acessivel(path)
+            # No Android, o path costuma vir como 'content://...'
+            threading.Thread(target=self._preparar_e_subir, args=(path,), daemon=True).start()
+
+    def _preparar_e_subir(self, path):
+        caminho_acessivel = self.copiar_para_pasta_app(path)
+        if caminho_acessivel:
+            # Atualiza a UI no fio principal
+            Clock.schedule_once(lambda dt: setattr(self, 'avatar_source', caminho_acessivel))
+            self._worker_upload_avatar(caminho_acessivel)
+
+    def copiar_para_pasta_app(self, uri_origem):
+        """Usa a API do Android para copiar o arquivo para onde o Python tem acesso"""
+        from kivy.utils import platform
+        if platform != 'android':
+            return uri_origem
+
+        try:
+            from jnius import autoclass
+            from kivy.app import App
+            import shutil
+
+            # Classes do Android
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            Uri = autoclass('android.net.Uri')
             
-            if readable_path:
-                self.avatar_source = readable_path
-                threading.Thread(target=self._worker_upload_avatar, args=(readable_path,), daemon=True).start()
+            activity = PythonActivity.mActivity
+            content_resolver = activity.getContentResolver()
+            uri = Uri.parse(uri_origem)
+            
+            # Cria o destino na pasta interna do VigiAA
+            app_folder = App.get_running_app().user_data_dir
+            dest_path = os.path.join(app_folder, "perfil_temp.jpg")
+            
+            # Abre o fluxo de dados (InputStream) do Android
+            input_stream = content_resolver.openInputStream(uri)
+            with open(dest_path, 'wb') as output_file:
+                # Copia em blocos de 1MB para não estourar a RAM
+                buffer = input_stream.read(1024 * 1024)
+                while buffer:
+                    output_file.write(buffer)
+                    buffer = input_stream.read(1024 * 1024)
+            input_stream.close()
+            
+            return dest_path
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Falha crítica na cópia: {e}")
+            return None
 
     def garantir_arquivo_acessivel(self, original_path):
         """Copia a imagem para a pasta do app para que o Python consiga ler"""
@@ -382,16 +424,26 @@ class ProfileTabContent(ScrollView):
 
     @mainthread
     def update_ui_fields(self, data):
+        import time # Import necessário para gerar o marcador de tempo
+        
+        # 1. Atualiza os campos de texto (Nome, Sobrenome, etc.)
         for key, field in self.fields_refs.items():
             if key in data:
                 field.ids.field_input.text = str(data.get(key, ""))
         
+        # 2. Atualiza a foto de perfil com "Cache Buster"
         if data.get("photo"):
             foto_url = data.get("photo")
+            
+            # Garante que a URL esteja completa com o endereço do servidor
             if not foto_url.startswith('http'):
                 foto_url = f"{config.API_URL}{foto_url}"
-            self.avatar_source = foto_url
+            
+            # A MÁGICA: Adicionamos um parâmetro único (?t=123456) no fim da URL.
+            # Isso força o Android a baixar a foto nova em vez de mostrar a antiga que está no cache.
+            self.avatar_source = f"{foto_url}?t={int(time.time())}"
 
+        # 3. Esconde o botão de redefinir senha se for login social (Google/Facebook)
         if data.get("tem_senha") is False:
             self.ids.btn_redefinir_senha.opacity = 0
             self.ids.btn_redefinir_senha.disabled = True
