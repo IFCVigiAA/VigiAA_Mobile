@@ -326,7 +326,9 @@ class ProfileTabContent(ScrollView):
             # 3. Atualiza a UI no Fio Principal
             @mainthread
             def atualizar_ui(dt):
+                # Para exibir na "bolinha" (FitImage) no Android:
                 prefixo = "file://" if platform == "android" else ""
+                # caminho_interno deve ser o caminho puro: /data/user/0/...
                 self.avatar_source = f"{prefixo}{caminho_interno}"
             
             Clock.schedule_once(atualizar_ui, 0.1)
@@ -455,13 +457,11 @@ class ProfileTabContent(ScrollView):
         # 2. Atualiza a foto de perfil com "Cache Buster"
         if data.get("photo"):
             foto_url = data.get("photo")
-            
-            # Garante que a URL esteja completa com o endereço do servidor
+            # Se a URL vier sem o domínio, anexe o config.API_URL
             if not foto_url.startswith('http'):
                 foto_url = f"{config.API_URL}{foto_url}"
-            
-            # A MÁGICA: Adicionamos um parâmetro único (?t=123456) no fim da URL.
-            # Isso força o Android a baixar a foto nova em vez de mostrar a antiga que está no cache.
+        
+        # O Cache Buster (?t=...) é OBRIGATÓRIO para a foto atualizar ao voltar na tela
             self.avatar_source = f"{foto_url}?t={int(time.time())}"
 
         # 3. Esconde o botão de redefinir senha se for login social (Google/Facebook)

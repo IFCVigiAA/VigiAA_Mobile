@@ -876,7 +876,7 @@ class FocusFormScreen(MDScreen):
     def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
         from plyer import camera
-        from kivymd.app import MDApp # Import correto para o seu projeto
+        from kivymd.app import MDApp
         import os
         import time
         
@@ -884,20 +884,21 @@ class FocusFormScreen(MDScreen):
         
         if perms_dict.get(Permission.CAMERA, False):
             try:
-                # O CAMINHO SEGURO: Usar a pasta privada do app
-                # user_data_dir garante acesso total para leitura/escrita e upload
-                pasta_fotos = MDApp.get_running_app().user_data_dir
-                
+                # 1. LIBERAR O ANDROID PARA GRAVAR O ARQUIVO (StrictMode)
+                from jnius import autoclass
+                StrictMode = autoclass('android.os.StrictMode')
+                VmPolicyBuilder = autoclass('android.os.StrictMode$VmPolicy$Builder')
+                StrictMode.setVmPolicy(VmPolicyBuilder().build())
+
+                # 2. DEFINIR CAMINHO PRIVADO
+                app = MDApp.get_running_app()
+                pasta_fotos = app.user_data_dir
                 nome_arquivo = f"foco_{int(time.time())}.jpg"
                 self.caminho_foto_temp = os.path.join(pasta_fotos, nome_arquivo)
                 
-                # O Plyer utiliza este caminho para gravar o arquivo binário da foto
                 camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
-                
             except Exception as e:
                 self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
-        else:
-            self.mostrar_aviso("Permissão de câmera negada!", "red")
 
     @mainthread
     def _on_camera_success(self, filepath=None):
