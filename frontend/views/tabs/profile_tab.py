@@ -316,26 +316,24 @@ class ProfileTabContent(ScrollView):
         caminho_interno = self.copiar_para_pasta_app(path)
         
         if caminho_interno:
-            print(f"VIGIAA DEBUG: Caminho pronto para exibir: {caminho_interno}")
+            print(f"VIGIAA DEBUG: Caminho interno: {caminho_interno}")
             
-            # 2. LIMPEZA DE CACHE FORÇADA (O segredo para a foto aparecer)
+            # 2. LIMPEZA DE CACHE FORÇADA
             from kivy.cache import Cache
             Cache.remove('kv.image')
             Cache.remove('kv.loader')
             
-            # 3. Atualiza a UI no Fio Principal com o prefixo file://
+            # 3. Atualiza a UI no Fio Principal
             @mainthread
             def atualizar_ui(dt):
-                # No Android, usamos o prefixo file://
                 prefixo = "file://" if platform == "android" else ""
-                
-                # IMPORTANTE: Removi o "?t=..." daqui! 
-                # Arquivos locais não aceitam parâmetros de URL.
                 self.avatar_source = f"{prefixo}{caminho_interno}"
-                
-                print(f"VIGIAA DEBUG: Carregando localmente: {self.avatar_source}")
             
             Clock.schedule_once(atualizar_ui, 0.1)
+
+            # --- AQUI ESTAVA O ERRO: Chamada para subir pro servidor ---
+            # Agora que o arquivo está na pasta do app, chamamos o upload
+            threading.Thread(target=self._worker_upload_avatar, args=(caminho_interno,), daemon=True).start()
 
     def copiar_para_pasta_app(self, uri_origem):
         """Abre o arquivo do Android e salva na pasta do VigiAA"""

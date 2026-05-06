@@ -876,6 +876,7 @@ class FocusFormScreen(MDScreen):
     def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
         from plyer import camera
+        from kivymd.app import MDApp # Import correto para o seu projeto
         import os
         import time
         
@@ -883,28 +884,14 @@ class FocusFormScreen(MDScreen):
         
         if perms_dict.get(Permission.CAMERA, False):
             try:
-                from kivy.utils import platform
-                if platform == 'android':
-                    from jnius import autoclass
-                    
-                    # 1. A BALA DE PRATA (Libera a passagem do caminho)
-                    StrictMode = autoclass('android.os.StrictMode')
-                    VmPolicyBuilder = autoclass('android.os.StrictMode$VmPolicy$Builder')
-                    StrictMode.setVmPolicy(VmPolicyBuilder().build())
-                    
-                    # 2. O NOVO ENDEREÇO DA FOTO (Pasta Pública de Imagens do Android)
-                    Environment = autoclass('android.os.Environment')
-                    pasta_fotos = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsolutePath()
-                else:
-                    # Se for teste no PC, usa a pasta normal do app
-                    from kivy.app import App
-                    pasta_fotos = App.get_running_app().user_data_dir
-
-                # Montamos o caminho final
+                # O CAMINHO SEGURO: Usar a pasta privada do app
+                # user_data_dir garante acesso total para leitura/escrita e upload
+                pasta_fotos = MDApp.get_running_app().user_data_dir
+                
                 nome_arquivo = f"foco_{int(time.time())}.jpg"
                 self.caminho_foto_temp = os.path.join(pasta_fotos, nome_arquivo)
                 
-                # Chamamos a câmera!
+                # O Plyer utiliza este caminho para gravar o arquivo binário da foto
                 camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
                 
             except Exception as e:
@@ -914,29 +901,20 @@ class FocusFormScreen(MDScreen):
 
     @mainthread
     def _on_camera_success(self, filepath=None):
+        # Verifica o caminho retornado ou usa o temporário definido anteriormente
         caminho_final = filepath if filepath else getattr(self, 'caminho_foto_temp', None)
         
         if caminho_final and os.path.exists(caminho_final):
-            tamanho = os.path.getsize(caminho_final) / (1024 * 1024)
-            if tamanho > 10:
-                self.mostrar_aviso("Imagem muito grande! Tente outra.")
-                return
-
-            # --- A SOLUÇÃO AQUI ---
-            # Copiamos o arquivo da galeria/câmera para a pasta interna do VigiAA
-            try:
-                app_folder = MDApp.get_running_app().user_data_dir
-                nome_seguro = f"upload_temp_{int(time.time())}.jpg"
-                caminho_acessivel = os.path.join(app_folder, nome_seguro)
-                
-                shutil.copy2(caminho_final, caminho_acessivel)
-                
-                # Agora usamos o caminho_acessivel para a lista e o upload
-                if caminho_acessivel not in self.selected_files:
-                    self.selected_files.append(caminho_acessivel)
-                    self.update_images_display()
-            except Exception as e:
-                self.mostrar_aviso("Erro ao processar imagem para upload.")
+            # Normaliza o caminho removendo prefixos de URI para que o Python (requests/shutil) 
+            # consiga localizar o arquivo no sistema de arquivos local
+            caminho_limpo = caminho_final.replace("file://", "")
+            
+            if caminho_limpo not in self.selected_files:
+                self.selected_files.append(caminho_limpo)
+                self.update_images_display()
+        else:
+            # Caso o arquivo não tenha sido criado (ex: usuário cancelou a foto)
+            self.mostrar_aviso("Erro ao processar imagem capturada.")
 
     # Mantemos o seu _handle_selection original intacto!
     def _handle_selection(self, selection):
