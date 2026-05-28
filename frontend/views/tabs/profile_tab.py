@@ -29,8 +29,8 @@ KV_PROFILE_TAB = '''
     size_hint_y: None
     height: "50dp"
     size_hint_x: 1
-    # Lápis colado na borda direita
-    padding: ["12dp", 0, "2dp", 0]
+    # Margem direita ajustada para 10dp para alinhar o botão exatamente com o fim da linha cinza
+    padding: ["12dp", 0, "10dp", 0]
     spacing: "10dp"
     
     canvas.before:
@@ -62,11 +62,12 @@ KV_PROFILE_TAB = '''
         cursor_color: 0.22, 0.75, 0.94, 1
 
     MDBoxLayout:
-        size_hint_x: None
-        width: "80dp" if btn_save.opacity > 0 else "38dp"
-        adaptive_width: True
+        size_hint: None, None
+        height: "36dp"
+        # Controle absoluto: 0dp se for email, 76dp para editar (2 botões + espaço) ou 36dp (só o lápis)
+        width: "0dp" if root.is_email else ("76dp" if btn_save.opacity > 0 else "36dp")
         pos_hint: {"center_y": .5}
-        spacing: "2dp"
+        spacing: "4dp"
         
         MDIconButton:
             id: btn_edit
@@ -78,6 +79,9 @@ KV_PROFILE_TAB = '''
             disabled: root.is_email or btn_save.opacity > 0
             pos_hint: {"center_y": .5}
             on_release: root.start_edit()
+            # Força o bloqueio do tamanho físico da área de toque
+            size_hint: None, None
+            size: ("36dp", "36dp") if self.opacity > 0 else ("0dp", "0dp")
             
         MDIconButton:
             id: btn_save
@@ -89,6 +93,8 @@ KV_PROFILE_TAB = '''
             disabled: True
             pos_hint: {"center_y": .5}
             on_release: root.save_edit()
+            size_hint: None, None
+            size: ("36dp", "36dp") if self.opacity > 0 else ("0dp", "0dp")
             
         MDIconButton:
             id: btn_cancel
@@ -100,7 +106,9 @@ KV_PROFILE_TAB = '''
             disabled: True
             pos_hint: {"center_y": .5}
             on_release: root.cancel_edit()
-
+            size_hint: None, None
+            size: ("36dp", "36dp") if self.opacity > 0 else ("0dp", "0dp")
+            
 <ActionRow@MDCard>:
     size_hint_y: None
     height: "56dp"
