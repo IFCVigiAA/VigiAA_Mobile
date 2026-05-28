@@ -5,6 +5,11 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+# --- A CORREÇÃO ESTÁ AQUI ---
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+# ---------------------------
+
 jobs:
   build-android:
     runs-on: ubuntu-22.04
