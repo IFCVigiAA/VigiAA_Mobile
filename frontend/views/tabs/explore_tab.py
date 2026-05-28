@@ -134,13 +134,38 @@ KV_EXPLORE_TAB = '''
                     on_ref_press: root.process_info_link_press(args[1])
 
             # --- LISTA ---
+            # --- LISTA DE AÇÕES (ESTILO UNIFICADO) ---
             MDList:
+                padding: 0
+                spacing: "5dp"
+
+                # Item: Sintomas
                 TwoLineAvatarIconListItem:
                     text: "Sintomas"
                     secondary_text: "Conheça os sinais"
                     on_release: root.go_to_route('sintomas')
                     IconLeftWidget:
                         icon: "thermometer"
+                    IconRightWidget:
+                        icon: "chevron-right"
+
+                # Item: Prevenção (Novo)
+                TwoLineAvatarIconListItem:
+                    text: "Prevenção"
+                    secondary_text: "Conheça as formas de evitar"
+                    on_release: root.go_to_route('prevencao')
+                    IconLeftWidget:
+                        icon: "shield-check-outline"
+                    IconRightWidget:
+                        icon: "chevron-right"
+
+                # Item: Campanhas (Novo)
+                TwoLineAvatarIconListItem:
+                    text: "Campanhas"
+                    secondary_text: "Fique por dentro das ações"
+                    on_release: root.go_to_route('campanhas')
+                    IconLeftWidget:
+                        icon: "bullhorn-outline"
                     IconRightWidget:
                         icon: "chevron-right"
 

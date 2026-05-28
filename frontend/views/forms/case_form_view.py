@@ -503,7 +503,15 @@ class CaseFormScreen(MDScreen):
             url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18"
             res = requests.get(url, headers={'User-Agent': 'VigiAA/1.0'}).json()
             addr = res.get("address", {})
-            self.gps_address_data = {"lat": str(lat), "lon": str(lon), "localidade": addr.get("city") or addr.get("town"), "bairro": addr.get("suburb"), "logradouro": addr.get("road"), "cep": addr.get("postcode"), "numero": addr.get("house_number")}
+            self.gps_address_data = {
+                "lat": str(lat), 
+                "lon": str(lon), 
+                "localidade": addr.get("city") or addr.get("town"), 
+                "bairro": addr.get("suburb"), 
+                "logradouro": addr.get("road"), 
+                "cep": addr.get("postcode"), 
+                "numero": addr.get("house_number")
+            }
             Clock.schedule_once(lambda dt: self.open_gps_modal(source), 0)
         except: Clock.schedule_once(lambda dt: self._reset_gps_btn(), 0)
 

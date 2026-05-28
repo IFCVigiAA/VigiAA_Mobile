@@ -156,8 +156,8 @@ KV_FOCUS_FORM = '''
                     icon: "map-marker-outline" # Match design map marker icon verbatim
                     md_bg_color: 0.22, 0.75, 0.94, 1 # Design light blue color verbatim
                     theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1 # White verbatim
-                    icon_color: 1, 1, 1, 1 # White verbatim
+                    text_color: 0, 0, 0, 1 # black
+                    icon_color: 0, 0, 0, 1 # White verbatim
                     pos_hint: {"center_x": .5}
                     size_hint_x: 0.9 # Full width look, slightly smaller than screen width verbatim design look
                     radius: [15, 15, 15, 15] # Rounded corner style verbatim
@@ -440,7 +440,7 @@ KV_FOCUS_FORM = '''
                 bold: True # Make bold text matching design look
                 md_bg_color: 0.22, 0.75, 0.94, 1 # Standard light blue design color
                 theme_text_color: "Custom"
-                text_color: 1, 1, 1, 1 # White
+                text_color: 0, 0, 0, 1 # black
                 size_hint_x: 1 # Standard filled blue button full width anchored style
                 height: "56dp"
                 # Ripple safety standard
@@ -785,7 +785,8 @@ class FocusFormScreen(MDScreen):
     def _worker_get_address_from_coords(self, lat, lon, source="Rede"):
         try:
             url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-            res = requests.get(url, headers={'User-Agent': 'VigiAA/1.0'}).json()
+            res = requests.get(url, 
+            headers={'User-Agent': 'VigiAA/1.0'}).json()
             addr = res.get("address", {})
             self.gps_address_data.clear()
             self.gps_address_data["lat"] = str(lat)
@@ -948,6 +949,9 @@ class FocusFormScreen(MDScreen):
             caminho_para_exibir = path
             if platform == 'android':
                 caminho_para_exibir = "file://" + path
+            else:
+                # No PC, garante que o caminho use barras normais
+                caminho_para_exibir = os.path.abspath(path)
             
             # Criamos o card passando o caminho (que pode ter o file://)
             card = ImageCard(image_path=caminho_para_exibir, image_name=nome_arquivo)

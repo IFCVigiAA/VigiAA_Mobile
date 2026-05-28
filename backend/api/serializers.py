@@ -12,14 +12,32 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     tem_senha = serializers.SerializerMethodField()
+    # Mantemos o source para leitura, mas precisamos tratar na escrita
+    photo = serializers.ImageField(source='profile.photo', required=False)
 
     class Meta:
         model = User
-        # OLHA O 'tem_senha' AQUI NO FINAL DA LISTA:
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'tem_senha'] 
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'tem_senha', 'photo'] 
 
     def get_tem_senha(self, obj):
         return obj.has_usable_password()
+
+    def update(self, instance, validated_data):
+        # 1. Tratamento da foto (campo pontuado 'profile.photo')
+        if 'profile' in validated_data:
+            profile_data = validated_data.pop('profile')
+            profile = instance.profile
+            if 'photo' in profile_data:
+                profile.photo = profile_data['photo']
+            profile.save()
+        
+        # 2. Atualização dos campos normais do User (username, first_name, etc.)
+        instance.username = validated_data.get('username', instance.username)
+        instance.first_name = validated_data.get('first_name', instance.first_name)
+        instance.last_name = validated_data.get('last_name', instance.last_name)
+        instance.save()
+        
+        return instance
 
 class SetNewPasswordSerializer(serializers.Serializer):
     password = serializers.CharField(min_length=6, write_only=True)
