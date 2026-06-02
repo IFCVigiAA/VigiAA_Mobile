@@ -1,5 +1,8 @@
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.lang import Builder
+from kivymd.app import MDApp
+# Importa o degradê que você criou na Home para manter o padrão visual
+from views.home_view import HorizontalGradientLayout
 
 KV_SINTOMAS = '''
 # --- COMPONENTE REUTILIZÁVEL PARA OS CARDS ---
@@ -32,6 +35,38 @@ KV_SINTOMAS = '''
 <SintomasView>:
     md_bg_color: 1, 1, 1, 1
     orientation: "vertical"
+
+    # --- CABEÇALHO DEGRADÊ PADRÃO DO VIGIAA ---
+    HorizontalGradientLayout:
+        size_hint_y: None   
+        height: "80dp" 
+        padding: ["5dp", "0dp", "15dp", "0dp"]
+
+        MDBoxLayout:
+            orientation: "horizontal"
+            adaptive_height: True
+            pos_hint: {"center_y": .5}
+            md_bg_color: 0, 0, 0, 0 
+
+            MDIconButton:
+                icon: "arrow-left"
+                theme_text_color: "Custom"
+                text_color: 0, 0, 0, 1 # Ícone preto para contrastar com o degradê claro
+                pos_hint: {"center_y": .5}
+                on_release: root.go_back()
+
+            MDLabel:
+                text: "Sintomas"
+                font_size: "22sp"
+                bold: True
+                theme_text_color: "Custom"
+                text_color: 0, 0, 0, 1 # Texto preto
+                valign: "center"
+                halign: "left"
+                padding_x: "10dp"
+                
+            Widget: # Empurra o título e o botão para a esquerda
+    # ------------------------------------------
 
     ScrollView:
         do_scroll_x: False
@@ -127,4 +162,7 @@ KV_SINTOMAS = '''
 Builder.load_string(KV_SINTOMAS)
 
 class SintomasView(MDBoxLayout):
-    pass
+    def go_back(self):
+        # Obtém a instância do app e volta para a tela principal (home)
+        app = MDApp.get_running_app()
+        app.root.current = 'home'
