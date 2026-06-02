@@ -860,6 +860,8 @@ class FocusFormScreen(MDScreen):
         except Exception as e:
             self.mostrar_aviso("Permissão de galeria negada ou indisponível.", "red")
 
+    # ... código anterior ...
+
     def open_camera(self):
         """Pede permissão e abre a câmera nativa do Android"""
         if platform == 'android':
@@ -872,7 +874,6 @@ class FocusFormScreen(MDScreen):
     def _on_camera_permissions(self, permissions, grants):
         # Jogamos a execução da câmera para o Fio Principal!
         Clock.schedule_once(lambda dt: self._safe_camera_start(permissions, grants), 0)
-
 
     def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
@@ -891,12 +892,18 @@ class FocusFormScreen(MDScreen):
                 VmPolicyBuilder = autoclass('android.os.StrictMode$VmPolicy$Builder')
                 StrictMode.setVmPolicy(VmPolicyBuilder().build())
 
-                # 2. DEFINIR CAMINHO PRIVADO
+                # 2. DEFINIR CAMINHO PRIVADO ABSOLUTO (Garante permissão de leitura)
                 app = MDApp.get_running_app()
                 pasta_fotos = app.user_data_dir
+                
+                # Garante que a pasta exista
+                if not os.path.exists(pasta_fotos):
+                    os.makedirs(pasta_fotos, exist_ok=True)
+                    
                 nome_arquivo = f"foco_{int(time.time())}.jpg"
                 self.caminho_foto_temp = os.path.join(pasta_fotos, nome_arquivo)
                 
+                print(f"VIGIAA DEBUG: [CAMERA] Tentando salvar em: {self.caminho_foto_temp}")
                 camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
             except Exception as e:
                 self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
@@ -906,17 +913,32 @@ class FocusFormScreen(MDScreen):
         # Verifica o caminho retornado ou usa o temporário definido anteriormente
         caminho_final = filepath if filepath else getattr(self, 'caminho_foto_temp', None)
         
-        if caminho_final and os.path.exists(caminho_final):
-            # Normaliza o caminho removendo prefixos de URI para que o Python (requests/shutil) 
-            # consiga localizar o arquivo no sistema de arquivos local
-            caminho_limpo = caminho_final.replace("file://", "")
+        print(f"VIGIAA DEBUG: [CAMERA] Câmera retornou o caminho: {caminho_final}")
+        
+        if caminho_final:
+            # 1. Limpa os prefixos URI que quebram o Python
+            caminho_limpo = str(caminho_final).replace("file://", "")
             
-            if caminho_limpo not in self.selected_files:
-                self.selected_files.append(caminho_limpo)
-                self.update_images_display()
+            # 2. TRUQUE: Tenta abrir em modo leitura rápida para burlar cache de disco do Android
+            arquivo_existe = False
+            try:
+                with open(caminho_limpo, 'rb') as f:
+                    # Lê 1 byte só para provar que o arquivo é real e está acessível
+                    f.read(1)
+                    arquivo_existe = True
+            except Exception as e:
+                print(f"VIGIAA DEBUG: [CAMERA] Falha ao tentar abrir o arquivo: {e}")
+            
+            # 3. Processa
+            if arquivo_existe:
+                if caminho_limpo not in self.selected_files:
+                    self.selected_files.append(caminho_limpo)
+                    self.update_images_display()
+            else:
+                self.mostrar_aviso("Foto cancelada ou não salva.")
         else:
-            # Caso o arquivo não tenha sido criado (ex: usuário cancelou a foto)
-            self.mostrar_aviso("Erro ao processar imagem capturada.")
+            self.mostrar_aviso("Nenhum arquivo capturado.")
+
 
     # Mantemos o seu _handle_selection original intacto!
     def _handle_selection(self, selection):
