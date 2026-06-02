@@ -14,14 +14,15 @@ KV_SINTOMAS = '''
     height: "130dp"
     radius: [15, 15, 15, 15]
     padding: "5dp"
-    spacing: "5dp"
+    spacing: "2dp" # Diminuímos o espaçamento entre imagem e texto
     elevation: 1
     md_bg_color: 1, 1, 1, 1
 
     FitImage:
         source: root.image
         radius: [10, 10, 10, 10]
-        size_hint_y: 0.55
+        # AGORA A IMAGEM OCUPA 80% DO CARD
+        size_hint_y: 0.8 
 
     MDLabel:
         text: root.text
@@ -29,7 +30,8 @@ KV_SINTOMAS = '''
         valign: "center"
         font_size: "10sp"
         theme_text_color: "Primary"
-        size_hint_y: 0.45
+        # O TEXTO FICA COM OS 20% RESTANTES
+        size_hint_y: 0.2 
         text_size: self.width, None
 
 <SintomasView>:
@@ -104,7 +106,7 @@ KV_SINTOMAS = '''
                 adaptive_height: True
 
                 SintomaCard:
-                    image: "assets/images/febre.png" 
+                    image: "assets/images/termometro.png" 
                     text: "Febre"
                 SintomaCard:
                     image: "assets/images/dor_corpo.png"

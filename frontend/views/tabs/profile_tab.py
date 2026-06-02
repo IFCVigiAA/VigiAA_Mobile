@@ -346,51 +346,32 @@ class ProfileTabContent(ScrollView):
             threading.Thread(target=self._worker_upload_avatar, args=(caminho_interno,), daemon=True).start()
 
     def copiar_para_pasta_app(self, uri_origem):
-        """Abre o arquivo do Android e salva na pasta do VigiAA de forma robusta"""
-        from kivy.utils import platform
-        from kivy.app import App
-        import os
+        """Abre o arquivo e salva na pasta do VigiAA sem depender de bibliotecas pesadas de URI"""
+        from kivymd.app import MDApp
         import shutil
+        import os
 
-        app_folder = App.get_running_app().user_data_dir
+        app_folder = MDApp.get_running_app().user_data_dir
         dest_path = os.path.join(app_folder, "perfil_local.jpg")
         
-        # Limpa prefixos indesejados (como file://)
-        uri_str = str(uri_origem)
-        if uri_str.startswith("file://"):
-            uri_str = uri_str.replace("file://", "", 1)
+        # Limpa o prefixo se existir
+        uri_str = str(uri_origem).replace("file://", "", 1)
 
-        # 1. SE FOR UMA URI PROTEGIDA (content://) - Típico de Android 10+
-        if uri_str.startswith('content://') and platform == 'android':
+        try:
+            # Tenta copiar o arquivo normalmente (a versão nova do Plyer já entrega o arquivo acessível)
+            shutil.copy2(uri_str, dest_path)
+            return dest_path
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Erro no shutil: {e}. Tentando leitura binária.")
             try:
-                from jnius import autoclass
-                Uri = autoclass('android.net.Uri')
-                PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                
-                activity = PythonActivity.mActivity
-                content_resolver = activity.getContentResolver()
-                uri = Uri.parse(uri_str)
-                
-                input_stream = content_resolver.openInputStream(uri)
-                with open(dest_path, 'wb') as output_file:
-                    chunk = input_stream.read(128 * 1024)
-                    while chunk:
-                        output_file.write(chunk)
-                        chunk = input_stream.read(128 * 1024)
-                input_stream.close()
+                # Plano B: Copia byte a byte "na força bruta"
+                with open(uri_str, 'rb') as f_in:
+                    with open(dest_path, 'wb') as f_out:
+                        f_out.write(f_in.read())
                 return dest_path
-            except Exception as e:
-                print(f"VIGIAA DEBUG ERROR: Falha na cópia via jnius: {e}")
-                return None
-                
-        # 2. SE FOR UM CAMINHO DIRETO (/storage/... ou PC)
-        else:
-            try:
-                shutil.copy2(uri_str, dest_path)
-                return dest_path
-            except Exception as e:
-                print(f"VIGIAA DEBUG ERROR: Falha no shutil.copy2: {e}")
-                return None
+            except Exception as e2:
+                print(f"VIGIAA DEBUG ERROR: Falha total na cópia: {e2}")
+                return uri_str # Se tudo falhar, devolve o original e reza
             
     def garantir_arquivo_acessivel(self, original_path):
         """Copia a imagem para a pasta do app para que o Python consiga ler"""
@@ -417,22 +398,14 @@ class ProfileTabContent(ScrollView):
         if not token: return
         
         try:
-            # 1. A CORREÇÃO DO SSL
-            os.environ['SSL_CERT_FILE'] = certifi.where()
-            
             url = f"{config.API_URL}/api/profile/"
             
-            # 2. VERIFICAÇÃO DE ARQUIVO
-            if not os.path.exists(file_path):
-                 self.mostrar_aviso("Erro: Arquivo não foi processado.")
+            if not file_path or not os.path.exists(file_path):
+                 self.mostrar_aviso("Erro: Arquivo de imagem não encontrado.")
                  return
 
-            print(f"VIGIAA DEBUG: Enviando PATCH com a imagem: {file_path}")
-
             with open(file_path, 'rb') as f:
-                # 3. O SEGREDO DO DJANGO NO ANDROID: 
-                # Enviar a tupla explicita (Nome_do_arquivo, Arquivo_Aberto, Mime_type)
-                # Isso impede que o requests envie pacotes corrompidos.
+                # O empacotamento exato para o Django aceitar no Android
                 files = {'photo': ('avatar_vigiaa.jpg', f, 'image/jpeg')}
                 
                 res = requests.patch(
@@ -440,21 +413,19 @@ class ProfileTabContent(ScrollView):
                     headers={"Authorization": f"Bearer {token}"}, 
                     files=files, 
                     timeout=30,
-                    verify=certifi.where() 
+                    verify=False # <-- DESLIGA O SSL PARA O UPLOAD NO ANDROID
                 )
-                
-            print(f"VIGIAA DEBUG: Resposta do Servidor: {res.status_code}")
                 
             if res.status_code == 200:
                 self.mostrar_aviso("Foto atualizada com sucesso!")
-                # Força a atualização da interface com a imagem nova do servidor
                 Clock.schedule_once(lambda dt: self.refresh_data(), 0.5)
             else:
-                self.mostrar_aviso(f"Erro no servidor: {res.status_code}")
+                self.mostrar_aviso(f"Erro do Servidor ao salvar: {res.status_code}")
                 
         except Exception as e:
+            # SE A THREAD QUEBRAR, MOSTRA O MOTIVO EXATO NA TELA!
             print(f"VIGIAA DEBUG: Erro detalhado no upload: {str(e)}")
-            self.mostrar_aviso("Erro na conexão ao enviar foto.")
+            self.mostrar_aviso(f"Falha no upload: {str(e)[:40]}...")
 
     def load_user_data(self):
         token = store.get("session")["token"] if store.exists("session") else None

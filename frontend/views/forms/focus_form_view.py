@@ -892,18 +892,22 @@ class FocusFormScreen(MDScreen):
                 VmPolicyBuilder = autoclass('android.os.StrictMode$VmPolicy$Builder')
                 StrictMode.setVmPolicy(VmPolicyBuilder().build())
 
-                # 2. DEFINIR CAMINHO PRIVADO ABSOLUTO (Garante permissão de leitura)
-                app = MDApp.get_running_app()
-                pasta_fotos = app.user_data_dir
+                # 2. DEFINIR CAMINHO DE CACHE EXTERNO (O SEGREDO PARA NÃO CRASHAR)
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                context = PythonActivity.mActivity
                 
-                # Garante que a pasta exista
-                if not os.path.exists(pasta_fotos):
-                    os.makedirs(pasta_fotos, exist_ok=True)
+                # Pega a pasta de cache externa (a câmera do Android tem permissão aqui!)
+                ext_cache = context.getExternalCacheDir()
+                if ext_cache:
+                    pasta_fotos = ext_cache.getAbsolutePath()
+                else:
+                    # Se falhar, tenta a pasta local
+                    pasta_fotos = MDApp.get_running_app().user_data_dir
                     
                 nome_arquivo = f"foco_{int(time.time())}.jpg"
                 self.caminho_foto_temp = os.path.join(pasta_fotos, nome_arquivo)
                 
-                print(f"VIGIAA DEBUG: [CAMERA] Tentando salvar em: {self.caminho_foto_temp}")
+                print(f"VIGIAA DEBUG: [CAMERA] Salvando em: {self.caminho_foto_temp}")
                 camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
             except Exception as e:
                 self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
