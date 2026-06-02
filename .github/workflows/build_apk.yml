@@ -32,11 +32,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git ffmpeg libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev libffi-dev libssl-dev autoconf automake libtool pkg-config unzip zip
 
-      - name: Instalando Buildozer e Cython (Versão Estável)
+      - name: Instalando Buildozer e Cython (Versão Estável Garantida)
         run: |
           pip install --upgrade pip
-          # CORREÇÃO: Removida a trava do Cython antigo para compatibilidade com versões novas
-          pip install buildozer cython virtualenv setuptools
+          # CORREÇÃO CRÍTICA: Retornando ao Cython 0.29.x necessário para compilar o pyjnius/Kivy sem erros
+          pip install buildozer cython==0.29.33 virtualenv setuptools
 
       - name: Criando a Receita do App
         run: |
@@ -65,7 +65,8 @@ jobs:
           android.manifest.launch_mode = singleTask
           android.low_memory_killer = False
           
-          # CORREÇÃO: p4a.branch = master foi removido para forçar o uso da versão estável padrão do python-for-android
+          # CORREÇÃO CRÍTICA: Mantendo a branch master do p4a para compatibilidade com as receitas da API 33
+          p4a.branch = master
           
           [buildozer]
           log_level = 2
