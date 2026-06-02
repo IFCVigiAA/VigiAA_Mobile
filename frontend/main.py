@@ -35,6 +35,7 @@ try:
     from views.forms.focus_form_view import FocusFormScreen
     from views.forms.case_form_view import CaseFormScreen
     from views.forms.positive_case_form_view import PositiveCaseFormScreen
+    from views.sintomas_view import SintomasView
 
     class VigiAA(MDApp):
         def build(self):
@@ -63,6 +64,10 @@ try:
             sm.add_widget(FocusFormScreen(name='form_foco'))
             sm.add_widget(CaseFormScreen(name='form_caso'))
             sm.add_widget(PositiveCaseFormScreen(name='form_caso_positivo'))
+
+            tela_sintomas = MDScreen(name='sintomas_screen')
+            tela_sintomas.add_widget(SintomasView())
+            sm.add_widget(tela_sintomas)
 
             sm.current = 'login'
             return sm

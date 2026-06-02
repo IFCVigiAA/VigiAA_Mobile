@@ -5,6 +5,7 @@ from kivy.properties import BooleanProperty, StringProperty
 from kivymd.uix.fitimage import FitImage
 from kivymd.uix.swiper import MDSwiper, MDSwiperItem
 from kivy.factory import Factory
+from kivymd.app import MDApp
 
 # Textos formatados
 LINK_COLOR = "0077B6"
@@ -190,3 +191,13 @@ class ExploreTabContent(MDBoxLayout):
 
     def go_to_route(self, route):
         print(f"DEBUG: Navegando para: {route}")
+        app = MDApp.get_running_app()
+
+        if route == 'sintomas':
+            app.root.current = 'sintomas_screen'
+            
+        elif route == 'prevencao':
+            print("Navegar para prevenção (Ainda não implementado)")
+            
+        elif route == 'campanhas':
+            print("Navegar para campanhas (Ainda não implementado)")

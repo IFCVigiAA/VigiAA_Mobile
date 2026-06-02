@@ -1,0 +1,130 @@
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivy.lang import Builder
+
+KV_SINTOMAS = '''
+# --- COMPONENTE REUTILIZÁVEL PARA OS CARDS ---
+<SintomaCard@MDCard>:
+    image: ""
+    text: ""
+    orientation: "vertical"
+    size_hint_y: None
+    height: "130dp"
+    radius: [15, 15, 15, 15]
+    padding: "5dp"
+    spacing: "5dp"
+    elevation: 1
+    md_bg_color: 1, 1, 1, 1
+
+    FitImage:
+        source: root.image
+        radius: [10, 10, 10, 10]
+        size_hint_y: 0.55
+
+    MDLabel:
+        text: root.text
+        halign: "center"
+        valign: "center"
+        font_size: "10sp"
+        theme_text_color: "Primary"
+        size_hint_y: 0.45
+        text_size: self.width, None
+
+<SintomasView>:
+    md_bg_color: 1, 1, 1, 1
+    orientation: "vertical"
+
+    ScrollView:
+        do_scroll_x: False
+        
+        MDBoxLayout:
+            orientation: "vertical"
+            padding: "15dp"
+            spacing: "20dp"
+            adaptive_height: True
+
+            # --- BOX INFORMATIVO (AZUL CLARO) ---
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                padding: "15dp"
+                radius: [15, 15, 15, 15]
+                md_bg_color: 0.88, 0.97, 0.98, 1
+                
+                MDLabel:
+                    text: "Ao sentir alguns desses sintomas, procure uma Unidade de Saúde e não tome remédio por conta própria."
+                    font_size: "13sp"
+                    bold: True
+                    adaptive_height: True
+
+            # --- SEÇÃO 1: PRINCIPAIS SINTOMAS ---
+            MDLabel:
+                text: "Principais sintomas da Dengue:"
+                bold: True
+                font_size: "16sp"
+                adaptive_height: True
+
+            MDGridLayout:
+                cols: 3
+                spacing: "10dp"
+                adaptive_height: True
+
+                SintomaCard:
+                    image: "assets/images/febre.png" 
+                    text: "Febre"
+                SintomaCard:
+                    image: "assets/images/dor_corpo.png"
+                    text: "Dores no corpo e/ ou articulações"
+                SintomaCard:
+                    image: "assets/images/enjoo.png"
+                    text: "Enjoo e/ou dores na barriga"
+                SintomaCard:
+                    image: "assets/images/dor_cabeca.png"
+                    text: "Dor de cabeça e/ou atrás dos olhos"
+                SintomaCard:
+                    image: "assets/images/manchas.png"
+                    text: "Manchas vermelhas na pele"
+                SintomaCard:
+                    image: "assets/images/fraqueza.png"
+                    text: "Fraqueza, cansaço e falta de energia"
+
+            # --- SEÇÃO 2: SINAIS DE ALERTA ---
+            MDLabel:
+                text: "Sinais de alerta:"
+                bold: True
+                font_size: "16sp"
+                adaptive_height: True
+
+            MDGridLayout:
+                cols: 3
+                spacing: "10dp"
+                adaptive_height: True
+
+                SintomaCard:
+                    image: "assets/images/cansaco.png"
+                    text: "Cansaço intenso"
+                SintomaCard:
+                    image: "assets/images/dor_barriga_forte.png"
+                    text: "Dor forte na barriga"
+                SintomaCard:
+                    image: "assets/images/falta_ar.png"
+                    text: "Dificuldade para respirar"
+                SintomaCard:
+                    image: "assets/images/vomito.png"
+                    text: "Vômitos"
+                SintomaCard:
+                    image: "assets/images/tontura.png"
+                    text: "Tontura / sensação de desmaio"
+                SintomaCard:
+                    image: "assets/images/sangramento.png"
+                    text: "Sangramento no nariz, gengiva e/ou fezes"
+
+            # Espaçamento no final para a Bottom Navigation não cobrir o conteúdo
+            Widget:
+                size_hint_y: None
+                height: "80dp"
+'''
+
+Builder.load_string(KV_SINTOMAS)
+
+class SintomasView(MDBoxLayout):
+    pass
