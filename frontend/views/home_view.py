@@ -14,10 +14,6 @@ from kivymd.uix.button import MDIconButton
 if not hasattr(MDIconButton, 'radius'):
     MDIconButton.radius = VariableListProperty([dp(0), dp(0), dp(0), dp(0)])
 
-# Importação segura das abas...
-# (resto do seu código segue igual)
-
-# Importação segura das abas
 try:
     from views.tabs.home_tab import HomeTabContent
     from views.tabs.new_tab import NewTabContent

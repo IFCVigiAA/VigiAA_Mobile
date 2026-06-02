@@ -65,7 +65,7 @@ try:
             sm.add_widget(CaseFormScreen(name='form_caso'))
             sm.add_widget(PositiveCaseFormScreen(name='form_caso_positivo'))
 
-            tela_sintomas = MDScreen(name='sintomas_screen')
+            tela_sintomas = HomeScreen(name='sintomas_screen')
             tela_sintomas.add_widget(SintomasView())
             sm.add_widget(tela_sintomas)
 
