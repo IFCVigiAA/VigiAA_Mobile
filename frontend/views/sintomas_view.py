@@ -143,16 +143,16 @@ KV_SINTOMAS = '''
                     image: "assets/images/dor-barriga.jpg"
                     text: "Dor forte na barriga"
                 SintomaCard:
-                    image: "assets/images/falta_ar.png"
+                    image: "assets/images/respirar.jpg"
                     text: "Dificuldade para respirar"
                 SintomaCard:
-                    image: "assets/images/vomito.png"
+                    image: "assets/images/vomitos.jpg"
                     text: "Vômitos"
                 SintomaCard:
                     image: "assets/images/tontura.png"
                     text: "Tontura / sensação de desmaio"
                 SintomaCard:
-                    image: "assets/images/sangramento.png"
+                    image: "assets/images/sangramento.jpg"
                     text: "Sangramento no nariz, gengiva e/ou fezes"
 
             # Espaçamento no final para a Bottom Navigation não cobrir o conteúdo

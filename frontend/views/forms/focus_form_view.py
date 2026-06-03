@@ -15,6 +15,7 @@ import requests
 import unicodedata
 import shutil
 from urllib.parse import quote
+from kivy.uix.modalview import ModalView
 
 # --- 2. COMPONENTES KIVYMD (Importação Única) ---
 from kivymd.uix.screen import MDScreen
@@ -448,7 +449,84 @@ KV_FOCUS_FORM = '''
                 on_release: root.submit_form()
 '''
 
+KV_CAMERA = '''
+<CameraModal>:
+    size_hint: 1, 1
+    background_color: 0, 0, 0, 1
+    auto_dismiss: False
+    
+    MDFloatLayout:
+        Camera:
+            id: camera
+            resolution: (640, 480)
+            play: True
+            allow_stretch: True
+            keep_ratio: True
+            
+        # Header (Sombra superior com botão fechar)
+        MDBoxLayout:
+            size_hint_y: None
+            height: "80dp"
+            pos_hint: {"top": 1}
+            md_bg_color: 0, 0, 0, 0.5
+            padding: ["10dp", "0dp"]
+            
+            Widget: # Joga o botão para a direita
+            
+            MDIconButton:
+                icon: "close"
+                icon_size: "32sp"
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+                pos_hint: {"center_y": .5}
+                on_release: root.fechar()
+                
+        # Footer (Sombra inferior com botão capturar)
+        MDBoxLayout:
+            size_hint_y: None
+            height: "100dp"
+            pos_hint: {"bottom": 1}
+            md_bg_color: 0, 0, 0, 0.5
+            
+            AnchorLayout:
+                anchor_x: "center"
+                anchor_y: "center"
+                MDIconButton:
+                    icon: "camera-iris"
+                    icon_size: "64sp"
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    on_release: root.capturar()
+'''
+
+Builder.load_string(KV_CAMERA)
+
 Builder.load_string(KV_FOCUS_FORM)
+
+class CameraModal(ModalView):
+    def __init__(self, callback_success, **kwargs):
+        super().__init__(**kwargs)
+        self.callback_success = callback_success
+        
+    def fechar(self):
+        self.ids.camera.play = False
+        self.dismiss()
+        
+    def capturar(self):
+        import time, os
+        from kivymd.app import MDApp
+        
+        # O Kivy salva direto e com segurança na pasta do App
+        pasta = MDApp.get_running_app().user_data_dir
+        filename = os.path.join(pasta, f"foco_{int(time.time())}.png")
+        
+        self.ids.camera.export_to_png(filename)
+        self.ids.camera.play = False
+        self.dismiss()
+        
+        # Devolve a foto pro formulário
+        if self.callback_success:
+            self.callback_success(filename)
 
 class ImageCard(MDBoxLayout):
     image_path = StringProperty("")
@@ -863,72 +941,37 @@ class FocusFormScreen(MDScreen):
     # ... código anterior ...
 
     def open_camera(self):
-        """Pede permissão e abre a câmera nativa do Android"""
+        """Pede permissão e abre a câmera INTERNA do VigiAA"""
         if platform == 'android':
             from android.permissions import request_permissions, Permission
-            # Pede a trindade de permissões: Câmera + Ler + Escrever na memória
-            request_permissions([Permission.CAMERA, Permission.WRITE_EXTERNAL_STORAGE, Permission.READ_EXTERNAL_STORAGE], self._on_camera_permissions)
+            request_permissions([Permission.CAMERA, Permission.WRITE_EXTERNAL_STORAGE], self._on_camera_permissions)
         else:
-            self.mostrar_aviso("A câmera nativa só funciona no celular.")
+            # Se testar no PC, abre direto!
+            self.camera_modal = CameraModal(callback_success=self._on_in_app_camera_success)
+            self.camera_modal.open()
 
     def _on_camera_permissions(self, permissions, grants):
-        # Jogamos a execução da câmera para o Fio Principal!
         Clock.schedule_once(lambda dt: self._safe_camera_start(permissions, grants), 0)
 
     def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
-        from plyer import camera
-        import os
-        import time
-        
         perms_dict = dict(zip(permissions, grants))
         
+        # Se permitiu a câmera, abre o Modal In-App!
         if perms_dict.get(Permission.CAMERA, False):
-            try:
-                from jnius import autoclass
-                StrictMode = autoclass('android.os.StrictMode')
-                VmPolicyBuilder = autoclass('android.os.StrictMode$VmPolicy$Builder')
-                StrictMode.setVmPolicy(VmPolicyBuilder().build())
-
-            
-                Environment = autoclass('android.os.Environment')
-                pasta_publica = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsolutePath()
- 
-                pasta_fotos = os.path.join(pasta_publica, "VigiAA")
-                if not os.path.exists(pasta_fotos):
-                    os.makedirs(pasta_fotos, exist_ok=True)
-                    
-                nome_arquivo = f"foco_{int(time.time())}.jpg"
-                self.caminho_foto_temp = os.path.join(pasta_fotos, nome_arquivo)
-                
-                print(f"VIGIAA DEBUG: [CAMERA] Câmera autorizada a salvar em: {self.caminho_foto_temp}")
-                camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
-            except Exception as e:
-                self.mostrar_aviso(f"Erro ao ligar a lente: {str(e)[:30]}", "red")
+            self.camera_modal = CameraModal(callback_success=self._on_in_app_camera_success)
+            self.camera_modal.open()
+        else:
+            self.mostrar_aviso("Permissão da câmera negada.", "red")
 
     @mainthread
-    def _on_camera_success(self, filepath=None):
-        caminho_final = filepath if filepath else getattr(self, 'caminho_foto_temp', None)
-        print(f"VIGIAA DEBUG: [CAMERA] Câmera retornou o caminho: {caminho_final}")
-
-        def checar_arquivo(dt):
-            if caminho_final:
-                caminho_limpo = str(caminho_final).replace("file://", "")
-                
-                # Lê o arquivo diretamente no disco
-                if os.path.exists(caminho_limpo):
-                    if caminho_limpo not in self.selected_files:
-                        self.selected_files.append(caminho_limpo)
-                        self.update_images_display()
-                else:
-                    self.mostrar_aviso("Foto cancelada ou descartada.")
-            else:
-                self.mostrar_aviso("Nenhum arquivo retornado.")
-
-        # O SEGREDO DO KIVY MOBILE: Esperar 0.6 segundos antes de checar.
-        # Isso dá tempo ao sistema operacional Android fechar a câmera e salvar os bytes!
-        from kivy.clock import Clock
-        Clock.schedule_once(checar_arquivo, 0.6)
+    def _on_in_app_camera_success(self, filepath):
+        if filepath and os.path.exists(filepath):
+            if filepath not in self.selected_files:
+                self.selected_files.append(filepath)
+                self.update_images_display()
+        else:
+            self.mostrar_aviso("Erro ao salvar foto.")
 
 
     # Mantemos o seu _handle_selection original intacto!
