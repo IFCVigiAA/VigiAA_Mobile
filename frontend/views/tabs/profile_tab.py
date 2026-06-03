@@ -320,33 +320,31 @@ class ProfileTabContent(ScrollView):
             threading.Thread(target=self._preparar_e_subir, args=(path,), daemon=True).start()
 
     def _preparar_e_subir(self, path):
-        # 1. Faz a cópia para a pasta segura do app
+        # 1. Faz a cópia segura
         caminho_interno = self.copiar_para_pasta_app(path)
         
         if caminho_interno:
-            print(f"VIGIAA DEBUG: Caminho interno: {caminho_interno}")
+            print(f"VIGIAA DEBUG: Caminho copiado com sucesso: {caminho_interno}")
             
-            # 2. LIMPEZA DE CACHE FORÇADA
+            # Limpa cache de imagem local
             from kivy.cache import Cache
             Cache.remove('kv.image')
             Cache.remove('kv.loader')
             
-            # 3. Atualiza a UI no Fio Principal
+            # Atualiza a bolinha de foto instantaneamente na UI
             @mainthread
             def atualizar_ui(dt):
-                # Para exibir na "bolinha" (FitImage) no Android:
                 prefixo = "file://" if platform == "android" else ""
-                # caminho_interno deve ser o caminho puro: /data/user/0/...
                 self.avatar_source = f"{prefixo}{caminho_interno}"
-            
             Clock.schedule_once(atualizar_ui, 0.1)
 
-            # --- AQUI ESTAVA O ERRO: Chamada para subir pro servidor ---
-            # Agora que o arquivo está na pasta do app, chamamos o upload
+            # Sobe pro servidor
             threading.Thread(target=self._worker_upload_avatar, args=(caminho_interno,), daemon=True).start()
+        else:
+            self.mostrar_aviso("Falha ao carregar a imagem da galeria.")
 
     def copiar_para_pasta_app(self, uri_origem):
-        """Abre o arquivo e salva na pasta do VigiAA sem depender de bibliotecas pesadas de URI"""
+        """Abre o arquivo e salva na pasta do app burlando o bloqueio do Android 11+"""
         from kivy.utils import platform
         from kivymd.app import MDApp
         import shutil
@@ -354,57 +352,74 @@ class ProfileTabContent(ScrollView):
         import time
 
         app_folder = MDApp.get_running_app().user_data_dir
-        # Garante um nome único para não usar cache velho
+        # Usamos o timestamp no nome para garantir que o Kivy não use cache velho da imagem
         dest_path = os.path.join(app_folder, f"perfil_{int(time.time())}.jpg")
         
         uri_str = str(uri_origem).replace("file://", "", 1)
+        print(f"VIGIAA DEBUG: [PERFIL] URI selecionada: {uri_str}")
 
-        # 1. A BALA DE PRATA: Usar o Java NIO para ler o 'content://' nativamente
-        if platform == 'android' and uri_str.startswith('content://'):
+        if platform == 'android':
             try:
                 from jnius import autoclass
-                PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                Uri = autoclass('android.net.Uri')
-                Paths = autoclass('java.nio.file.Paths')
-                Files = autoclass('java.nio.file.Files')
+                from android import api_version
+                
+                if api_version >= 29:
+                    Uri = autoclass('android.net.Uri')
+                    PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                    FileOutputStream = autoclass('java.io.FileOutputStream')
+                    FileUtils = autoclass('android.os.FileUtils')
+                    File = autoclass('java.io.File')
 
-                activity = PythonActivity.mActivity
-                uri_obj = Uri.parse(uri_str)
-                
-                # Abre um túnel de dados direto com o sistema Android
-                input_stream = activity.getContentResolver().openInputStream(uri_obj)
-                dest_file = Paths.get(dest_path)
-                
-                # O Java faz a cópia em nível de sistema, ignorando o bloqueio do Python!
-                Files.copy(input_stream, dest_file)
-                input_stream.close()
-                
-                return dest_path
+                    activity = PythonActivity.mActivity
+                    
+                    if uri_str.startswith('content://'):
+                        uri_obj = Uri.parse(uri_str)
+                    else:
+                        uri_obj = Uri.fromFile(File(uri_str))
+
+                    # Pede para o próprio Android abrir o fluxo de leitura da Galeria
+                    input_stream = activity.getContentResolver().openInputStream(uri_obj)
+                    output_stream = FileOutputStream(dest_path)
+                    
+                    # Copia na velocidade da luz por dentro do sistema do celular
+                    FileUtils.copy(input_stream, output_stream)
+                    
+                    output_stream.flush()
+                    output_stream.close()
+                    input_stream.close()
+                    
+                    print(f"VIGIAA DEBUG: [PERFIL] Cópia nativa via Java FileUtils sucesso!")
+                    return dest_path
             except Exception as e:
-                print(f"VIGIAA DEBUG: Falha no JNIUS NIO: {e}")
-                pass # Se falhar, tenta o bloco debaixo
-
-        # 2. Se for um caminho comum (PC ou Android antigo), tenta o shutil
+                print(f"VIGIAA DEBUG: [PERFIL] Falha na cópia via Java: {e}")
+                
         try:
+            print(f"VIGIAA DEBUG: [PERFIL] Tentando shutil no Python puro...")
             shutil.copy2(uri_str, dest_path)
             return dest_path
         except Exception as e:
-            print(f"VIGIAA DEBUG ERROR: Falha total na cópia: {e}")
-            return uri_str # Última esperança, devolve o original
-            
+            print(f"VIGIAA DEBUG ERROR: [PERFIL] Falha no shutil: {e}")
+
+        try:
+            print(f"VIGIAA DEBUG: [PERFIL] Tentando leitura binária raiz...")
+            with open(uri_str, 'rb') as f_in:
+                with open(dest_path, 'wb') as f_out:
+                    f_out.write(f_in.read())
+            return dest_path
+        except Exception as e:
+            print(f"VIGIAA DEBUG ERROR: [PERFIL] Falha na leitura raiz: {e}")
+            return None
+        
     def garantir_arquivo_acessivel(self, original_path):
         """Copia a imagem para a pasta do app para que o Python consiga ler"""
         import shutil
         from kivy.app import App
         
         try:
-            # Caminho da pasta interna do app
             app_folder = App.get_running_app().user_data_dir
             ext = original_path.split('.')[-1]
             dest_path = os.path.join(app_folder, f"temp_profile_upload.{ext}")
             
-            # Se for um caminho 'content://', o Plyer já tentou converter, 
-            # mas o shutil.copy2 garante que o binário seja movido para onde temos permissão.
             shutil.copy2(original_path, dest_path)
             return dest_path
         except Exception as e:
@@ -417,14 +432,20 @@ class ProfileTabContent(ScrollView):
         if not token: return
         
         try:
+            import certifi
+            import os
+            import requests
+            
             url = f"{config.API_URL}/api/profile/"
             
             if not file_path or not os.path.exists(file_path):
-                 self.mostrar_aviso("Erro: Arquivo de imagem não encontrado.")
+                 self.mostrar_aviso("Erro interno ao ler arquivo.")
                  return
 
+            print(f"VIGIAA DEBUG: [PERFIL] Enviando PATCH da foto: {file_path}")
+
             with open(file_path, 'rb') as f:
-                # O empacotamento exato para o Django aceitar no Android
+                # 'avatar_vigiaa.jpg' é o nome que o Django vai receber
                 files = {'photo': ('avatar_vigiaa.jpg', f, 'image/jpeg')}
                 
                 res = requests.patch(
@@ -432,19 +453,22 @@ class ProfileTabContent(ScrollView):
                     headers={"Authorization": f"Bearer {token}"}, 
                     files=files, 
                     timeout=30,
-                    verify=False # <-- DESLIGA O SSL PARA O UPLOAD NO ANDROID
+                    verify=False # O SSL é desligado temporariamente para passar direto
                 )
+                
+            print(f"VIGIAA DEBUG: [PERFIL] Resposta Servidor: {res.status_code}")
                 
             if res.status_code == 200:
                 self.mostrar_aviso("Foto atualizada com sucesso!")
+                from kivy.clock import Clock
+                # Recarrega os dados (o cache buster vai forçar a exibição da foto vinda da web)
                 Clock.schedule_once(lambda dt: self.refresh_data(), 0.5)
             else:
-                self.mostrar_aviso(f"Erro do Servidor ao salvar: {res.status_code}")
+                self.mostrar_aviso(f"Erro no servidor: {res.status_code}")
                 
         except Exception as e:
-            # SE A THREAD QUEBRAR, MOSTRA O MOTIVO EXATO NA TELA!
-            print(f"VIGIAA DEBUG: Erro detalhado no upload: {str(e)}")
-            self.mostrar_aviso(f"Falha no upload: {str(e)[:40]}...")
+            print(f"VIGIAA DEBUG: [PERFIL] Erro no upload: {str(e)}")
+            self.mostrar_aviso(f"Erro na conexão: {str(e)[:25]}...")
 
     def load_user_data(self):
         token = store.get("session")["token"] if store.exists("session") else None

@@ -109,16 +109,16 @@ KV_SINTOMAS = '''
                     image: "assets/images/termometro.png" 
                     text: "Febre"
                 SintomaCard:
-                    image: "assets/images/dor_corpo.png"
+                    image: "assets/images/dores.jpeg"
                     text: "Dores no corpo e/ ou articulações"
                 SintomaCard:
-                    image: "assets/images/enjoo.png"
+                    image: "assets/images/enjoo.jpg"
                     text: "Enjoo e/ou dores na barriga"
                 SintomaCard:
-                    image: "assets/images/dor_cabeca.png"
+                    image: "assets/images/dor-cabeca.jpg"
                     text: "Dor de cabeça e/ou atrás dos olhos"
                 SintomaCard:
-                    image: "assets/images/manchas.png"
+                    image: "assets/images/manchas.jpeg"
                     text: "Manchas vermelhas na pele"
                 SintomaCard:
                     image: "assets/images/fraqueza.png"
@@ -137,10 +137,10 @@ KV_SINTOMAS = '''
                 adaptive_height: True
 
                 SintomaCard:
-                    image: "assets/images/cansaco.png"
+                    image: "assets/images/cansaco.jpg"
                     text: "Cansaço intenso"
                 SintomaCard:
-                    image: "assets/images/dor_barriga_forte.png"
+                    image: "assets/images/dor-barriga.jpg"
                     text: "Dor forte na barriga"
                 SintomaCard:
                     image: "assets/images/falta_ar.png"
