@@ -347,31 +347,50 @@ class ProfileTabContent(ScrollView):
 
     def copiar_para_pasta_app(self, uri_origem):
         """Abre o arquivo e salva na pasta do VigiAA sem depender de bibliotecas pesadas de URI"""
+        from kivy.utils import platform
         from kivymd.app import MDApp
         import shutil
         import os
+        import time
 
         app_folder = MDApp.get_running_app().user_data_dir
-        dest_path = os.path.join(app_folder, "perfil_local.jpg")
+        # Garante um nome único para não usar cache velho
+        dest_path = os.path.join(app_folder, f"perfil_{int(time.time())}.jpg")
         
-        # Limpa o prefixo se existir
         uri_str = str(uri_origem).replace("file://", "", 1)
 
+        # 1. A BALA DE PRATA: Usar o Java NIO para ler o 'content://' nativamente
+        if platform == 'android' and uri_str.startswith('content://'):
+            try:
+                from jnius import autoclass
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                Uri = autoclass('android.net.Uri')
+                Paths = autoclass('java.nio.file.Paths')
+                Files = autoclass('java.nio.file.Files')
+
+                activity = PythonActivity.mActivity
+                uri_obj = Uri.parse(uri_str)
+                
+                # Abre um túnel de dados direto com o sistema Android
+                input_stream = activity.getContentResolver().openInputStream(uri_obj)
+                dest_file = Paths.get(dest_path)
+                
+                # O Java faz a cópia em nível de sistema, ignorando o bloqueio do Python!
+                Files.copy(input_stream, dest_file)
+                input_stream.close()
+                
+                return dest_path
+            except Exception as e:
+                print(f"VIGIAA DEBUG: Falha no JNIUS NIO: {e}")
+                pass # Se falhar, tenta o bloco debaixo
+
+        # 2. Se for um caminho comum (PC ou Android antigo), tenta o shutil
         try:
-            # Tenta copiar o arquivo normalmente (a versão nova do Plyer já entrega o arquivo acessível)
             shutil.copy2(uri_str, dest_path)
             return dest_path
         except Exception as e:
-            print(f"VIGIAA DEBUG: Erro no shutil: {e}. Tentando leitura binária.")
-            try:
-                # Plano B: Copia byte a byte "na força bruta"
-                with open(uri_str, 'rb') as f_in:
-                    with open(dest_path, 'wb') as f_out:
-                        f_out.write(f_in.read())
-                return dest_path
-            except Exception as e2:
-                print(f"VIGIAA DEBUG ERROR: Falha total na cópia: {e2}")
-                return uri_str # Se tudo falhar, devolve o original e reza
+            print(f"VIGIAA DEBUG ERROR: Falha total na cópia: {e}")
+            return uri_str # Última esperança, devolve o original
             
     def garantir_arquivo_acessivel(self, original_path):
         """Copia a imagem para a pasta do app para que o Python consiga ler"""

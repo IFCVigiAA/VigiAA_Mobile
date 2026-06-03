@@ -878,7 +878,6 @@ class FocusFormScreen(MDScreen):
     def _safe_camera_start(self, permissions, grants):
         from android.permissions import Permission
         from plyer import camera
-        from kivymd.app import MDApp
         import os
         import time
         
@@ -886,62 +885,50 @@ class FocusFormScreen(MDScreen):
         
         if perms_dict.get(Permission.CAMERA, False):
             try:
-                # 1. LIBERAR O ANDROID PARA GRAVAR O ARQUIVO (StrictMode)
                 from jnius import autoclass
                 StrictMode = autoclass('android.os.StrictMode')
                 VmPolicyBuilder = autoclass('android.os.StrictMode$VmPolicy$Builder')
                 StrictMode.setVmPolicy(VmPolicyBuilder().build())
 
-                # 2. DEFINIR CAMINHO DE CACHE EXTERNO (O SEGREDO PARA NÃO CRASHAR)
-                PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                context = PythonActivity.mActivity
-                
-                # Pega a pasta de cache externa (a câmera do Android tem permissão aqui!)
-                ext_cache = context.getExternalCacheDir()
-                if ext_cache:
-                    pasta_fotos = ext_cache.getAbsolutePath()
-                else:
-                    # Se falhar, tenta a pasta local
-                    pasta_fotos = MDApp.get_running_app().user_data_dir
+            
+                Environment = autoclass('android.os.Environment')
+                pasta_publica = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsolutePath()
+ 
+                pasta_fotos = os.path.join(pasta_publica, "VigiAA")
+                if not os.path.exists(pasta_fotos):
+                    os.makedirs(pasta_fotos, exist_ok=True)
                     
                 nome_arquivo = f"foco_{int(time.time())}.jpg"
                 self.caminho_foto_temp = os.path.join(pasta_fotos, nome_arquivo)
                 
-                print(f"VIGIAA DEBUG: [CAMERA] Salvando em: {self.caminho_foto_temp}")
+                print(f"VIGIAA DEBUG: [CAMERA] Câmera autorizada a salvar em: {self.caminho_foto_temp}")
                 camera.take_picture(filename=self.caminho_foto_temp, on_complete=self._on_camera_success)
             except Exception as e:
-                self.mostrar_aviso(f"Erro ao ligar a lente: {e}", "red")
+                self.mostrar_aviso(f"Erro ao ligar a lente: {str(e)[:30]}", "red")
 
     @mainthread
     def _on_camera_success(self, filepath=None):
-        # Verifica o caminho retornado ou usa o temporário definido anteriormente
         caminho_final = filepath if filepath else getattr(self, 'caminho_foto_temp', None)
-        
         print(f"VIGIAA DEBUG: [CAMERA] Câmera retornou o caminho: {caminho_final}")
-        
-        if caminho_final:
-            # 1. Limpa os prefixos URI que quebram o Python
-            caminho_limpo = str(caminho_final).replace("file://", "")
-            
-            # 2. TRUQUE: Tenta abrir em modo leitura rápida para burlar cache de disco do Android
-            arquivo_existe = False
-            try:
-                with open(caminho_limpo, 'rb') as f:
-                    # Lê 1 byte só para provar que o arquivo é real e está acessível
-                    f.read(1)
-                    arquivo_existe = True
-            except Exception as e:
-                print(f"VIGIAA DEBUG: [CAMERA] Falha ao tentar abrir o arquivo: {e}")
-            
-            # 3. Processa
-            if arquivo_existe:
-                if caminho_limpo not in self.selected_files:
-                    self.selected_files.append(caminho_limpo)
-                    self.update_images_display()
+
+        def checar_arquivo(dt):
+            if caminho_final:
+                caminho_limpo = str(caminho_final).replace("file://", "")
+                
+                # Lê o arquivo diretamente no disco
+                if os.path.exists(caminho_limpo):
+                    if caminho_limpo not in self.selected_files:
+                        self.selected_files.append(caminho_limpo)
+                        self.update_images_display()
+                else:
+                    self.mostrar_aviso("Foto cancelada ou descartada.")
             else:
-                self.mostrar_aviso("Foto cancelada ou não salva.")
-        else:
-            self.mostrar_aviso("Nenhum arquivo capturado.")
+                self.mostrar_aviso("Nenhum arquivo retornado.")
+
+        # O SEGREDO DO KIVY MOBILE: Esperar 0.6 segundos antes de checar.
+        # Isso dá tempo ao sistema operacional Android fechar a câmera e salvar os bytes!
+        from kivy.clock import Clock
+        Clock.schedule_once(checar_arquivo, 0.6)
 
 
     # Mantemos o seu _handle_selection original intacto!
