@@ -938,7 +938,6 @@ class FocusFormScreen(MDScreen):
         except Exception as e:
             self.mostrar_aviso("Permissão de galeria negada ou indisponível.", "red")
 
-    # ... código anterior ...
 
     def open_camera(self):
         """Pede permissão e abre a câmera INTERNA do VigiAA"""

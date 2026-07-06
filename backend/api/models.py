@@ -53,7 +53,6 @@ def save_user_profile(sender, instance, **kwargs):
     except Profile.DoesNotExist:
         Profile.objects.create(user=instance)
 
-# --- ADICIONE ISTO NO FINAL DO SEU models.py ---
 
 class DengueCase(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE) # Quem registrou
@@ -73,7 +72,7 @@ class DengueCase(models.Model):
         return f"Caso em {self.city} ({self.notification_date})"
     
 class PositiveDengueCase(models.Model):
-    # Liga este paciente ao caso de dengue base que acabamos de criar
+    # Liga este paciente ao caso de dengue
     dengue_case = models.OneToOneField(DengueCase, on_delete=models.CASCADE, related_name='positive_details')
     patient_name = models.CharField(max_length=150)
     cpf = models.CharField(max_length=20, blank=True, null=True)

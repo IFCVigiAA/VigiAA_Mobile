@@ -13,6 +13,14 @@ try:
     if current_dir not in sys.path:
         sys.path.append(current_dir)
 
+    # --- CONFIGURAÇÃO DO TAMANHO DA TELA (EMULADOR NO PC) ---
+    from kivy.config import Config
+    # Configura o tamanho para simular a tela de um celular (ex: 360x640)
+    Config.set('graphics', 'width', '360')
+    Config.set('graphics', 'height', '640')
+    Config.set('graphics', 'resizable', False)
+    # --------------------------------------------------------
+
     from kivy.uix.screenmanager import ScreenManager
     from kivy.lang import Builder
 
