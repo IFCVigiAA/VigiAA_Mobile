@@ -1,4 +1,4 @@
-from import MDScreen
+from kivymd.uix.screen import MDScreen
 from kivy.lang import Builder
 from kivy.clock import mainthread, Clock
 from kivymd.toast import toast
