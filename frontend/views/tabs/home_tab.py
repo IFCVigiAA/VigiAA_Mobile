@@ -4,6 +4,9 @@ from kivy.uix.scrollview import ScrollView
 from kivy.lang import Builder
 from kivy.properties import StringProperty, BooleanProperty, ObjectProperty
 from kivy.clock import Clock
+from kivy.network.urlrequest import (
+    UrlRequest,
+)
 
 KV_HOME_TAB = '''
 <StatCard@MDCard>:
@@ -113,19 +116,21 @@ KV_HOME_TAB = '''
             spacing: "10dp"
 
             StatCard:
+                id: card_confirmados    
                 title: "Casos confirmados"
-                value: "457"
+                value: "Carregando..."
                 subtext: "+20 este mês"
 
             StatCard:
+                id: card_suspeitas      
                 title: "Suspeitas de dengue"
-                value: "2,405"
+                value: "Carregando..."
                 subtext: "+300 este mês"
 
         # Gráficos
         ChartCard:
             title: "Casos confirmados por mês"
-            image_src: "assets/images/grafico1.png" 
+            image_src: "assets/images/grafico1.png"
 
         ChartCard:
             title: "Proporção de focos por tipo"
@@ -148,6 +153,7 @@ class HomeTabContent(ScrollView):
         super().__init__(**kwargs)
         self.year_buttons = []
         Clock.schedule_once(self.populate_years, 0)
+        Clock.schedule_once(lambda dt: self.carregar_dados_api(), 0.1) #kk
 
     def populate_years(self, dt):
         anos = ["2026", "2025", "2024"]
@@ -162,3 +168,34 @@ class HomeTabContent(ScrollView):
             btn.is_selected = False
         clicked_btn.is_selected = True
         print(f"Ano selecionado: {clicked_btn.year_text}")
+        #clicked_btn.year_text mostra o ano selecionado pelo botãokk
+
+    # ADICIONADO: Método para buscar os dados na API REST do Django
+    def carregar_dados_api(self):
+        # Alterado de localhost para a URL pública (Ngrok)
+        url = "https://froglike-cataleya-quirkily.ngrok-free.dev/api/estatisticas/"
+
+        UrlRequest(
+            url,
+            on_success=self._on_dados_sucesso,
+            on_failure=self._on_dados_erro,
+            on_error=self._on_dados_erro,
+            timeout=5,
+        )
+
+    # ADICIONADO: Atualiza apenas os StatCards com o retorno da API
+    def _on_dados_sucesso(self, request, result):
+        print(f"[DEBUG] Dados recebidos da API com sucesso: {result}")
+        # Leitura extraindo as propriedades corretas dentro do dicionário "resumo"
+        resumo = result.get("resumo", {})
+        total_confirmados = resumo.get("total_casos_positivos", result.get("confirmados", 0))
+        total_suspeitas = resumo.get("total_casos_suspeitos", result.get("suspeitas", 0))
+
+        self.ids.card_confirmados.value = str(total_confirmados)
+        self.ids.card_suspeitas.value = str(total_suspeitas)
+
+    # ADICIONADO: Tratamento de erro de conexão
+    def _on_dados_erro(self, request, error):
+        print(f"Erro na requisição: {error}")
+        self.ids.card_confirmados.value = "N/A"
+        self.ids.card_suspeitas.value = "N/A"

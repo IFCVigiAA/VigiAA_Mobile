@@ -31,6 +31,10 @@ import os
 # Seus Serializers
 from .serializers import MyTokenObtainPairSerializer
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated # ou AllowAny, dependendo do uso
+from django.db.models import Count
+
 # --- MUDANÇA 1: Importe o Modelo e o Serializer de Casos aqui! ---
 # (Verifique se o nome do seu modelo no models.py é exatamente DengueCase)
 from .models import DengueFocus, DengueCase, PositiveDengueCase
@@ -410,3 +414,16 @@ class PositiveDengueCaseCreateView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# ==============================================================================
+# ESTATISTICAS HOME
+# ==============================================================================
+
+@api_view(['GET'])
+# @permission_classes([IsAuthenticated]) # Descomente se exigir login
+def estatisticas_view(request):
+    # Total de registros
+    total_focos = DengueFocus.objects.count()
+    total_casos = DengueCase.objects.count()
+    total_casos_positivos = PositiveDengueCase.objects.count()
+    

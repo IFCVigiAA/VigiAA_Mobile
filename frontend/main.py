@@ -4,6 +4,15 @@ import sys
 import textwrap
 from kivymd.app import MDApp
 from kivy.storage.jsonstore import JsonStore
+# No main.py ou gerenciador de telas:
+from views.home_view import HomeStatistics  # Atualize a importação
+
+class MainApp(MDApp):
+    def build(self):
+        sm = ScreenManager()
+        # Adicione com o novo nome
+        sm.add_widget(HomeStatistics(name="home_statistics"))
+        return sm
 
 # O store continua aqui em cima
 store = JsonStore('sessao_app.json')
@@ -96,4 +105,4 @@ except Exception as e:
                          text_size=(Window.width * 0.9, None), halign='left', valign='top')
             
     if __name__ == '__main__':
-        ErrorApp().run()
+        VigiAA().run()

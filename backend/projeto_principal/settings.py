@@ -193,7 +193,7 @@ LOGIN_REDIRECT_URL = '/api/google-callback/'
 
 CSRF_COOKIE_SAMESITE = 'None'
 
-CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev'] #para que o ngrok permita a conexão
+#CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev'] #para que o ngrok permita a conexão
 
 # Usa o banco de dados para garantir que a sessão persista
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'

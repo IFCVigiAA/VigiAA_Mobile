@@ -8,6 +8,92 @@ from kivy.properties import ListProperty, VariableListProperty
 from kivy.uix.boxlayout import BoxLayout 
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.metrics import dp
+ # graficosdadoskk
+import os
+import sys
+from kivy.properties import StringProperty
+import requests
+from kivy.clock import Clock
+from kivymd.uix.label import MDLabel
+from kivymd.uix.list import OneLineListItem
+# graficosgraficoskk
+
+# graficosdadoskk
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+print("ROOT:", ROOT_DIR)
+print("CONTEUDO:", os.listdir(ROOT_DIR))
+
+sys.path.insert(0, ROOT_DIR)
+
+BASE_DIR = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
+BACKEND_DIR = os.path.join(BASE_DIR, "backend")
+sys.path.insert(0, BASE_DIR)
+sys.path.insert(0, BACKEND_DIR)
+
+
+os.environ.setdefault(
+    "DJANGO_SETTINGS_MODULE",
+    "backend.projeto_principal.settings"
+)
+
+print(sys.path)
+
+import django
+django.setup()
+
+# from backend.api.models import PositiveDengueCase, DengueFocus, DengueCase
+
+ # ==============================================================================
+ # GRAFICOS DA HOME
+ # ==============================================================================
+
+
+class HomeStatistics(MDScreen):
+    def on_enter(self):
+        """Executado automaticamente quando a tela abre"""
+        self.carregar_estatisticas()
+
+    def carregar_estatisticas(self):
+        url = "https://froglike-cataleya-quirkily.ngrok-free.dev/api/estatisticas/"
+        
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                dados = response.json()
+                Clock.schedule_once(lambda dt: self.atualizar_interface(dados))
+            else:
+                print(f"Erro na API: {response.status_code}")
+        except Exception as e:
+            print(f"Erro de conexão: {e}")
+
+    def atualizar_interface(self, dados):
+        container = self.ids.container_lista 
+        container.clear_widgets() 
+        
+        resumo = dados.get("resumo", {})
+        total_positivos = resumo.get("total_casos_positivos", 0)
+        
+        self.ids.label_total.text = f"Casos Positivos: {total_positivos}"
+
+        casos = dados.get("detalhes_casos_positivos", [])
+        
+        if not casos:
+            container.add_widget(MDLabel(text="Nenhum registro encontrado.", halign="center"))
+            return
+
+        for caso in casos:
+            nome = caso.get("patient_name", "Sem nome")
+            cidade = caso.get("city", "Cidade não informada")
+            caso_id = caso.get("id")
+
+            item = OneLineListItem(
+                text=f"ID {caso_id}: {nome} - {cidade}"
+            )
+            container.add_widget(item)
 
 # Vacina preventiva para os ícones da Home (sininho, etc)
 from kivymd.uix.button import MDIconButton
@@ -116,6 +202,24 @@ KV_HOME_VIEW = '''
                 on_tab_release: profile_tab.refresh_data()
                 ProfileTabContent:
                     id: profile_tab
+
+<HomeStatistics>:
+    name: "home_statistics"  # Nome da rota/screen se usar ScreenManager
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: "16dp"
+        spacing: "10dp"
+
+        MDLabel:
+            id: label_total
+            text: "Carregando..."
+            font_style: "H6"
+            size_hint_y: None
+            height: "40dp"
+
+        ScrollView:
+            MDList:
+                id: container_lista
 '''
 
 Builder.load_string(KV_HOME_VIEW)
@@ -204,3 +308,6 @@ class HomeScreen(MDScreen):
             
         app.root.current = 'login'
         toast("Sessão expirada. Faça login novamente.")
+
+    # def on_pre_enter(self):
+    #     self.pacient_positive = str(PositiveDengueCase.objects.count())
