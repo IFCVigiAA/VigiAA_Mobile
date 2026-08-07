@@ -419,11 +419,45 @@ class PositiveDengueCaseCreateView(APIView):
 # ESTATISTICAS HOME
 # ==============================================================================
 
+# @api_view(['GET'])
+# # @permission_classes([IsAuthenticated])
+# def estatisticas_view(request):
+#     total_casos = DengueCase.objects.count()
+#     total_casos_positivos = PositiveDengueCase.objects.count()
+
+#     data = {
+#         "resumo": {
+#             "total_casos_positivos": total_casos_positivos,
+#             "total_casos_suspeitos": total_casos
+#         }
+#     }
+
+#     # RETORNO OBRIGATÓRIO PARA O DRF ENVIAR O JSON
+#     return Response(data, status=status.HTTP_200_OK)
+
 @api_view(['GET'])
-# @permission_classes([IsAuthenticated]) # Descomente se exigir login
 def estatisticas_view(request):
-    # Total de registros
-    total_focos = DengueFocus.objects.count()
     total_casos = DengueCase.objects.count()
     total_casos_positivos = PositiveDengueCase.objects.count()
+
+    # Busca os últimos 20 casos positivos para preencher a lista
+    casos_qs = PositiveDengueCase.objects.all()[:20]
+    
+    detalhes = []
+    for c in casos_qs:
+        detalhes.append({
+            "id": c.id,
+            "patient_name": getattr(c, 'patient_name', getattr(c, 'nome', f"Caso #{c.id}")),
+            "city": getattr(c, 'city', getattr(c, 'cidade', "Não informada"))
+        })
+
+    data = {
+        "resumo": {
+            "total_casos_positivos": total_casos_positivos,
+            "total_casos_suspeitos": total_casos
+        },
+        "detalhes_casos_positivos": detalhes
+    }
+
+    return Response(data, status=status.HTTP_200_OK)
     

@@ -15,24 +15,29 @@ from .views import PasswordResetWebConfirm
 
 urlpatterns = [
     # --- Autenticação JWT ---
-    path('api/token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/register/', UserRegistrationView.as_view(), name='user_register'),
-    path('api/delete-account/', UserDeleteView.as_view(), name='user_delete'),
+    path('token/', MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('register/', UserRegistrationView.as_view(), name='user_register'),
+    path('delete-account/', UserDeleteView.as_view(), name='user_delete'),
 
     # --- Login Google (Manual) ---
-    path('api/start-login/', views.start_login, name='start_login'),
-    path('api/google-callback/', views.google_callback_manual, name='google_callback_manual'),
-    path('api/check-login/', views.check_login_status, name='check_login_status'),
+    path('start-login/', views.start_login, name='start_login'),
+    path('google-callback/', views.google_callback_manual, name='google_callback_manual'),
+    path('check-login/', views.check_login_status, name='check_login_status'),
     
     # --- Recuperação de Senha ---
-    path('api/password-reset-request/', RequestPasswordResetEmail.as_view(), name='password-reset-request'),
-    path('api/password-reset-confirm/', PasswordTokenCheckAPI.as_view(), name='password-reset-confirm'),
-    path('api/password-reset-web/<uidb64>/<token>/', PasswordResetWebConfirm.as_view(), name='password-reset-web'),
-    path('api/change-password/', ChangePasswordView.as_view(), name='change-password'),
+    path('password-reset-request/', RequestPasswordResetEmail.as_view(), name='password-reset-request'),
+    path('password-reset-confirm/', PasswordTokenCheckAPI.as_view(), name='password-reset-confirm'),
+    path('password-reset-web/<uidb64>/<token>/', PasswordResetWebConfirm.as_view(), name='password-reset-web'),
+    path('change-password/', ChangePasswordView.as_view(), name='change-password'),
 
-    path('api/profile/', UserProfileView.as_view(), name='user-profile'),
+    path('profile/', UserProfileView.as_view(), name='user-profile'),
 
-    path('api/report-focus/', DengueFocusCreateView.as_view(), name='report-focus'),
-    path('api/report-case/', DengueCaseCreateView.as_view(), name='report-case'),
-    path('api/report-positive-case/', views.PositiveDengueCaseCreateView.as_view(), name='report-positive-case'),
+    path('report-focus/', DengueFocusCreateView.as_view(), name='report-focus'),
+    path('report-case/', DengueCaseCreateView.as_view(), name='report-case'),
+    path('report-positive-case/', views.PositiveDengueCaseCreateView.as_view(), name='report-positive-case'),
+]
+from .views import SuasEstatisticasView
+
+urlpatterns = [
+    path('estatisticas/', SuasEstatisticasView.as_view(), name='estatisticas'),
 ]

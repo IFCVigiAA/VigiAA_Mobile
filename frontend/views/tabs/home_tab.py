@@ -4,9 +4,10 @@ from kivy.uix.scrollview import ScrollView
 from kivy.lang import Builder
 from kivy.properties import StringProperty, BooleanProperty, ObjectProperty
 from kivy.clock import Clock
-from kivy.network.urlrequest import (
-    UrlRequest,
-)
+from kivy.network.urlrequest import UrlRequest
+from kivymd.uix.list import OneLineListItem
+from kivymd.uix.label import MDLabel
+from kivymd.uix.boxlayout import MDBoxLayout
 
 KV_HOME_TAB = '''
 <StatCard@MDCard>:
@@ -70,7 +71,6 @@ KV_HOME_TAB = '''
         allow_stretch: True
         keep_ratio: True
 
-# Novo botão limpo e leve, sem conflito de sombras
 <YearButton>:
     text: root.year_text
     font_size: "14sp"
@@ -122,7 +122,7 @@ KV_HOME_TAB = '''
                 subtext: "+20 este mês"
 
             StatCard:
-                id: card_suspeitas      
+                id: card_suspeitas    
                 title: "Suspeitas de dengue"
                 value: "Carregando..."
                 subtext: "+300 este mês"
@@ -136,9 +136,10 @@ KV_HOME_TAB = '''
             title: "Proporção de focos por tipo"
             image_src: "assets/images/grafico2.png"
 '''
+
 Builder.load_string(KV_HOME_TAB)
 
-# Trocamos de MDCard para MDFillRoundFlatButton para não ter bug de sombra!
+
 class YearButton(MDFillRoundFlatButton):
     is_selected = BooleanProperty(False)
     year_text = StringProperty("")
@@ -148,54 +149,66 @@ class YearButton(MDFillRoundFlatButton):
         if self.callback:
             self.callback(self)
 
+
 class HomeTabContent(ScrollView):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.year_buttons = []
         Clock.schedule_once(self.populate_years, 0)
-        Clock.schedule_once(lambda dt: self.carregar_dados_api(), 0.1) #kk
+        Clock.schedule_once(lambda dt: self.carregar_dados_api(), 0.1)
 
     def populate_years(self, dt):
         anos = ["2026", "2025", "2024"]
-        for i, ano in enumerate(anos):
-            # Passando os dados limpos
-            btn = YearButton(year_text=ano, is_selected=(i == 0), callback=self.change_year)
-            self.year_buttons.append(btn)
-            self.ids.year_container.add_widget(btn)
+        if "year_container" in self.ids:
+            self.ids.year_container.clear_widgets()
+            for i, ano in enumerate(anos):
+                btn = YearButton(year_text=ano, is_selected=(i == 0), callback=self.change_year)
+                self.year_buttons.append(btn)
+                self.ids.year_container.add_widget(btn)
 
     def change_year(self, clicked_btn):
         for btn in self.year_buttons:
             btn.is_selected = False
         clicked_btn.is_selected = True
-        print(f"Ano selecionado: {clicked_btn.year_text}")
-        #clicked_btn.year_text mostra o ano selecionado pelo botãokk
+        print(f"[DEBUG] Ano selecionado: {clicked_btn.year_text}")
+        self.carregar_dados_api()
 
-    # ADICIONADO: Método para buscar os dados na API REST do Django
     def carregar_dados_api(self):
-        # Alterado de localhost para a URL pública (Ngrok)
         url = "https://froglike-cataleya-quirkily.ngrok-free.dev/api/estatisticas/"
+        
+        # Cabeçalhos necessários para ignorar o bloqueio de aviso do Ngrok
+        headers = {
+            'ngrok-skip-browser-warning': 'true',
+            'Content-Type': 'application/json'
+        }
 
         UrlRequest(
             url,
             on_success=self._on_dados_sucesso,
             on_failure=self._on_dados_erro,
             on_error=self._on_dados_erro,
-            timeout=5,
+            req_headers=headers,
+            timeout=10,
         )
 
-    # ADICIONADO: Atualiza apenas os StatCards com o retorno da API
     def _on_dados_sucesso(self, request, result):
-        print(f"[DEBUG] Dados recebidos da API com sucesso: {result}")
-        # Leitura extraindo as propriedades corretas dentro do dicionário "resumo"
-        resumo = result.get("resumo", {})
-        total_confirmados = resumo.get("total_casos_positivos", result.get("confirmados", 0))
-        total_suspeitas = resumo.get("total_casos_suspeitos", result.get("suspeitas", 0))
+        print(f"[DEBUG] Resposta completa da API: {result}")
+        
+        # Extrai os dados do JSON com segurança
+        resumo = result.get("resumo", {}) if isinstance(result, dict) else {}
+        total_confirmados = resumo.get("total_casos_positivos", result.get("confirmados", 0) if isinstance(result, dict) else 0)
+        total_suspeitas = resumo.get("total_casos_suspeitos", result.get("suspeitas", 0) if isinstance(result, dict) else 0)
 
-        self.ids.card_confirmados.value = str(total_confirmados)
-        self.ids.card_suspeitas.value = str(total_suspeitas)
+        print(f"[DEBUG] Confirmados: {total_confirmados} | Suspeitas: {total_suspeitas}")
 
-    # ADICIONADO: Tratamento de erro de conexão
+        if "card_confirmados" in self.ids:
+            self.ids.card_confirmados.value = str(total_confirmados)
+        if "card_suspeitas" in self.ids:
+            self.ids.card_suspeitas.value = str(total_suspeitas)
+
     def _on_dados_erro(self, request, error):
-        print(f"Erro na requisição: {error}")
-        self.ids.card_confirmados.value = "N/A"
-        self.ids.card_suspeitas.value = "N/A"
+        print(f"[DEBUG] Erro na requisição API: {error}")
+        if "card_confirmados" in self.ids:
+            self.ids.card_confirmados.value = "Erro"
+        if "card_suspeitas" in self.ids:
+            self.ids.card_suspeitas.value = "Erro"
