@@ -1,17 +1,37 @@
 from django.urls import path
-from . import views
+from .import views
 from .views import (
-    estatisticas_view,
-    EstatisticasView,
-    MyTokenObtainPairView, 
-    UserRegistrationView, 
-    UserDeleteView, 
-    RequestPasswordResetEmail, 
-    PasswordTokenCheckAPI,
-    UserProfileView,
+    # estatisticas_view,
+    # EstatisticasView,
+    # MyTokenObtainPairView, 
+    # UserRegistrationView, 
+    # UserDeleteView, 
+    # RequestPasswordResetEmail, 
+    # PasswordTokenCheckAPI,
+    # UserProfileView,
+    # ChangePasswordView,
+    # DengueFocusCreateView,
+    # DengueCaseCreateView,
+    # check_login_status,
+    # delete_account_view,
+    # google_callback_manual,
+    # profile_view,
+    # start_login,
     ChangePasswordView,
+    DengueCaseCreateView,
     DengueFocusCreateView,
-    DengueCaseCreateView
+    EstatisticasView,
+    MyTokenObtainPairView,
+    PasswordResetWebConfirm,
+    PasswordTokenCheckAPI,
+    RequestPasswordResetEmail,
+    UserDeleteView,
+    UserProfileView,
+    UserRegistrationView,
+    check_login_status,
+    estatisticas_view,
+    google_callback_manual,
+    start_login,
 )
 from .views import PasswordResetWebConfirm
 
@@ -37,9 +57,6 @@ urlpatterns = [
     path('report-focus/', DengueFocusCreateView.as_view(), name='report-focus'),
     path('report-case/', DengueCaseCreateView.as_view(), name='report-case'),
     path('report-positive-case/', views.PositiveDengueCaseCreateView.as_view(), name='report-positive-case'),
-]
 
-urlpatterns = [
     path('estatisticas/', estatisticas_view, name='estatisticas'),
 ]
-

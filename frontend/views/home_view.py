@@ -1,3 +1,6 @@
+import token
+
+from django.apps import config
 from kivymd.uix.screen import MDScreen
 from kivy.lang import Builder
 from kivy.clock import mainthread, Clock
@@ -253,36 +256,62 @@ class HomeScreen(MDScreen):
             print("VIGIAA DEBUG: [HOME FATAL] Cofre realmente vazio. Chutando pro login...")
             self._chutar_para_login()
 
+    # def _seguranca_silencioso(self, token):
+    #     import requests
+    #     import config 
+    #     from kivy.clock import Clock
+        
+    #     try:
+    #         headers = {"Authorization": f"Bearer {token}"}
+            
+    #         # ATENÇÃO: Se você souber a rota correta para validar o token, troque aqui.
+    #         url = f"{config.API_URL}/api/profile/" 
+            
+    #         res = requests.get(url, headers=headers, timeout=5)
+            
+    #         # O SEGURANÇA INTELIGENTE:
+    #         if res.status_code in [401, 403]:
+    #             # Token realmente inválido ou vencido -> EXPULSA!
+    #             print(f"VIGIAA DEBUG: Segurança barrou! Token Inválido (Erro {res.status_code})")
+    #             Clock.schedule_once(lambda dt: self._chutar_para_login(), 0)
+                
+    #         elif res.status_code == 404:
+    #             # A URL está errada! O Django não achou essa rota.
+    #             print("VIGIAA DEBUG: [ALERTA DESENVOLVEDOR] A rota da API não existe (Erro 404). O Token está salvo, mas a URL de checagem está errada!")
+    #             # Não expulsamos o usuário, pois o erro é na rota, não no token dele.
+                
+    #         elif res.status_code in [200, 201]:
+    #             print("VIGIAA DEBUG: Token validado com sucesso na porta da frente!")
+                
+    #     except Exception as e:
+    #         # Sem internet ou servidor desligado -> Deixa passar (modo offline)
+    #         print(f"VIGIAA DEBUG: Servidor inalcançável. Liberado offline. Erro: {e}")
     def _seguranca_silencioso(self, token):
         import requests
-        import config 
+        import config
         from kivy.clock import Clock
-        
+
         try:
-            headers = {"Authorization": f"Bearer {token}"}
-            
-            # ATENÇÃO: Se você souber a rota correta para validar o token, troque aqui.
-            url = f"{config.API_URL}/api/profile/" 
-            
+            # Garante que o token enviado seja apenas a STRING e não um Dicionário
+            if isinstance(token, dict):
+             token = token.get('access') or token.get('access_token')
+
+            headers = {'Authorization': f'Bearer {token}'}
+            url = f'{config.API_URL}/api/profile/'
+
             res = requests.get(url, headers=headers, timeout=5)
-            
-            # O SEGURANÇA INTELIGENTE:
+
             if res.status_code in [401, 403]:
-                # Token realmente inválido ou vencido -> EXPULSA!
-                print(f"VIGIAA DEBUG: Segurança barrou! Token Inválido (Erro {res.status_code})")
+                # IMPRIMA ESTA LINHA NO SEU TERMINAL KIVY:
+                print(f'VIGIAA DEBUG - MOTIVO DO 401: {res.text}')
+
                 Clock.schedule_once(lambda dt: self._chutar_para_login(), 0)
-                
-            elif res.status_code == 404:
-                # A URL está errada! O Django não achou essa rota.
-                print("VIGIAA DEBUG: [ALERTA DESENVOLVEDOR] A rota da API não existe (Erro 404). O Token está salvo, mas a URL de checagem está errada!")
-                # Não expulsamos o usuário, pois o erro é na rota, não no token dele.
-                
-            elif res.status_code in [200, 201]:
-                print("VIGIAA DEBUG: Token validado com sucesso na porta da frente!")
-                
+
+            elif res.status_code == 200:
+                print('VIGIAA DEBUG: Token validado com sucesso!')
+
         except Exception as e:
-            # Sem internet ou servidor desligado -> Deixa passar (modo offline)
-            print(f"VIGIAA DEBUG: Servidor inalcançável. Liberado offline. Erro: {e}")
+            print(f'VIGIAA DEBUG: Erro de conexão: {e}')
 
     @mainthread
     def _chutar_para_login(self, *args):
@@ -309,5 +338,4 @@ class HomeScreen(MDScreen):
         app.root.current = 'login'
         toast("Sessão expirada. Faça login novamente.")
 
-    # def on_pre_enter(self):
-    #     self.pacient_positive = str(PositiveDengueCase.objects.count())
+    

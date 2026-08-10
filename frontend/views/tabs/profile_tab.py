@@ -428,16 +428,83 @@ class ProfileTabContent(ScrollView):
             print(f"VIGIAA DEBUG: [PERFIL] Erro no upload: {str(e)}")
             self.mostrar_aviso(f"Erro de conexão: {str(e)[:25]}")
 
+    # def load_user_data(self):
+    #     session = store.get("session") if store.exists("session") else None
+    #     token = session.get("token") if session else None
+        
+    #     if not token:
+    #         print("VIGIAA DEBUG: Nenhum token encontrado na sessão local.")
+    #         return
+
+    #     # Cabeçalhos necessários para bypass do Ngrok e envio do Token
+    #     headers = {
+    #         "Authorization": f"Bearer {token}",  # Mude para "Token {token}" se usar DRF TokenAuth
+    #         "ngrok-skip-browser-warning": "true",
+    #         "User-Agent": "KivyApp"
+    #     }
+        
+    #     try:
+    #         url = f"{config.API_URL}/api/profile/"
+    #         print(f"VIGIAA DEBUG: Conectando em -> {url}")
+            
+    #         res = requests.get(url, headers=headers, timeout=10, verify=False)
+            
+    #         print(f"VIGIAA DEBUG: Status Code retornado -> {res.status_code}")
+    #         print(f"VIGIAA DEBUG: Conteúdo recebido (primeiros 150 chars) -> {res.text[:150]}")
+            
+    #         if res.status_code == 200:
+    #             data = res.json()
+    #             Clock.schedule_once(lambda dt: self.update_ui_fields(data), 0)
+    #         else:
+    #             print(f"VIGIAA DEBUG: Servidor retornou código de erro: {res.status_code}")
+                
+    #     except requests.exceptions.ConnectionError as e:
+    #         print(f"VIGIAA DEBUG: Erro de conexão com a API. Verifique a URL do Ngrok: {e}")
+    #     except Exception as e:
+    #         print(f"VIGIAA DEBUG: Exceção inesperada: {e}")
+
     def load_user_data(self):
-        token = store.get("session")["token"] if store.exists("session") else None
-        if not token: return
+        if not store.exists("session"):
+            print("VIGIAA DEBUG: Nenhuma sessão encontrada.")
+            return
+
+        session = store.get("session")
+        token_data = session.get("token")
+        
+        # Extrai a string JWT de acesso de dentro da estrutura {'access': '...', 'refresh': '...'}
+        access_token = None
+        if isinstance(token_data, dict):
+            access_token = token_data.get("access")
+        elif isinstance(token_data, str):
+            access_token = token_data
+
+        if not access_token:
+            print("VIGIAA DEBUG: [ERRO] Token de acesso não encontrado na sessão.")
+            return
+
+        headers = {
+            "Authorization": f"Bearer {access_token.strip()}",
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "KivyApp"
+        }
+
         try:
             url = f"{config.API_URL}/api/profile/"
-            res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+            print(f"VIGIAA DEBUG: Enviando requisição de perfil para -> {url}")
+            
+            res = requests.get(url, headers=headers, timeout=10, verify=False)
+            
+            print(f"VIGIAA DEBUG: Resposta da API (Status {res.status_code})")
+            
             if res.status_code == 200:
                 data = res.json()
+                print("VIGIAA DEBUG: Dados do perfil recebidos com sucesso!")
                 Clock.schedule_once(lambda dt: self.update_ui_fields(data), 0)
-        except: pass
+            else:
+                print(f"VIGIAA DEBUG: Erro da API -> {res.text[:150]}")
+                
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Exceção na requisição -> {e}")
 
     @mainthread
     def update_ui_fields(self, data):

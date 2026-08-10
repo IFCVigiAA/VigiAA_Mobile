@@ -35,6 +35,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated # ou AllowAny, dependendo do uso
 from django.db.models import Count
 
+from .models import Profile
+
 # --- MUDANÇA 1: Importe o Modelo e o Serializer de Casos aqui! ---
 # (Verifique se o nome do seu modelo no models.py é exatamente DengueCase)
 from .models import DengueFocus, DengueCase, PositiveDengueCase
@@ -51,9 +53,12 @@ GOOGLE_REDIRECT_URI = "https://froglike-cataleya-quirkily.ngrok-free.dev/api/goo
 
 
 def get_tokens_for_user(user):
-    """Gera o JWT manualmente para um usuário"""
-    refresh = RefreshToken.for_user(user)
-    return str(refresh.access_token)
+   """Gera o par de tokens JWT (access e refresh) para o usuário"""
+   refresh = RefreshToken.for_user(user)
+   return {
+      'access': str(refresh.access_token),
+      'refresh': str(refresh),
+  }
 
 def start_login(request):
     """
@@ -428,31 +433,7 @@ class PositiveDengueCaseCreateView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# @api_view(['GET'])
-# def estatisticas_view(request):
-#     total_casos = DengueCase.objects.count()
-#     total_casos_positivos = PositiveDengueCase.objects.count()
 
-#     # Busca os últimos 20 casos positivos para preencher a lista
-#     casos_qs = PositiveDengueCase.objects.all()[:20]
-    
-#     detalhes = []
-#     for c in casos_qs:
-#         detalhes.append({
-#             "id": c.id,
-#             "patient_name": getattr(c, 'patient_name', getattr(c, 'nome', f"Caso #{c.id}")),
-#             "city": getattr(c, 'city', getattr(c, 'cidade', "Não informada"))
-#         })
-
-#     data = {
-#         "resumo": {
-#             "total_casos_positivos": total_casos_positivos,
-#             "total_casos_suspeitos": total_casos
-#         },
-#         "detalhes_casos_positivos": detalhes
-#     }
-
-#     return Response(data, status=status.HTTP_200_OK)
 @api_view(['GET'])
 def estatisticas_view(request):
   # Captura o parâmetro ?ano= enviado pelo Kivy
@@ -477,3 +458,20 @@ def estatisticas_view(request):
   }
 
   return Response(data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])  # Login não exige token prévio
+def start_login_view(request):
+  login_id = request.GET.get('login_id')
+
+  if not login_id:
+    return Response(
+        {'error': 'login_id não informado'}, status=status.HTTP_400_BAD_REQUEST
+    )
+
+  # Aqui vai a sua lógica de iniciar o login do Google com o login_id
+  # ...
+
+  return Response(
+      {'status': 'ok', 'login_id': login_id}, status=status.HTTP_200_OK
+  )
