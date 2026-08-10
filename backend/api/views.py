@@ -202,6 +202,19 @@ def check_login_status(request):
     else:
         return JsonResponse({'status': 'waiting'})
 
+# ==============================================================================
+# ATUALIZAÇAO DE VALORES DAS TABELAS DE ESTATISTICAS
+# ==============================================================================
+
+class EstatisticasView(APIView):
+
+  def get(self, request):
+   
+    dados = {
+        "total_registros": 100,
+        "status": "ativo",
+    }
+    return Response(dados)
 
 # ==============================================================================
 # VIEWS PADRÃO (REGISTRO, LOGIN SENHA, ETC) - MANTIDAS
@@ -414,26 +427,6 @@ class PositiveDengueCaseCreateView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# ==============================================================================
-# ESTATISTICAS HOME
-# ==============================================================================
-
-# @api_view(['GET'])
-# # @permission_classes([IsAuthenticated])
-# def estatisticas_view(request):
-#     total_casos = DengueCase.objects.count()
-#     total_casos_positivos = PositiveDengueCase.objects.count()
-
-#     data = {
-#         "resumo": {
-#             "total_casos_positivos": total_casos_positivos,
-#             "total_casos_suspeitos": total_casos
-#         }
-#     }
-
-#     # RETORNO OBRIGATÓRIO PARA O DRF ENVIAR O JSON
-#     return Response(data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 def estatisticas_view(request):

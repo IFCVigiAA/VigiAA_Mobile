@@ -207,7 +207,8 @@ class HomeTabContent(ScrollView):
             self.ids.card_suspeitas.value = str(total_suspeitas)
 
     def _on_dados_erro(self, request, error):
-        print(f"[DEBUG] Erro na requisição API: {error}")
+        status = getattr(request, 'resp_status', 'Desconhecido')
+        print(f"[DEBUG] Erro na requisição API: (Status {status})")
         if "card_confirmados" in self.ids:
             self.ids.card_confirmados.value = "Erro"
         if "card_suspeitas" in self.ids:

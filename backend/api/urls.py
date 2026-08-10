@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
 from .views import (
+    estatisticas_view,
+    EstatisticasView,
     MyTokenObtainPairView, 
     UserRegistrationView, 
     UserDeleteView, 
@@ -36,8 +38,8 @@ urlpatterns = [
     path('report-case/', DengueCaseCreateView.as_view(), name='report-case'),
     path('report-positive-case/', views.PositiveDengueCaseCreateView.as_view(), name='report-positive-case'),
 ]
-from .views import SuasEstatisticasView
 
 urlpatterns = [
-    path('estatisticas/', SuasEstatisticasView.as_view(), name='estatisticas'),
+    path('estatisticas/', estatisticas_view, name='estatisticas'),
 ]
+
