@@ -209,7 +209,7 @@ def check_login_status(request):
 class EstatisticasView(APIView):
 
   def get(self, request):
-   
+    # Substitua pelos seus dados reais do banco de dados/lógica
     dados = {
         "total_registros": 100,
         "status": "ativo",
@@ -428,29 +428,52 @@ class PositiveDengueCaseCreateView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# @api_view(['GET'])
+# def estatisticas_view(request):
+#     total_casos = DengueCase.objects.count()
+#     total_casos_positivos = PositiveDengueCase.objects.count()
+
+#     # Busca os últimos 20 casos positivos para preencher a lista
+#     casos_qs = PositiveDengueCase.objects.all()[:20]
+    
+#     detalhes = []
+#     for c in casos_qs:
+#         detalhes.append({
+#             "id": c.id,
+#             "patient_name": getattr(c, 'patient_name', getattr(c, 'nome', f"Caso #{c.id}")),
+#             "city": getattr(c, 'city', getattr(c, 'cidade', "Não informada"))
+#         })
+
+#     data = {
+#         "resumo": {
+#             "total_casos_positivos": total_casos_positivos,
+#             "total_casos_suspeitos": total_casos
+#         },
+#         "detalhes_casos_positivos": detalhes
+#     }
+
+#     return Response(data, status=status.HTTP_200_OK)
 @api_view(['GET'])
 def estatisticas_view(request):
-    total_casos = DengueCase.objects.count()
-    total_casos_positivos = PositiveDengueCase.objects.count()
+  # Captura o parâmetro ?ano= enviado pelo Kivy
+  ano = request.GET.get('ano')
 
-    # Busca os últimos 20 casos positivos para preencher a lista
-    casos_qs = PositiveDengueCase.objects.all()[:20]
-    
-    detalhes = []
-    for c in casos_qs:
-        detalhes.append({
-            "id": c.id,
-            "patient_name": getattr(c, 'patient_name', getattr(c, 'nome', f"Caso #{c.id}")),
-            "city": getattr(c, 'city', getattr(c, 'cidade', "Não informada"))
-        })
+  casos_qs = DengueCase.objects.all()
+  positivos_qs = PositiveDengueCase.objects.all()
 
-    data = {
-        "resumo": {
-            "total_casos_positivos": total_casos_positivos,
-            "total_casos_suspeitos": total_casos
-        },
-        "detalhes_casos_positivos": detalhes
-    }
+  # Se o ano foi informado nos botões, filtra pela data de notificação
+  if ano:
+    casos_qs = casos_qs.filter(notification_date__year=ano)
+    positivos_qs = positivos_qs.filter(
+        dengue_case__notification_date__year=ano
+    )
 
-    return Response(data, status=status.HTTP_200_OK)
-    
+  # Retorna estritamente o resumo esperado pelos cards do Kivy
+  data = {
+      'resumo': {
+          'total_casos_positivos': positivos_qs.count(),
+          'total_casos_suspeitos': casos_qs.count(),
+      }
+  }
+
+  return Response(data, status=status.HTTP_200_OK)
