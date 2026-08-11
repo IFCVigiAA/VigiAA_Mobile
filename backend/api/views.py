@@ -41,7 +41,9 @@ from .models import Profile
 # (Verifique se o nome do seu modelo no models.py é exatamente DengueCase)
 from .models import DengueFocus, DengueCase, PositiveDengueCase
 from .serializers import DengueFocusSerializer, DengueCaseSerializer, PositiveDengueCaseSerializer
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser,  JSONParser
+
+from .serializers import UserProfileSerializer, ChangePasswordSerializer
 
 # ==============================================================================
 # CONFIGURAÇÕES DO GOOGLE (PREENCHA AQUI OU PEGUE DO SETTINGS/ENV)
@@ -360,8 +362,27 @@ class PasswordResetWebConfirm(APIView):
                 
             return Response({'error': error_msg, 'uidb64': uidb64, 'token': token})
 
+# class UserProfileView(APIView):
+#     permission_classes = [IsAuthenticated] 
+
+#     def get(self, request):
+#         serializer = UserProfileSerializer(request.user)
+#         return Response(serializer.data)
+    
+#     def patch(self, request):
+#         user = request.user
+#         serializer = UserProfileSerializer(user, data=request.data, partial=True)
+        
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data)
+        
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class UserProfileView(APIView):
-    permission_classes = [IsAuthenticated] 
+    permission_classes = [IsAuthenticated]
+    # 2. Adicionar os parsers aqui:
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         serializer = UserProfileSerializer(request.user)
@@ -373,7 +394,7 @@ class UserProfileView(APIView):
         
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -475,3 +496,17 @@ def start_login_view(request):
   return Response(
       {'status': 'ok', 'login_id': login_id}, status=status.HTTP_200_OK
   )
+
+@api_view(['GET'])
+def check_login(request):
+    session_id = request.GET.get('session_id')
+    # Recupera o estado do login do cache ou banco
+    login_data = cache.get(session_id) 
+
+    if login_data and login_data.get('status') == 'completed':
+        return Response({
+            "authenticated": True,
+            "token": login_data.get('tokens')  # {'access': '...', 'refresh': '...'}
+        }, status=200)
+
+    return Response({"authenticated": False}, status=200)

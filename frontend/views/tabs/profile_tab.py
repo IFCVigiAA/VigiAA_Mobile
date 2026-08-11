@@ -391,8 +391,24 @@ class ProfileTabContent(ScrollView):
 
     def _worker_upload_avatar(self, file_path):
         session = store.get("session") if store.exists("session") else None
-        token = session["token"] if session else None
-        if not token: return
+        # token = session["token"] if session else None
+        if not session:
+        #token
+            return
+        
+
+        token_data = session.get("token")
+
+        access_token = None
+        if isinstance(token_data, dict):
+            access_token = token_data.get("access")
+        elif isinstance(token_data, str):
+            access_token = token_data
+
+        if not access_token:
+            self.mostrar_aviso("Token de acesso não encontrado.")
+            return
+
         
         try:
             import certifi
@@ -405,13 +421,19 @@ class ProfileTabContent(ScrollView):
                  self.mostrar_aviso("Erro interno ao ler arquivo gerado.")
                  return
 
+            headers = {
+                "Authorization": f"Bearer {access_token.strip()}",
+                "ngrok-skip-browser-warning": "true",
+                "User-Agent": "KivyApp"
+            }
+
             with open(file_path, 'rb') as f:
                 # IMPORTANTE: Mudei aqui para image/png para combinar com o arquivo exportado!
                 files = {'photo': ('avatar_vigiaa.png', f, 'image/png')}
                 
                 res = requests.patch(
                     url, 
-                    headers={"Authorization": f"Bearer {token}"}, 
+                    headers=headers,  #{"Authorization": f"Bearer {token}"}, 
                     files=files, 
                     timeout=30,
                     verify=False # SSL desligado temporariamente no Android
@@ -422,46 +444,13 @@ class ProfileTabContent(ScrollView):
                 from kivy.clock import Clock
                 Clock.schedule_once(lambda dt: self.refresh_data(), 0.5)
             else:
+                print(f"VIGIAA DEBUG: Erro no upload ({res.status_code}): {res.text}")
                 self.mostrar_aviso(f"Erro no servidor: {res.status_code}")
+                # self.mostrar_aviso(f"Erro no servidor: {res.status_code}")
                 
         except Exception as e:
             print(f"VIGIAA DEBUG: [PERFIL] Erro no upload: {str(e)}")
             self.mostrar_aviso(f"Erro de conexão: {str(e)[:25]}")
-
-    # def load_user_data(self):
-    #     session = store.get("session") if store.exists("session") else None
-    #     token = session.get("token") if session else None
-        
-    #     if not token:
-    #         print("VIGIAA DEBUG: Nenhum token encontrado na sessão local.")
-    #         return
-
-    #     # Cabeçalhos necessários para bypass do Ngrok e envio do Token
-    #     headers = {
-    #         "Authorization": f"Bearer {token}",  # Mude para "Token {token}" se usar DRF TokenAuth
-    #         "ngrok-skip-browser-warning": "true",
-    #         "User-Agent": "KivyApp"
-    #     }
-        
-    #     try:
-    #         url = f"{config.API_URL}/api/profile/"
-    #         print(f"VIGIAA DEBUG: Conectando em -> {url}")
-            
-    #         res = requests.get(url, headers=headers, timeout=10, verify=False)
-            
-    #         print(f"VIGIAA DEBUG: Status Code retornado -> {res.status_code}")
-    #         print(f"VIGIAA DEBUG: Conteúdo recebido (primeiros 150 chars) -> {res.text[:150]}")
-            
-    #         if res.status_code == 200:
-    #             data = res.json()
-    #             Clock.schedule_once(lambda dt: self.update_ui_fields(data), 0)
-    #         else:
-    #             print(f"VIGIAA DEBUG: Servidor retornou código de erro: {res.status_code}")
-                
-    #     except requests.exceptions.ConnectionError as e:
-    #         print(f"VIGIAA DEBUG: Erro de conexão com a API. Verifique a URL do Ngrok: {e}")
-    #     except Exception as e:
-    #         print(f"VIGIAA DEBUG: Exceção inesperada: {e}")
 
     def load_user_data(self):
         if not store.exists("session"):
@@ -536,9 +525,21 @@ class ProfileTabContent(ScrollView):
         threading.Thread(target=self._worker_save, args=(api_key, novo_valor, field_instance), daemon=True).start()
 
     def _worker_save(self, api_key, novo_valor, field_instance):
-        token = store.get("session")["token"]
+        session = store.get("session") if store.exists("session") else {}
+        token_data = session.get("token")
+        access_token = token_data.get("access") if isinstance(token_data, dict) else token_data
+
+        if not access_token:
+            Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
+            return
+
+        headers = {
+            "Authorization": f"Bearer {access_token.strip()}",
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "KivyApp"
+        }
         try:
-            res = requests.patch(f"{config.API_URL}/api/profile/", json={api_key: novo_valor}, headers={"Authorization": f"Bearer {token}"})
+            res = requests.patch(f"{config.API_URL}/api/profile/", json={api_key: novo_valor}, headers=headers, verify=False)
             if res.status_code == 200:
                 self.mostrar_aviso(f"{field_instance.label_text} atualizado!")
                 Clock.schedule_once(lambda dt: field_instance._lock_field(), 0)
@@ -571,9 +572,20 @@ class ProfileTabContent(ScrollView):
         threading.Thread(target=self._worker_delete, daemon=True).start()
 
     def _worker_delete(self):
-        token = store.get("session")["token"]
+        session = store.get("session") if store.exists("session") else {}
+        token_data = session.get("token")
+        access_token = token_data.get("access") if isinstance(token_data, dict) else token_data
+
+        if not access_token:
+            return
+
+        headers = {
+            "Authorization": f"Bearer {access_token.strip()}",
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "KivyApp"
+        }
         try:
-            res = requests.delete(f"{config.API_URL}/api/delete-account/", headers={"Authorization": f"Bearer {token}"})
+            res = requests.delete(f"{config.API_URL}/api/delete-account/", headers=headers, verify=False)
             if res.status_code == 200:
                 self.mostrar_aviso("Conta excluída.")
                 Clock.schedule_once(lambda dt: self.logout(), 0)

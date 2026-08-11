@@ -9,17 +9,9 @@ from api.views import estatisticas_view
 urlpatterns = [
     # ... suas rotas existentes ...
     path('api/estatisticas/', estatisticas_view, name='estatisticas'),
-]
-
-urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('api.urls')), 
+    path('api/', include('api.urls')), 
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
-urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/', include('api.urls')),
-]
