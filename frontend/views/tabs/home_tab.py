@@ -12,7 +12,7 @@ from kivymd.uix.boxlayout import MDBoxLayout
 KV_HOME_TAB = '''
 <StatCard@MDCard>:
     orientation: "vertical"
-    padding: "15dp"
+    padding: ["15dp", "5dp", "15dp", "15dp"]
     spacing: "2dp"
     radius: [10, 10, 10, 10]
     elevation: 1
@@ -24,26 +24,21 @@ KV_HOME_TAB = '''
     
     MDLabel:
         text: root.title
-        font_size: "13sp"
+        font_size: "14sp"
         bold: True
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
         halign: "left"
+        font_size: "18sp"
         
     MDLabel:
         text: root.value
-        font_size: "26sp"
+        font_size: "28sp"
         bold: True
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
         halign: "left"
-        
-    MDLabel:
-        text: root.subtext
-        font_size: "11sp"
-        theme_text_color: "Custom"
-        text_color: 0.5, 0.5, 0.5, 1
-        halign: "left"
+        font_size: "32sp"
 
 <ChartCard@MDCard>:
     orientation: "vertical"
@@ -119,13 +114,11 @@ KV_HOME_TAB = '''
                 id: card_confirmados    
                 title: "Casos confirmados"
                 value: "Carregando..."
-                subtext: "+20 este mês"
 
             StatCard:
                 id: card_suspeitas    
                 title: "Suspeitas de dengue"
                 value: "Carregando..."
-                subtext: "+300 este mês"
 
         # Gráficos
         ChartCard:
