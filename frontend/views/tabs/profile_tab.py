@@ -20,9 +20,91 @@ import os
 from kivy.utils import platform
 import time  # <--- ADICIONE ESTE
 from kivy.utils import platform  # <--- ADICIONE ESTE
+from kivymd.uix.screen import MDScreen
 
 store = JsonStore('sessao_app.json')
 
+class ProfileViewCheck(MDScreen):
+    # 1. Flag para controlar se o perfil já foi carregado nesta sessão
+    profile_carregado = False
+
+    def on_tab_open(self):
+        """
+        Método chamado ao clicar/abrir a aba de Perfil.
+        Pode ser acionado no on_tab_switch do MDBottomNavigation ou MDTabs.
+        """
+        if not self.profile_carregado:
+            print("VIGIAA DEBUG: Primeiros dados do perfil solicitados.")
+            self.carregar_perfil_api()
+        else:
+            print("VIGIAA DEBUG: Perfil já em memória. Requisição à API evitada.")
+
+    def carregar_perfil_api(self, force_reload=False):
+        """Busca os dados do perfil no backend Django."""
+        if self.profile_carregado and not force_reload:
+            return
+
+        app = MDApp.get_running_app()
+        headers = {'Authorization': f'Token {app.user_token}'} # Ou seu padrão de autenticação
+        url = f"{app.api_base_url}/api/profile/"
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                dados = response.json()
+                self.preencher_campos_ui(dados)
+                
+                # Marca que os dados estão atualizados em memória
+                self.profile_carregado = True
+                print("VIGIAA DEBUG: Perfil carregado com sucesso.")
+            else:
+                print(f"VIGIAA DEBUG: Falha ao buscar perfil: Status {response.status_code}")
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Erro de conexão ao buscar perfil: {e}")
+
+    def preencher_campos_ui(self, dados):
+        """Atualiza a interface com os dados recebidos."""
+        self.ids.txt_nome.text = dados.get('first_name', '')
+        self.ids.txt_sobrenome.text = dados.get('last_name', '')
+        self.ids.txt_username.text = dados.get('username', '')
+        self.ids.txt_email.text = dados.get('email', '')
+        
+        if dados.get('foto_url'):
+            self.ids.avatar_user.source = f"{dados['foto_url']}?t={int(time.time())}"
+
+    def salvar_alteracoes_perfil(self, nome, sobrenome, email, username):
+        """
+        Chamado ao clicar no botão 'Salvar' das alterações do perfil.
+        Sincroniza com o Django e força a atualização do estado local.
+        """
+        app = MDApp.get_running_app()
+        headers = {'Authorization': f'Token {app.user_token}'}
+        url = f"{app.api_base_url}/api/profile/"
+
+        payload = {
+            'first_name': nome,
+            'last_name': sobrenome,
+            'email': email,
+            'username': username
+        }
+
+        try:
+            response = requests.patch(url, json=payload, headers=headers, timeout=10)
+            if response.status_code in [200, 201]:
+                print("VIGIAA DEBUG: Dados cadastrais atualizados no backend com sucesso.")
+                self.carregar_perfil_api(force_reload=True)
+            else:
+                print(f"VIGIAA DEBUG: Erro ao atualizar perfil: {response.text}")
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Exceção ao salvar perfil: {e}")
+
+    def atualizar_foto_perfil_sucesso(self):
+        """
+        Chamado assim que o upload da foto de perfil via API for concluído com sucesso.
+        """
+        print("VIGIAA DEBUG: Foto atualizada. Forçando recarregamento do perfil...")
+        self.carregar_perfil_api(force_reload=True)
+        
 KV_PROFILE_TAB = '''
 <ProfileField>:
     orientation: "horizontal"

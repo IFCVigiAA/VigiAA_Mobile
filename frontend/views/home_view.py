@@ -202,7 +202,7 @@ KV_HOME_VIEW = '''
                 name: 'tab_profile'
                 text: 'Perfil'
                 icon: 'account'
-                on_tab_release: profile_tab.refresh_data()
+                on_tab_press: root.on_enter() # O método on_enter já faz a checagem com a flag
                 ProfileTabContent:
                     id: profile_tab
 
