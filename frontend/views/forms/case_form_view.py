@@ -388,7 +388,7 @@ class CaseFormScreen(MDScreen):
         self.ids.btn_gps.text = "Pedindo permissão..."
         self.ids.btn_gps.disabled = True
         if platform == 'android':
-            from android.permissions import request_permissions, Permission
+            from android.permissions import request_permissions, Permission # type: ignore
             request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
         else:
             self._reset_gps_btn()
@@ -428,7 +428,7 @@ class CaseFormScreen(MDScreen):
 
     def _get_last_known_location_android(self):
         try:
-            from jnius import autoclass
+            from jnius import autoclass # type: ignore
             Context = autoclass('android.content.Context')
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
             LocationManager = autoclass('android.location.LocationManager')

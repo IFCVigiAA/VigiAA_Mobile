@@ -256,36 +256,7 @@ class HomeScreen(MDScreen):
             print("VIGIAA DEBUG: [HOME FATAL] Cofre realmente vazio. Chutando pro login...")
             self._chutar_para_login()
 
-    # def _seguranca_silencioso(self, token):
-    #     import requests
-    #     import config 
-    #     from kivy.clock import Clock
-        
-    #     try:
-    #         headers = {"Authorization": f"Bearer {token}"}
-            
-    #         # ATENÇÃO: Se você souber a rota correta para validar o token, troque aqui.
-    #         url = f"{config.API_URL}/api/profile/" 
-            
-    #         res = requests.get(url, headers=headers, timeout=5)
-            
-    #         # O SEGURANÇA INTELIGENTE:
-    #         if res.status_code in [401, 403]:
-    #             # Token realmente inválido ou vencido -> EXPULSA!
-    #             print(f"VIGIAA DEBUG: Segurança barrou! Token Inválido (Erro {res.status_code})")
-    #             Clock.schedule_once(lambda dt: self._chutar_para_login(), 0)
-                
-    #         elif res.status_code == 404:
-    #             # A URL está errada! O Django não achou essa rota.
-    #             print("VIGIAA DEBUG: [ALERTA DESENVOLVEDOR] A rota da API não existe (Erro 404). O Token está salvo, mas a URL de checagem está errada!")
-    #             # Não expulsamos o usuário, pois o erro é na rota, não no token dele.
-                
-    #         elif res.status_code in [200, 201]:
-    #             print("VIGIAA DEBUG: Token validado com sucesso na porta da frente!")
-                
-    #     except Exception as e:
-    #         # Sem internet ou servidor desligado -> Deixa passar (modo offline)
-    #         print(f"VIGIAA DEBUG: Servidor inalcançável. Liberado offline. Erro: {e}")
+    
     def _seguranca_silencioso(self, token):
         import requests
         import config
