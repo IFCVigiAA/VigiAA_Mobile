@@ -75,7 +75,7 @@ jobs:
       - name: Fabricar o APK
         run: |
           cd frontend
-          buildozer android debug
+          yes | buildozer -v android debug
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4

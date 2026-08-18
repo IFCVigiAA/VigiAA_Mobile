@@ -677,69 +677,95 @@ class ProfileTabContent(ScrollView):
     def mostrar_aviso(self, texto):
         MDSnackbar(MDLabel(text=texto, theme_text_color="Custom", text_color=(1,1,1,1))).open()
 
-import os
-import shutil
-import time
-from kivy.utils import platform
-from kivymd.app import MDApp
+    import os
+    import shutil
+    import time
+    from kivy.utils import platform
+    from kivymd.app import MDApp
 
 
-def garantir_arquivo_acessivel(self, original_path):
-    """Copia a imagem para a pasta privada do app, lidando com URIs do Android e caminhos do Desktop."""
-    if not original_path:
-        return None
-
-    uri_str = str(original_path)
-    app_folder = MDApp.get_running_app().user_data_dir
-
-    # Define extensão do arquivo
-    ext = uri_str.split(".")[-1].lower() if "." in uri_str else "png"
-    if len(ext) > 4 or "/" in ext:
-        ext = "png"
-
-    dest_path = os.path.join(
-        app_folder, f"temp_profile_{int(time.time())}.{ext}"
-    )
-
-    # 1. Trata URIs 'content://' no Android usando Java ContentResolver
-    if platform == "android" and uri_str.startswith("content://"):
-        try:
-            from jnius import autoclass 
-
-            PythonActivity = autoclass("org.kivy.android.PythonActivity")
-            Uri = autoclass("android.net.Uri")
-
-            context = PythonActivity.mActivity
-            content_resolver = context.getContentResolver()
-            input_stream = content_resolver.openInputStream(Uri.parse(uri_str))
-
-            with open(dest_path, "wb") as output_file:
-                buffer = bytearray(1024 * 1024)  # 1MB
-                while True:
-                    bytes_read = input_stream.read(buffer)
-                    if bytes_read == -1:
-                        break
-                    output_file.write(buffer[:bytes_read])
-
-            input_stream.close()
-            print(
-                f"VIGIAA DEBUG: Foto copiada via ContentResolver -> {dest_path}"
-            )
-            return dest_path
-        except Exception as e:
-            print(f"VIGIAA DEBUG ERROR: ContentResolver falhou: {e}")
+    def garantir_arquivo_acessivel(self, original_path):
+        """Copia a imagem para a pasta privada do app, lidando com URIs do Android e caminhos do Desktop."""
+        if not original_path:
             return None
 
-    # 2. Trata caminhos físicos padrão (Desktop ou prefixos 'file://')
-    try:
-        clean_path = uri_str.replace("file://", "")
-        shutil.copy2(clean_path, dest_path)
-        print(f"VIGIAA DEBUG: Foto copiada via shutil -> {dest_path}")
-        return dest_path
-    except Exception as e:
-        print(f"VIGIAA DEBUG ERROR: shutil falhou: {e}")
-        return (
-            original_path
-            if os.path.exists(original_path)
-            else None
+        uri_str = str(original_path)
+        app_folder = MDApp.get_running_app().user_data_dir
+
+        # Define extensão do arquivo
+        ext = uri_str.split(".")[-1].lower() if "." in uri_str else "png"
+        if len(ext) > 4 or "/" in ext:
+            ext = "png"
+
+        dest_path = os.path.join(
+            app_folder, f"temp_profile_{int(time.time())}.{ext}"
         )
+
+        # 1. Trata URIs 'content://' no Android usando Java ContentResolver
+        if platform == "android" and uri_str.startswith("content://"):
+            try:
+                from jnius import autoclass 
+
+                PythonActivity = autoclass("org.kivy.android.PythonActivity")
+                Uri = autoclass("android.net.Uri")
+
+                context = PythonActivity.mActivity
+                content_resolver = context.getContentResolver()
+                input_stream = content_resolver.openInputStream(Uri.parse(uri_str))
+
+                with open(dest_path, "wb") as output_file:
+                    buffer = bytearray(1024 * 1024)  # 1MB
+                    while True:
+                        bytes_read = input_stream.read(buffer)
+                        if bytes_read == -1:
+                            break
+                        output_file.write(buffer[:bytes_read])
+
+                input_stream.close()
+                print(
+                    f"VIGIAA DEBUG: Foto copiada via ContentResolver -> {dest_path}"
+                )
+                return dest_path
+            except Exception as e:
+                print(f"VIGIAA DEBUG ERROR: ContentResolver falhou: {e}")
+                return None
+
+        # 2. Trata caminhos físicos padrão (Desktop ou prefixos 'file://')
+        try:
+            clean_path = uri_str.replace("file://", "")
+            shutil.copy2(clean_path, dest_path)
+            print(f"VIGIAA DEBUG: Foto copiada via shutil -> {dest_path}")
+            return dest_path
+        except Exception as e:
+            print(f"VIGIAA DEBUG ERROR: shutil falhou: {e}")
+            return (
+                original_path
+                if os.path.exists(original_path)
+                else None
+            )
+        
+    def show_delete_dialog(self):
+        """Abre a caixa de confirmação para o usuário não apagar sem querer."""
+        if not hasattr(self, 'dialog') or not self.dialog:
+            from kivymd.uix.dialog import MDDialog
+            from kivymd.uix.button import MDFlatButton
+            
+            self.dialog = MDDialog(
+                title="Apagar Conta",
+                text="Tem certeza que deseja apagar sua conta permanentemente? Esta ação não pode ser desfeita.",
+                buttons=[
+                    MDFlatButton(
+                        text="CANCELAR",
+                        theme_text_color="Custom",
+                        text_color=self.theme_cls.primary_color,
+                        on_release=lambda x: self.dialog.dismiss()
+                    ),
+                    MDFlatButton(
+                        text="APAGAR",
+                        theme_text_color="Error",
+                        # Chama a função que inicia o processo de exclusão
+                        on_release=lambda x: self.confirm_delete_account() 
+                    ),
+                ],
+            )
+        self.dialog.open()    
