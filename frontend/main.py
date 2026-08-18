@@ -4,6 +4,15 @@ import sys
 import textwrap
 from kivymd.app import MDApp
 from kivy.storage.jsonstore import JsonStore
+# No main.py ou gerenciador de telas:
+from views.home_view import HomeStatistics  # Atualize a importação
+
+class MainApp(MDApp):
+    def build(self):
+        sm = ScreenManager()
+        # Adicione com o novo nome
+        sm.add_widget(HomeStatistics(name="home_statistics"))
+        return sm
 
 # O store continua aqui em cima
 store = JsonStore('sessao_app.json')
@@ -13,7 +22,7 @@ try:
     if current_dir not in sys.path:
         sys.path.append(current_dir)
 
-    # --- CONFIGURAÇÃO DO TAMANHO DA TELA (EMULADOR NO PC) ---
+     # --- CONFIGURAÇÃO DO TAMANHO DA TELA (EMULADOR NO PC) ---
     from kivy.config import Config
     # Configura o tamanho para simular a tela de um celular (ex: 360x640)
     Config.set('graphics', 'width', '360')
@@ -96,4 +105,4 @@ except Exception as e:
                          text_size=(Window.width * 0.9, None), halign='left', valign='top')
             
     if __name__ == '__main__':
-        ErrorApp().run()
+        VigiAA().run()

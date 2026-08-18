@@ -37,9 +37,10 @@ from kivymd.uix.button import (
 )
 
 # --- 4. A VACINA (Corrigida) ---
+from kivymd.uix.card import MDCard
 classes_para_vacinar = [
     MDFlatButton, MDRectangleFlatIconButton, MDRaisedButton, 
-    MDFillRoundFlatButton, MDFillRoundFlatIconButton, MDIconButton # <-- Era aqui o erro!
+    MDFillRoundFlatButton, MDFillRoundFlatIconButton, MDIconButton, MDCard, # <-- Era aqui o erro!
 ]
 
 for cls in classes_para_vacinar:
@@ -50,7 +51,7 @@ for cls in classes_para_vacinar:
 from plyer import filechooser, camera, gps
 
 if platform == 'android':
-    from android.permissions import request_permissions, Permission
+    from android.permissions import request_permissions, Permission # type: ignore
 
 store = JsonStore('sessao_app.json')
 
@@ -714,7 +715,6 @@ class FocusFormScreen(MDScreen):
 
         if platform == 'android':
             print("VIGIAA DEBUG: [1.1] Plataforma Android detectada. Solicitando permissões...")
-            from android.permissions import request_permissions, Permission
             request_permissions([Permission.ACCESS_FINE_LOCATION, Permission.ACCESS_COARSE_LOCATION], self._on_permissions_result)
         else:
             print("VIGIAA DEBUG: [1.2] PC detectado. Indo para IP.")
@@ -807,7 +807,7 @@ class FocusFormScreen(MDScreen):
 
     def _get_last_known_location_android(self):
         try:
-            from jnius import autoclass
+            from jnius import autoclass # type: ignore
             Context = autoclass('android.content.Context')
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
             LocationManager = autoclass('android.location.LocationManager')
@@ -942,7 +942,6 @@ class FocusFormScreen(MDScreen):
     def open_camera(self):
         """Pede permissão e abre a câmera INTERNA do VigiAA"""
         if platform == 'android':
-            from android.permissions import request_permissions, Permission
             request_permissions([Permission.CAMERA, Permission.WRITE_EXTERNAL_STORAGE], self._on_camera_permissions)
         else:
             # Se testar no PC, abre direto!
@@ -953,7 +952,6 @@ class FocusFormScreen(MDScreen):
         Clock.schedule_once(lambda dt: self._safe_camera_start(permissions, grants), 0)
 
     def _safe_camera_start(self, permissions, grants):
-        from android.permissions import Permission
         perms_dict = dict(zip(permissions, grants))
         
         # Se permitiu a câmera, abre o Modal In-App!

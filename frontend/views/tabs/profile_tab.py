@@ -20,9 +20,91 @@ import os
 from kivy.utils import platform
 import time  # <--- ADICIONE ESTE
 from kivy.utils import platform  # <--- ADICIONE ESTE
+from kivymd.uix.screen import MDScreen
 
 store = JsonStore('sessao_app.json')
 
+class ProfileViewCheck(MDScreen):
+    # 1. Flag para controlar se o perfil já foi carregado nesta sessão
+    profile_carregado = False
+
+    def on_tab_open(self):
+        """
+        Método chamado ao clicar/abrir a aba de Perfil.
+        Pode ser acionado no on_tab_switch do MDBottomNavigation ou MDTabs.
+        """
+        if not self.profile_carregado:
+            print("VIGIAA DEBUG: Primeiros dados do perfil solicitados.")
+            self.carregar_perfil_api()
+        else:
+            print("VIGIAA DEBUG: Perfil já em memória. Requisição à API evitada.")
+
+    def carregar_perfil_api(self, force_reload=False):
+        """Busca os dados do perfil no backend Django."""
+        if self.profile_carregado and not force_reload:
+            return
+
+        app = MDApp.get_running_app()
+        headers = {'Authorization': f'Token {app.user_token}'} # Ou seu padrão de autenticação
+        url = f"{app.api_base_url}/api/profile/"
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                dados = response.json()
+                self.preencher_campos_ui(dados)
+                
+                # Marca que os dados estão atualizados em memória
+                self.profile_carregado = True
+                print("VIGIAA DEBUG: Perfil carregado com sucesso.")
+            else:
+                print(f"VIGIAA DEBUG: Falha ao buscar perfil: Status {response.status_code}")
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Erro de conexão ao buscar perfil: {e}")
+
+    def preencher_campos_ui(self, dados):
+        """Atualiza a interface com os dados recebidos."""
+        self.ids.txt_nome.text = dados.get('first_name', '')
+        self.ids.txt_sobrenome.text = dados.get('last_name', '')
+        self.ids.txt_username.text = dados.get('username', '')
+        self.ids.txt_email.text = dados.get('email', '')
+        
+        if dados.get('foto_url'):
+            self.ids.avatar_user.source = f"{dados['foto_url']}?t={int(time.time())}"
+
+    def salvar_alteracoes_perfil(self, nome, sobrenome, email, username):
+        """
+        Chamado ao clicar no botão 'Salvar' das alterações do perfil.
+        Sincroniza com o Django e força a atualização do estado local.
+        """
+        app = MDApp.get_running_app()
+        headers = {'Authorization': f'Token {app.user_token}'}
+        url = f"{app.api_base_url}/api/profile/"
+
+        payload = {
+            'first_name': nome,
+            'last_name': sobrenome,
+            'email': email,
+            'username': username
+        }
+
+        try:
+            response = requests.patch(url, json=payload, headers=headers, timeout=10)
+            if response.status_code in [200, 201]:
+                print("VIGIAA DEBUG: Dados cadastrais atualizados no backend com sucesso.")
+                self.carregar_perfil_api(force_reload=True)
+            else:
+                print(f"VIGIAA DEBUG: Erro ao atualizar perfil: {response.text}")
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Exceção ao salvar perfil: {e}")
+
+    def atualizar_foto_perfil_sucesso(self):
+        """
+        Chamado assim que o upload da foto de perfil via API for concluído com sucesso.
+        """
+        print("VIGIAA DEBUG: Foto atualizada. Forçando recarregamento do perfil...")
+        self.carregar_perfil_api(force_reload=True)
+        
 KV_PROFILE_TAB = '''
 <ProfileField>:
     orientation: "horizontal"
@@ -391,8 +473,24 @@ class ProfileTabContent(ScrollView):
 
     def _worker_upload_avatar(self, file_path):
         session = store.get("session") if store.exists("session") else None
-        token = session["token"] if session else None
-        if not token: return
+        # token = session["token"] if session else None
+        if not session:
+        #token
+            return
+        
+
+        token_data = session.get("token")
+
+        access_token = None
+        if isinstance(token_data, dict):
+            access_token = token_data.get("access")
+        elif isinstance(token_data, str):
+            access_token = token_data
+
+        if not access_token:
+            self.mostrar_aviso("Token de acesso não encontrado.")
+            return
+
         
         try:
             import certifi
@@ -405,13 +503,19 @@ class ProfileTabContent(ScrollView):
                  self.mostrar_aviso("Erro interno ao ler arquivo gerado.")
                  return
 
+            headers = {
+                "Authorization": f"Bearer {access_token.strip()}",
+                "ngrok-skip-browser-warning": "true",
+                "User-Agent": "KivyApp"
+            }
+
             with open(file_path, 'rb') as f:
                 # IMPORTANTE: Mudei aqui para image/png para combinar com o arquivo exportado!
                 files = {'photo': ('avatar_vigiaa.png', f, 'image/png')}
                 
                 res = requests.patch(
                     url, 
-                    headers={"Authorization": f"Bearer {token}"}, 
+                    headers=headers,  #{"Authorization": f"Bearer {token}"}, 
                     files=files, 
                     timeout=30,
                     verify=False # SSL desligado temporariamente no Android
@@ -422,22 +526,56 @@ class ProfileTabContent(ScrollView):
                 from kivy.clock import Clock
                 Clock.schedule_once(lambda dt: self.refresh_data(), 0.5)
             else:
+                print(f"VIGIAA DEBUG: Erro no upload ({res.status_code}): {res.text}")
                 self.mostrar_aviso(f"Erro no servidor: {res.status_code}")
+                # self.mostrar_aviso(f"Erro no servidor: {res.status_code}")
                 
         except Exception as e:
             print(f"VIGIAA DEBUG: [PERFIL] Erro no upload: {str(e)}")
             self.mostrar_aviso(f"Erro de conexão: {str(e)[:25]}")
 
     def load_user_data(self):
-        token = store.get("session")["token"] if store.exists("session") else None
-        if not token: return
+        if not store.exists("session"):
+            print("VIGIAA DEBUG: Nenhuma sessão encontrada.")
+            return
+
+        session = store.get("session")
+        token_data = session.get("token")
+        
+        # Extrai a string JWT de acesso de dentro da estrutura {'access': '...', 'refresh': '...'}
+        access_token = None
+        if isinstance(token_data, dict):
+            access_token = token_data.get("access")
+        elif isinstance(token_data, str):
+            access_token = token_data
+
+        if not access_token:
+            print("VIGIAA DEBUG: [ERRO] Token de acesso não encontrado na sessão.")
+            return
+
+        headers = {
+            "Authorization": f"Bearer {access_token.strip()}",
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "KivyApp"
+        }
+
         try:
             url = f"{config.API_URL}/api/profile/"
-            res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+            print(f"VIGIAA DEBUG: Enviando requisição de perfil para -> {url}")
+            
+            res = requests.get(url, headers=headers, timeout=10, verify=False)
+            
+            print(f"VIGIAA DEBUG: Resposta da API (Status {res.status_code})")
+            
             if res.status_code == 200:
                 data = res.json()
+                print("VIGIAA DEBUG: Dados do perfil recebidos com sucesso!")
                 Clock.schedule_once(lambda dt: self.update_ui_fields(data), 0)
-        except: pass
+            else:
+                print(f"VIGIAA DEBUG: Erro da API -> {res.text[:150]}")
+                
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Exceção na requisição -> {e}")
 
     @mainthread
     def update_ui_fields(self, data):
@@ -469,9 +607,21 @@ class ProfileTabContent(ScrollView):
         threading.Thread(target=self._worker_save, args=(api_key, novo_valor, field_instance), daemon=True).start()
 
     def _worker_save(self, api_key, novo_valor, field_instance):
-        token = store.get("session")["token"]
+        session = store.get("session") if store.exists("session") else {}
+        token_data = session.get("token")
+        access_token = token_data.get("access") if isinstance(token_data, dict) else token_data
+
+        if not access_token:
+            Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
+            return
+
+        headers = {
+            "Authorization": f"Bearer {access_token.strip()}",
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "KivyApp"
+        }
         try:
-            res = requests.patch(f"{config.API_URL}/api/profile/", json={api_key: novo_valor}, headers={"Authorization": f"Bearer {token}"})
+            res = requests.patch(f"{config.API_URL}/api/profile/", json={api_key: novo_valor}, headers=headers, verify=False)
             if res.status_code == 200:
                 self.mostrar_aviso(f"{field_instance.label_text} atualizado!")
                 Clock.schedule_once(lambda dt: field_instance._lock_field(), 0)
@@ -504,9 +654,20 @@ class ProfileTabContent(ScrollView):
         threading.Thread(target=self._worker_delete, daemon=True).start()
 
     def _worker_delete(self):
-        token = store.get("session")["token"]
+        session = store.get("session") if store.exists("session") else {}
+        token_data = session.get("token")
+        access_token = token_data.get("access") if isinstance(token_data, dict) else token_data
+
+        if not access_token:
+            return
+
+        headers = {
+            "Authorization": f"Bearer {access_token.strip()}",
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "KivyApp"
+        }
         try:
-            res = requests.delete(f"{config.API_URL}/api/delete-account/", headers={"Authorization": f"Bearer {token}"})
+            res = requests.delete(f"{config.API_URL}/api/delete-account/", headers=headers, verify=False)
             if res.status_code == 200:
                 self.mostrar_aviso("Conta excluída.")
                 Clock.schedule_once(lambda dt: self.logout(), 0)
@@ -515,3 +676,70 @@ class ProfileTabContent(ScrollView):
     @mainthread
     def mostrar_aviso(self, texto):
         MDSnackbar(MDLabel(text=texto, theme_text_color="Custom", text_color=(1,1,1,1))).open()
+
+import os
+import shutil
+import time
+from kivy.utils import platform
+from kivymd.app import MDApp
+
+
+def garantir_arquivo_acessivel(self, original_path):
+    """Copia a imagem para a pasta privada do app, lidando com URIs do Android e caminhos do Desktop."""
+    if not original_path:
+        return None
+
+    uri_str = str(original_path)
+    app_folder = MDApp.get_running_app().user_data_dir
+
+    # Define extensão do arquivo
+    ext = uri_str.split(".")[-1].lower() if "." in uri_str else "png"
+    if len(ext) > 4 or "/" in ext:
+        ext = "png"
+
+    dest_path = os.path.join(
+        app_folder, f"temp_profile_{int(time.time())}.{ext}"
+    )
+
+    # 1. Trata URIs 'content://' no Android usando Java ContentResolver
+    if platform == "android" and uri_str.startswith("content://"):
+        try:
+            from jnius import autoclass 
+
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            Uri = autoclass("android.net.Uri")
+
+            context = PythonActivity.mActivity
+            content_resolver = context.getContentResolver()
+            input_stream = content_resolver.openInputStream(Uri.parse(uri_str))
+
+            with open(dest_path, "wb") as output_file:
+                buffer = bytearray(1024 * 1024)  # 1MB
+                while True:
+                    bytes_read = input_stream.read(buffer)
+                    if bytes_read == -1:
+                        break
+                    output_file.write(buffer[:bytes_read])
+
+            input_stream.close()
+            print(
+                f"VIGIAA DEBUG: Foto copiada via ContentResolver -> {dest_path}"
+            )
+            return dest_path
+        except Exception as e:
+            print(f"VIGIAA DEBUG ERROR: ContentResolver falhou: {e}")
+            return None
+
+    # 2. Trata caminhos físicos padrão (Desktop ou prefixos 'file://')
+    try:
+        clean_path = uri_str.replace("file://", "")
+        shutil.copy2(clean_path, dest_path)
+        print(f"VIGIAA DEBUG: Foto copiada via shutil -> {dest_path}")
+        return dest_path
+    except Exception as e:
+        print(f"VIGIAA DEBUG ERROR: shutil falhou: {e}")
+        return (
+            original_path
+            if os.path.exists(original_path)
+            else None
+        )

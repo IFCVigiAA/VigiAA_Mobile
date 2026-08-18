@@ -153,3 +153,5 @@ class PositiveDengueCaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = PositiveDengueCase
         fields = ['id', 'dengue_case', 'patient_name', 'cpf', 'phone', 'test_location']
+
+        

@@ -31,11 +31,19 @@ import os
 # Seus Serializers
 from .serializers import MyTokenObtainPairSerializer
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated # ou AllowAny, dependendo do uso
+from django.db.models import Count
+
+from .models import Profile
+
 # --- MUDANÇA 1: Importe o Modelo e o Serializer de Casos aqui! ---
 # (Verifique se o nome do seu modelo no models.py é exatamente DengueCase)
 from .models import DengueFocus, DengueCase, PositiveDengueCase
 from .serializers import DengueFocusSerializer, DengueCaseSerializer, PositiveDengueCaseSerializer
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser,  JSONParser
+
+from .serializers import UserProfileSerializer, ChangePasswordSerializer
 
 # ==============================================================================
 # CONFIGURAÇÕES DO GOOGLE (PREENCHA AQUI OU PEGUE DO SETTINGS/ENV)
@@ -47,9 +55,12 @@ GOOGLE_REDIRECT_URI = "https://froglike-cataleya-quirkily.ngrok-free.dev/api/goo
 
 
 def get_tokens_for_user(user):
-    """Gera o JWT manualmente para um usuário"""
-    refresh = RefreshToken.for_user(user)
-    return str(refresh.access_token)
+   """Gera o par de tokens JWT (access e refresh) para o usuário"""
+   refresh = RefreshToken.for_user(user)
+   return {
+      'access': str(refresh.access_token),
+      'refresh': str(refresh),
+  }
 
 def start_login(request):
     """
@@ -198,6 +209,19 @@ def check_login_status(request):
     else:
         return JsonResponse({'status': 'waiting'})
 
+# ==============================================================================
+# ATUALIZAÇAO DE VALORES DAS TABELAS DE ESTATISTICAS
+# ==============================================================================
+
+class EstatisticasView(APIView):
+
+  def get(self, request):
+    # Substitua pelos seus dados reais do banco de dados/lógica
+    dados = {
+        "total_registros": 100,
+        "status": "ativo",
+    }
+    return Response(dados)
 
 # ==============================================================================
 # VIEWS PADRÃO (REGISTRO, LOGIN SENHA, ETC) - MANTIDAS
@@ -338,8 +362,27 @@ class PasswordResetWebConfirm(APIView):
                 
             return Response({'error': error_msg, 'uidb64': uidb64, 'token': token})
 
+# class UserProfileView(APIView):
+#     permission_classes = [IsAuthenticated] 
+
+#     def get(self, request):
+#         serializer = UserProfileSerializer(request.user)
+#         return Response(serializer.data)
+    
+#     def patch(self, request):
+#         user = request.user
+#         serializer = UserProfileSerializer(user, data=request.data, partial=True)
+        
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data)
+        
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class UserProfileView(APIView):
-    permission_classes = [IsAuthenticated] 
+    permission_classes = [IsAuthenticated]
+    # 2. Adicionar os parsers aqui:
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         serializer = UserProfileSerializer(request.user)
@@ -351,7 +394,7 @@ class UserProfileView(APIView):
         
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -410,3 +453,60 @@ class PositiveDengueCaseCreateView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def estatisticas_view(request):
+  # Captura o parâmetro ?ano= enviado pelo Kivy
+  ano = request.GET.get('ano')
+
+  casos_qs = DengueCase.objects.all()
+  positivos_qs = PositiveDengueCase.objects.all()
+
+  # Se o ano foi informado nos botões, filtra pela data de notificação
+  if ano:
+    casos_qs = casos_qs.filter(notification_date__year=ano)
+    positivos_qs = positivos_qs.filter(
+        dengue_case__notification_date__year=ano
+    )
+
+  # Retorna estritamente o resumo esperado pelos cards do Kivy
+  data = {
+      'resumo': {
+          'total_casos_positivos': positivos_qs.count(),
+          'total_casos_suspeitos': casos_qs.count(),
+      }
+  }
+
+  return Response(data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])  # Login não exige token prévio
+def start_login_view(request):
+  login_id = request.GET.get('login_id')
+
+  if not login_id:
+    return Response(
+        {'error': 'login_id não informado'}, status=status.HTTP_400_BAD_REQUEST
+    )
+
+  # Aqui vai a sua lógica de iniciar o login do Google com o login_id
+  # ...
+
+  return Response(
+      {'status': 'ok', 'login_id': login_id}, status=status.HTTP_200_OK
+  )
+
+@api_view(['GET'])
+def check_login(request):
+    session_id = request.GET.get('session_id')
+    # Recupera o estado do login do cache ou banco
+    login_data = cache.get(session_id) 
+
+    if login_data and login_data.get('status') == 'completed':
+        return Response({
+            "authenticated": True,
+            "token": login_data.get('tokens')  # {'access': '...', 'refresh': '...'}
+        }, status=200)
+
+    return Response({"authenticated": False}, status=200)
