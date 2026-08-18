@@ -35,7 +35,7 @@ jobs:
       - name: Instalando Buildozer e Cython (Versão Estável)
         run: |
           pip install --upgrade pip
-          pip install buildozer cython<3.1.0 virtualenv setuptools
+          pip install buildozer "cython<3.1.0" virtualenv setuptools
 
       - name: Criando a Receita do App
         run: |
