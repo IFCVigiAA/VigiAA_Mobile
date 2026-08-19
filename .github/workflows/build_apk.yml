@@ -51,7 +51,7 @@ jobs:
           source.include_exts = py,png,jpg,jpeg,kv,atlas,json,ttf
           version = 1.0
           
-          requirements = python3==3.11.9,kivy==2.3.0,kivymd==1.2.0,pillow,requests,urllib3,charset-normalizer,idna,certifi,plyer
+          requirements = python3==3.11.5, hostpython3==3.11.5, kivy, pyjnius, kivy==2.3.0,kivymd==1.2.0,pillow,requests,urllib3,charset-normalizer,idna,certifi,plyer
           
           orientation = portrait
           android.permissions = INTERNET, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, CAMERA, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE, READ_MEDIA_IMAGES
