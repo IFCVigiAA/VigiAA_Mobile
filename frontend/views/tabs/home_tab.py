@@ -119,7 +119,12 @@ KV_HOME_TAB = '''
                 id: card_suspeitas    
                 title: "Suspeitas de dengue"
                 value: "Carregando..."
-
+        
+        # espaço para o mapa
+        ChartCard:
+            title: "Mapa"
+            image_src: "assets/images/mapaexemplo.png"        
+        
         # Gráficos
         ChartCard:
             title: "Casos confirmados por mês"
