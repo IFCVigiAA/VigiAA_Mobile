@@ -21,6 +21,7 @@ from kivy.utils import platform
 import time  # <--- ADICIONE ESTE
 from kivy.utils import platform  # <--- ADICIONE ESTE
 from kivymd.uix.screen import MDScreen
+import shutil
 
 store = JsonStore('sessao_app.json')
 
