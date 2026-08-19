@@ -28,97 +28,84 @@ KV_EXPLORE_TAB = '''
             spacing: "20dp"
             adaptive_height: True
 
-            # --- CARROSSEL COM DESIGN AJUSTADO ---
+            # --- CARROSSEL COM BORDAS ARREDONDADAS E RESPIRO LATERAL ---
             MDRelativeLayout:
                 size_hint_y: None
                 height: "180dp"
                 
-                MDCard:
-                    size_hint: 1, 1
+                # Container visual que corta as bordas perfeitamente em todas as pontas
+                MDBoxLayout:
+                    size_hint: 0.96, 1
+                    pos_hint: {"center_x": .5, "center_y": .5}
                     radius: [20, 20, 20, 20]
-                    elevation: 1
-                    padding: 0
-                    clip_to_bounds: True # Corta o conteúdo na curva
+                    clip_to_bounds: True
                     md_bg_color: 1, 1, 1, 1
 
                     MDSwiper:
                         id: swiper
                         size_hint: 1, 1
+                        items_spacing: "15dp"
                         width_mult: 1
-                        items_spacing: 0
-                        show_pagination: True
-                        radius: [20, 20, 20, 20]
 
                         # --- SLIDE 1 ---
                         MDSwiperItem:
-                            size_hint: 1, 1
                             MDRelativeLayout:
+                                size_hint: 0.95, 1
+                                pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                                    
                                 FitImage:
                                     source: "assets/images/banner1.jpeg"
-                                    size_hint: 1, 1
+                                    size_hint: 0.94, 1
                                     radius: [20, 20, 20, 20]
-                                
+                                    
                                 MDBoxLayout:
                                     size_hint_y: None
                                     height: "50dp"
                                     pos_hint: {"bottom": 0}
                                     md_bg_color: 0, 0, 0, 0.6
-                                    # Acompanha o radius inferior do card
-                                    radius: [0, 0, 20, 20] 
-                                    padding: ["60dp", 0, "10dp", 0] 
-                                    
+                                    radius: [0, 0, 20, 20]
+                                    padding: ["15dp", 0, 0, 0]
+                                        
                                     MDLabel:
                                         text: "O mosquito não descansa!"
                                         theme_text_color: "Custom"
                                         text_color: 1, 1, 1, 1
                                         bold: True
-                                        halign: "left"
-                                        valign: "center"
-                                        text_size: self.size
 
                         # --- SLIDE 2 ---
                         MDSwiperItem:
-                            size_hint: 1, 1
                             MDRelativeLayout:
+                                size_hint: 1, 1
+                                    
                                 FitImage:
                                     source: "assets/images/agentes.jpeg"
-                                    size_hint: 1, 1
+                                    size_hint: 0.95, 1
+                                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
                                     radius: [20, 20, 20, 20]
-                                
+                                    
                                 MDBoxLayout:
                                     size_hint_y: None
                                     height: "50dp"
                                     pos_hint: {"bottom": 0}
                                     md_bg_color: 0, 0, 0, 0.6
-                                    # Acompanha o radius inferior do card
                                     radius: [0, 0, 20, 20]
-                                    # Texto ainda mais para a direita para segurança total
-                                    padding: ["60dp", 0, "10dp", 0]
-                                    
+                                    padding: ["15dp", 0, 0, 0]
+                                        
                                     MDLabel:
                                         text: "Agentes em combate"
                                         theme_text_color: "Custom"
                                         text_color: 1, 1, 1, 1
                                         bold: True
-                                        halign: "left"
-                                        valign: "center"
-                                        text_size: self.size
 
-                # SETAS LATERAIS
+                # --- SETAS LATERAIS (FORA DO BOX PARA EVITAR ERRO DE CLIP) ---
                 MDIconButton:
                     icon: "chevron-left"
-                    theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1
-                    md_bg_color: 0, 0, 0, 0.3
-                    pos_hint: {"left": 0, "center_y": .5}
+                    pos_hint: {"left": 0.01, "center_y": .5}
                     on_release: swiper.swipe_left()
 
                 MDIconButton:
                     icon: "chevron-right"
-                    theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1
-                    md_bg_color: 0, 0, 0, 0.3
-                    pos_hint: {"right": 1, "center_y": .5}
+                    pos_hint: {"right": 0.99, "center_y": .5}
                     on_release: swiper.swipe_right()
 
             # --- BOX INFORMATIVO ---
@@ -135,7 +122,6 @@ KV_EXPLORE_TAB = '''
                     on_ref_press: root.process_info_link_press(args[1])
 
             # --- LISTA ---
-            # --- LISTA DE AÇÕES (ESTILO UNIFICADO) ---
             MDList:
                 padding: 0
                 spacing: "5dp"
@@ -150,7 +136,7 @@ KV_EXPLORE_TAB = '''
                     IconRightWidget:
                         icon: "chevron-right"
 
-                # Item: Prevenção (Novo)
+                # Item: Prevenção
                 TwoLineAvatarIconListItem:
                     text: "Prevenção"
                     secondary_text: "Conheça as formas de evitar"
@@ -160,7 +146,7 @@ KV_EXPLORE_TAB = '''
                     IconRightWidget:
                         icon: "chevron-right"
 
-                # Item: Campanhas (Novo)
+                # Item: Campanhas
                 TwoLineAvatarIconListItem:
                     text: "Campanhas"
                     secondary_text: "Fique por dentro das ações"
