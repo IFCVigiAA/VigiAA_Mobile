@@ -49,13 +49,13 @@ KV_NEW_TAB = '''
                     spacing: "2dp"
 
                     MDLabel:
-                        text: "Cadastrar novo foco"
+                        text: "Cadastrar novo foco de dengue"
                         font_size: "17sp"
                         bold: True
                         adaptive_height: True
 
                     MDLabel:
-                        text: "Forneça informações sobre focos do mosquito."
+                        text: "Forneça informações necessárias para o cadastro de um local com possíveis focos do mosquito"
                         theme_text_color: "Secondary"
                         font_size: "13sp"
                         adaptive_height: True

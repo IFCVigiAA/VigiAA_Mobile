@@ -10,7 +10,7 @@ from kivymd.app import MDApp
 # Textos formatados
 LINK_COLOR = "0077B6"
 SHORT_INFO_TEXT = f"A [b]dengue[/b] é uma arbovirose... [ref=more][color={LINK_COLOR}]ler mais...[/color][/ref]"
-FULL_INFO_TEXT = f"A [b]dengue[/b] é uma arbovirose causada pelo mosquito Aedes aegypti. [ref=less][color={LINK_COLOR}]ler menos[/color][/ref]"
+FULL_INFO_TEXT = f"A [b]dengue[/b] é uma arbovirose causada por um vírus transmitido pelo mosquito Aedes aegypti. [ref=less][color={LINK_COLOR}]ler menos[/color][/ref]"
 
 Factory.register('MDSwiper', cls=MDSwiper)
 Factory.register('MDSwiperItem', cls=MDSwiperItem)

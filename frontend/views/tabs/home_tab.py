@@ -122,7 +122,7 @@ KV_HOME_TAB = '''
         
         # espaço para o mapa
         ChartCard:
-            title: "Mapa"
+            title: "Mapa com dados de Dengue e Aedes aegypti"
             image_src: "assets/images/mapaexemplo.png"        
         
         # Gráficos
@@ -131,7 +131,7 @@ KV_HOME_TAB = '''
             image_src: "assets/images/grafico1.png"
 
         ChartCard:
-            title: "Proporção de focos por tipo"
+            title: "Proporção de focos por tipo de atividade"
             image_src: "assets/images/grafico2.png"
 '''
 
