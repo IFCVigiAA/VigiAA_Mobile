@@ -1,6 +1,6 @@
 import token
 
-# from django.apps import config
+
 from kivymd.uix.screen import MDScreen
 from kivy.lang import Builder
 from kivy.clock import mainthread, Clock
@@ -45,8 +45,6 @@ os.environ.setdefault(
 
 print(sys.path)
 
-# import django
-# django.setup()
 
 # from backend.api.models import PositiveDengueCase, DengueFocus, DengueCase
 
