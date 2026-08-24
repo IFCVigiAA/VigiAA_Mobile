@@ -79,7 +79,7 @@ KV_EXPLORE_TAB = '''
                         MDSwiperItem:
                             
                             MDBoxLayout:
-                                padding: ["-30dp", 0, "30dp", 0]
+                                padding: ["-32.5dp", 0, "30dp", 0]
 
                                 MDRelativeLayout:
                                     size_hint: 1, 1
@@ -108,13 +108,22 @@ KV_EXPLORE_TAB = '''
                 # --- SETAS LATERAIS (FORA DO BOX PARA EVITAR ERRO DE CLIP) ---
                 MDIconButton:
                     icon: "chevron-left"
-                    pos_hint: {"left": 0.01, "center_y": .5}
+                    pos_hint: {"right": 0.1, "center_y": .5}
                     on_release: swiper.swipe_left()
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    md_bg_color: 0, 0, 0, 0.75
+                    icon_size: "30dp"
+                
 
                 MDIconButton:
                     icon: "chevron-right"
-                    pos_hint: {"right": 0.99, "center_y": .5}
+                    pos_hint: {"right": 0.96, "center_y": .5}
                     on_release: swiper.swipe_right()
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    md_bg_color: 0, 0, 0, 0.75
+                    icon_size: "30dp"
 
             # --- BOX INFORMATIVO ---
             MDBoxLayout:
