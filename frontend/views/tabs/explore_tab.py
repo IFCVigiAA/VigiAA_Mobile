@@ -35,8 +35,8 @@ KV_EXPLORE_TAB = '''
                 
                 # Container visual que corta as bordas perfeitamente em todas as pontas
                 MDBoxLayout:
-                    size_hint: 0.96, 1
-                    pos_hint: {"center_x": .5, "center_y": .5}
+                    size_hint: 1, 1
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
                     radius: [20, 20, 20, 20]
                     clip_to_bounds: True
                     md_bg_color: 1, 1, 1, 1
@@ -44,24 +44,27 @@ KV_EXPLORE_TAB = '''
                     MDSwiper:
                         id: swiper
                         size_hint: 1, 1
-                        items_spacing: "15dp"
+                        
                         width_mult: 1
 
                         # --- SLIDE 1 ---
                         MDSwiperItem:
+                            
+                            
                             MDRelativeLayout:
-                                size_hint: 0.95, 1
+                                size_hint: 1, 1
                                 pos_hint: {"center_x": 0.5, "center_y": 0.5}
                                     
                                 FitImage:
                                     source: "assets/images/banner1.jpeg"
-                                    size_hint: 0.94, 1
+                                    size_hint: 0.95, 1
                                     radius: [20, 20, 20, 20]
                                     
+                                    
                                 MDBoxLayout:
-                                    size_hint_y: None
+                                    size_hint: 0.95, None
                                     height: "50dp"
-                                    pos_hint: {"bottom": 0}
+                                    
                                     md_bg_color: 0, 0, 0, 0.6
                                     radius: [0, 0, 20, 20]
                                     padding: ["15dp", 0, 0, 0]
@@ -74,28 +77,33 @@ KV_EXPLORE_TAB = '''
 
                         # --- SLIDE 2 ---
                         MDSwiperItem:
-                            MDRelativeLayout:
-                                size_hint: 1, 1
-                                    
-                                FitImage:
-                                    source: "assets/images/agentes.jpeg"
-                                    size_hint: 0.95, 1
+                            
+                            MDBoxLayout:
+                                padding: ["-30dp", 0, "30dp", 0]
+
+                                MDRelativeLayout:
+                                    size_hint: 1, 1
                                     pos_hint: {"center_x": 0.5, "center_y": 0.5}
-                                    radius: [20, 20, 20, 20]
-                                    
-                                MDBoxLayout:
-                                    size_hint_y: None
-                                    height: "50dp"
-                                    pos_hint: {"bottom": 0}
-                                    md_bg_color: 0, 0, 0, 0.6
-                                    radius: [0, 0, 20, 20]
-                                    padding: ["15dp", 0, 0, 0]
+
+                                    FitImage:
+                                        source: "assets/images/agentes.jpeg"
+                                        size_hint: 0.95, 1
+                                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                                        radius: [20, 20, 20, 20]
+
+                                    MDBoxLayout:
+                                        size_hint: 0.95,None
+                                        height: "50dp"
+                                        pos_hint: {"center_x": 0.5, "y": 0}
+                                        md_bg_color: 0, 0, 0, 0.6
+                                        radius: [0, 0, 20, 20]
+                                        padding: ["15dp", 0, 0, 0]
                                         
-                                    MDLabel:
-                                        text: "Agentes em combate"
-                                        theme_text_color: "Custom"
-                                        text_color: 1, 1, 1, 1
-                                        bold: True
+                                        MDLabel:
+                                            text: "Agentes em combate"
+                                            theme_text_color: "Custom"
+                                            text_color: 1, 1, 1, 1
+                                            bold: True
 
                 # --- SETAS LATERAIS (FORA DO BOX PARA EVITAR ERRO DE CLIP) ---
                 MDIconButton:
