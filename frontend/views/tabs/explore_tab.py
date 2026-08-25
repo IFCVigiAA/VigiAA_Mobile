@@ -29,11 +29,108 @@ KV_EXPLORE_TAB = '''
             adaptive_height: True
 
             # --- CARROSSEL COM BORDAS ARREDONDADAS E RESPIRO LATERAL ---
+            # MDRelativeLayout:
+            #     size_hint_y: None
+            #     height: "180dp"
+                
+            #     # Container visual que corta as bordas perfeitamente em todas as pontas
+            #     MDBoxLayout:
+            #         size_hint: 1, 1
+            #         pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            #         radius: [20, 20, 20, 20]
+            #         clip_to_bounds: True
+            #         md_bg_color: 1, 1, 1, 1
+
+            #         MDSwiper:
+            #             id: swiper
+            #             size_hint: 1, 1
+                        
+            #             width_mult: 1
+
+            #             # --- SLIDE 1 ---
+            #             MDSwiperItem:
+                            
+            #                 MDBoxLayout:
+            #                     padding: ["-8.5dp", 0, "-2dp", 0]
+                        
+            #                     MDRelativeLayout:
+            #                         size_hint: 1, 1
+            #                         pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                                    
+            #                         FitImage:
+            #                             source: "assets/images/banner1.jpeg"
+            #                             size_hint: 0.95, 1
+            #                             radius: [20, 20, 20, 20]
+                                    
+                                    
+            #                         MDBoxLayout:
+            #                             size_hint: 0.95, None
+            #                             height: "50dp"
+                                    
+            #                             md_bg_color: 0, 0, 0, 0.6
+            #                             radius: [0, 0, 20, 20]
+            #                             padding: ["15dp", 0, 0, 0]
+                                        
+            #                             MDLabel:
+            #                                 text: "O mosquito não descansa!"
+            #                                 theme_text_color: "Custom"
+            #                                 text_color: 1, 1, 1, 1
+            #                                 bold: True
+
+            #             # --- SLIDE 2 ---
+            #             MDSwiperItem:
+                            
+            #                 MDBoxLayout:
+            #                     padding: ["-32.5dp", 0, "20dp", 0]
+
+            #                     MDRelativeLayout:
+            #                         size_hint: 1, 1
+            #                         pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+            #                         FitImage:
+            #                             source: "assets/images/agentes.jpeg"
+            #                             size_hint: 0.95, 1
+            #                             pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            #                             radius: [20, 20, 20, 20]
+
+            #                         MDBoxLayout:
+            #                             size_hint: 0.95,None
+            #                             height: "50dp"
+            #                             pos_hint: {"center_x": 0.5, "y": 0}
+            #                             md_bg_color: 0, 0, 0, 0.6
+            #                             radius: [0, 0, 20, 20]
+            #                             padding: ["15dp", 0, 0, 0]
+                                        
+            #                             MDLabel:
+            #                                 text: "Agentes em combate"
+            #                                 theme_text_color: "Custom"
+            #                                 text_color: 1, 1, 1, 1
+            #                                 bold: True
+
+            #     # --- SETAS LATERAIS (FORA DO BOX PARA EVITAR ERRO DE CLIP) ---
+            #     MDIconButton:
+            #         icon: "chevron-left"
+            #         pos_hint: {"center_x": 0.08, "center_y": .5}
+            #         on_release: swiper.swipe_left()
+            #         theme_text_color: "Custom"
+            #         text_color: 1, 1, 1, 1
+            #         md_bg_color: 0, 0, 0, 0.75
+            #         icon_size: "30dp"
+                
+
+            #     MDIconButton:
+            #         icon: "chevron-right"
+            #         pos_hint: {"center_x": 0.92, "center_y": .5}
+            #         on_release: swiper.swipe_right()
+            #         theme_text_color: "Custom"
+            #         text_color: 1, 1, 1, 1
+            #         md_bg_color: 0, 0, 0, 0.75
+            #         icon_size: "30dp"
             MDRelativeLayout:
                 size_hint_y: None
                 height: "180dp"
-                
-                # Container visual que corta as bordas perfeitamente em todas as pontas
+
+                # 1. CAMADA DE FUNDO: O Carrossel com bordas arredondadas
                 MDBoxLayout:
                     size_hint: 1, 1
                     pos_hint: {"center_x": 0.5, "center_y": 0.5}
@@ -44,42 +141,43 @@ KV_EXPLORE_TAB = '''
                     MDSwiper:
                         id: swiper
                         size_hint: 1, 1
-                        
                         width_mult: 1
 
                         # --- SLIDE 1 ---
                         MDSwiperItem:
-                            
-                            
-                            MDRelativeLayout:
-                                size_hint: 1, 1
-                                pos_hint: {"center_x": 0.5, "center_y": 0.5}
-                                    
-                                FitImage:
-                                    source: "assets/images/banner1.jpeg"
-                                    size_hint: 0.95, 1
-                                    radius: [20, 20, 20, 20]
-                                    
-                                    
-                                MDBoxLayout:
-                                    size_hint: 0.95, None
-                                    height: "50dp"
-                                    
-                                    md_bg_color: 0, 0, 0, 0.6
-                                    radius: [0, 0, 20, 20]
-                                    padding: ["15dp", 0, 0, 0]
+
+                            MDBoxLayout:
+                                padding: ["-10dp", 0, "1dp", 0]
+
+                                MDRelativeLayout:
+                                    size_hint: 1, 1
+                                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                                
+                                    FitImage:
+                                        source: "assets/images/banner1.jpeg"
+                                        size_hint: 0.95, 1
                                         
-                                    MDLabel:
-                                        text: "O mosquito não descansa!"
-                                        theme_text_color: "Custom"
-                                        text_color: 1, 1, 1, 1
-                                        bold: True
+                                        radius: [20, 20, 20, 20]
+                                    
+                                    MDBoxLayout:
+                                        size_hint: 0.95, None
+                                        height: "50dp"
+                                        
+                                        md_bg_color: 0, 0, 0, 0.6
+                                        radius: [0, 0, 20, 20]
+                                        padding: ["15dp", 0, 0, 0]
+                                    
+                                        MDLabel:
+                                            text: "O mosquito não descansa!"
+                                            theme_text_color: "Custom"
+                                            text_color: 1, 1, 1, 1
+                                            bold: True
 
                         # --- SLIDE 2 ---
                         MDSwiperItem:
-                            
+
                             MDBoxLayout:
-                                padding: ["-32.5dp", 0, "30dp", 0]
+                                padding: ["-20dp", 0, "10dp", 0]
 
                                 MDRelativeLayout:
                                     size_hint: 1, 1
@@ -88,42 +186,52 @@ KV_EXPLORE_TAB = '''
                                     FitImage:
                                         source: "assets/images/agentes.jpeg"
                                         size_hint: 0.95, 1
-                                        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                                        
                                         radius: [20, 20, 20, 20]
 
                                     MDBoxLayout:
-                                        size_hint: 0.95,None
+                                        size_hint: 0.95, None
                                         height: "50dp"
-                                        pos_hint: {"center_x": 0.5, "y": 0}
+                                        
                                         md_bg_color: 0, 0, 0, 0.6
                                         radius: [0, 0, 20, 20]
                                         padding: ["15dp", 0, 0, 0]
-                                        
+                                    
                                         MDLabel:
                                             text: "Agentes em combate"
                                             theme_text_color: "Custom"
                                             text_color: 1, 1, 1, 1
                                             bold: True
 
-                # --- SETAS LATERAIS (FORA DO BOX PARA EVITAR ERRO DE CLIP) ---
-                MDIconButton:
-                    icon: "chevron-left"
-                    pos_hint: {"right": 0.1, "center_y": .5}
-                    on_release: swiper.swipe_left()
-                    theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1
-                    md_bg_color: 0, 0, 0, 0.75
-                    icon_size: "30dp"
-                
+                # 2. CAMADA DE SOBREPOSIÇÃO (OVERLAY): As Setas perfeitamente alinhadas à imagem
+                MDBoxLayout:
+                    size_hint: 0.92, 1  # Mesma largura exata da imagem (0.92)
+                    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+                    orientation: "horizontal"
+                    
+                    # Seta Esquerda (Grudada na margem esquerda da imagem)
+                    MDIconButton:
+                        icon: "chevron-left"
+                        pos_hint: {"center_y": 0.5}
+                        on_release: swiper.swipe_left()
+                        theme_text_color: "Custom"
+                        text_color: 1, 1, 1, 1
+                        md_bg_color: 0, 0, 0, 0.75
+                        icon_size: "26dp"
 
-                MDIconButton:
-                    icon: "chevron-right"
-                    pos_hint: {"right": 0.96, "center_y": .5}
-                    on_release: swiper.swipe_right()
-                    theme_text_color: "Custom"
-                    text_color: 1, 1, 1, 1
-                    md_bg_color: 0, 0, 0, 0.75
-                    icon_size: "30dp"
+                    # Espaçador invisível que empurra a seta da direita para a outra ponta
+                    Widget:
+                        size_hint_x: 1
+
+                    # Seta Direita (Grudada na margem direita da imagem)
+                    MDIconButton:
+                        icon: "chevron-right"
+                        pos_hint: {"center_y": 0.5}
+                        on_release: swiper.swipe_right()
+                        theme_text_color: "Custom"
+                        text_color: 1, 1, 1, 1
+                        md_bg_color: 0, 0, 0, 0.75
+                        icon_size: "26dp"
 
             # --- BOX INFORMATIVO ---
             MDBoxLayout:
