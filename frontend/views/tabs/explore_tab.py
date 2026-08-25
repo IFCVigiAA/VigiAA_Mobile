@@ -140,6 +140,7 @@ KV_EXPLORE_TAB = '''
 
             # --- LISTA ---
             MDList:
+                adaptive_height: True
                 padding: 0
                 spacing: "5dp"
 
@@ -150,8 +151,10 @@ KV_EXPLORE_TAB = '''
                     on_release: root.go_to_route('sintomas')
                     IconLeftWidget:
                         icon: "thermometer"
+                        on_release: root.go_to_route('sintomas')
                     IconRightWidget:
                         icon: "chevron-right"
+                        on_release: root.go_to_route('sintomas')
 
                 # Item: Prevenção
                 TwoLineAvatarIconListItem:
@@ -160,8 +163,10 @@ KV_EXPLORE_TAB = '''
                     on_release: root.go_to_route('prevencao')
                     IconLeftWidget:
                         icon: "shield-check-outline"
+                        on_release: root.go_to_route('prevencao')
                     IconRightWidget:
                         icon: "chevron-right"
+                        on_release: root.go_to_route('prevencao')
 
                 # Item: Campanhas
                 TwoLineAvatarIconListItem:
@@ -170,12 +175,14 @@ KV_EXPLORE_TAB = '''
                     on_release: root.go_to_route('campanhas')
                     IconLeftWidget:
                         icon: "bullhorn-outline"
+                        on_release: root.go_to_route('campanhas')
                     IconRightWidget:
                         icon: "chevron-right"
+                        on_release: root.go_to_route('campanhas')
 
             Widget:
                 size_hint_y: None
-                height: "80dp"
+                height: "120dp"
 '''
 
 Builder.load_string(KV_EXPLORE_TAB)

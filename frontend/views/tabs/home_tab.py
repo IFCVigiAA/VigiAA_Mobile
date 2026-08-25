@@ -29,7 +29,7 @@ KV_HOME_TAB = '''
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
         halign: "left"
-        font_size: "18sp"
+        font_size: "15sp"
         
     MDLabel:
         text: root.value
@@ -38,7 +38,7 @@ KV_HOME_TAB = '''
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
         halign: "left"
-        font_size: "32sp"
+        font_size: "30sp"
 
 <ChartCard@MDCard>:
     orientation: "vertical"
