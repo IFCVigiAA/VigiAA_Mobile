@@ -21,6 +21,8 @@ KV_HOME_TAB = '''
     title: ""
     value: ""
     subtext: ""
+    size_hint_x: None
+    width: "220dp"
     
     MDLabel:
         text: root.title
@@ -28,7 +30,7 @@ KV_HOME_TAB = '''
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
         halign: "left"
-        font_size: "14sp"
+        font_size: "15sp"
         
     MDLabel:
         text: root.value
@@ -36,7 +38,7 @@ KV_HOME_TAB = '''
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
         halign: "left"
-        font_size: "28sp"
+        font_size: "30sp"
 
 <ChartCard@MDCard>:
     orientation: "vertical"
@@ -102,26 +104,42 @@ KV_HOME_TAB = '''
                 padding: ["0dp", "5dp", "0dp", "5dp"]
 
         # Cards de Estatísticas
-        MDBoxLayout:
-            orientation: "horizontal"
+        ScrollView:
             size_hint_y: None
-            height: "100dp"
-            spacing: "10dp"
+            height: "120dp"
+            do_scroll_x: True
+            do_scroll_y: False
+            bar_width: "4dp" # Deixei a barra visível para você ver que o scroll existe
+            
+            MDBoxLayout:
+                orientation: "horizontal"
+                # Kivy raiz para forçar o scroll horizontal:
+                size_hint_x: None
+                width: self.minimum_width
+                spacing: "15dp"
+                padding: ["15dp", "5dp", "15dp", "5dp"]
+                bar_width: 0
 
-            StatCard:
-                id: card_confirmados    
-                title: "Casos confirmados"
-                value: "Carregando..."
+                StatCard:
+                    id: card_confirmados    
+                    title: "Casos confirmados"
+                    value: "..."
+                    size_hint_x: None 
+                    width: root.width * 0.7
 
-            StatCard:
-                id: card_suspeitas    
-                title: "Suspeitas de dengue"
-                value: "Carregando..."
+                StatCard:
+                    id: card_suspeitas    
+                    title: "Casos em suspeita"
+                    value: "..."
+                    size_hint_x: None
+                    width: root.width * 0.7
 
-            StatCard:
-                id: card_focus    
-                title: "Areas de focos da dengue"
-                value: "Carregando..."
+                StatCard:
+                    id: card_focus    
+                    title: "Áreas de focos da dengue"
+                    value: "..."
+                    size_hint_x: None
+                    width: root.width * 0.7
         
         # espaço para o mapa
         ChartCard:
