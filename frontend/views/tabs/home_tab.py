@@ -24,21 +24,19 @@ KV_HOME_TAB = '''
     
     MDLabel:
         text: root.title
-        font_size: "12sp"
         bold: True
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
         halign: "left"
-        font_size: "15sp"
+        font_size: "14sp"
         
     MDLabel:
         text: root.value
-        font_size: "24sp"
         bold: True
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
         halign: "left"
-        font_size: "30sp"
+        font_size: "28sp"
 
 <ChartCard@MDCard>:
     orientation: "vertical"

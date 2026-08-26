@@ -192,7 +192,7 @@ KV_EXPLORE_TAB = '''
 
             Widget:
                 size_hint_y: None
-                height: "120dp"
+                height: "180dp"
 '''
 
 Builder.load_string(KV_EXPLORE_TAB)
