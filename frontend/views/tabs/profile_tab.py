@@ -591,6 +591,15 @@ class ProfileTabContent(ScrollView):
             print(f"VIGIAA DEBUG: Erro no upload: {str(e)}")
             self.mostrar_aviso(f"Erro de conexão: {str(e)[:25]}")
 
+        # 🧹 LIMPEZA SEGURA: Apaga apenas este arquivo temporário específico após o término do upload
+        finally:
+            try:
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"VIGIAA DEBUG: Arquivo temporário local removido: {file_path}")
+            except Exception as e:
+                print(f"VIGIAA DEBUG: Não foi possível remover o arquivo temporário: {e}")
+
     # --------------------------------------------------------------------------
     # REQUISIÇÕES E ATUALIZAÇÕES DOS DADOS DE TEXTO
     # --------------------------------------------------------------------------

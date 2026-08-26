@@ -53,6 +53,9 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
 
+    #limpeza de dados
+    'django_cleanup.apps.CleanupConfig',
+
     # Seus Apps
     'api',
 ]
