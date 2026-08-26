@@ -129,6 +129,13 @@ KV_PROFILE_TAB = '''
         multiline: False
         pos_hint: {"center_y": .5}
         cursor_color: 0.22, 0.75, 0.94, 1
+        # IMPORTANTE PARA O CELULAR:
+        # Garante que o teclado saiba que é um campo de texto simples de linha única
+        write_tab: False 
+        # Dispara o salvamento se o usuário clicar no botão de confirmação/enter do teclado do celular
+        on_text_validate: root.save_edit()
+        # Gerencia a perda de foco (caso toque fora ou feche o teclado pelo botão nativo)
+        on_focus: root.on_input_focus(self, self.focus)
 
     # Container de Ações (Editar, Salvar, Cancelar)
     MDBoxLayout:
@@ -315,16 +322,33 @@ class ProfileField(MDBoxLayout):
         self.original_value = ""
 
     def start_edit(self):
-        """Habilita a edição do campo de texto."""
+        """Habilita a edição do campo de texto e força a exibição do teclado."""
         self.original_value = self.ids.field_input.text
+        self._is_saving_or_canceling = False
+        
+        # 1. Libera a edição e atualiza a visibilidade dos botões de ação
         self.ids.field_input.readonly = False
-        self.ids.field_input.focus = True
         self.ids.btn_edit.opacity = 0
         self.ids.btn_edit.disabled = True
         self.ids.btn_save.opacity = 1
         self.ids.btn_save.disabled = False
         self.ids.btn_cancel.opacity = 1
         self.ids.btn_cancel.disabled = False
+
+        # 2. Usa o Clock para garantir que o foco e o teclado apareçam sem conflito de renderização
+        Clock.schedule_once(lambda dt: self._focus_and_show_keyboard(), 0.1)
+
+    def _focus_and_show_keyboard(self):
+        """Atribui o foco ao TextInput, invocando o teclado nativo do Android/iOS."""
+        self.ids.field_input.focus = True
+        
+        # Alternativa extra de segurança para plataformas móveis forçarem o teclado
+        if platform in ('android', 'ios'):
+            try:
+                from kivy.core.window import Window
+                Window.softinput_mode = "below_target" # Ou "pan" dependendo do seu design
+            except Exception:
+                pass
 
     def cancel_edit(self):
         """Restaura o valor original e bloqueia o campo."""
