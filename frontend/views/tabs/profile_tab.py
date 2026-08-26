@@ -320,6 +320,7 @@ class ProfileField(MDBoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.original_value = ""
+        self._is_saving_or_canceling = False
 
     def start_edit(self):
         """Habilita a edição do campo de texto e força a exibição do teclado."""
@@ -335,30 +336,48 @@ class ProfileField(MDBoxLayout):
         self.ids.btn_cancel.opacity = 1
         self.ids.btn_cancel.disabled = False
 
-        # 2. Usa o Clock para garantir que o foco e o teclado apareçam sem conflito de renderização
-        Clock.schedule_once(lambda dt: self._focus_and_show_keyboard(), 0.1)
-
-    def _focus_and_show_keyboard(self):
-        """Atribui o foco ao TextInput, invocando o teclado nativo do Android/iOS."""
+        # 2. Ativa o foco diretamente de forma segura
         self.ids.field_input.focus = True
+
+    # def _focus_and_show_keyboard(self):
+    #     """Atribui o foco ao TextInput, invocando o teclado nativo do Android/iOS."""
+    #     self.ids.field_input.focus = True
         
-        # Alternativa extra de segurança para plataformas móveis forçarem o teclado
-        if platform in ('android', 'ios'):
-            try:
-                from kivy.core.window import Window
-                Window.softinput_mode = "below_target" # Ou "pan" dependendo do seu design
-            except Exception:
-                pass
+    #     # Alternativa extra de segurança para plataformas móveis forçarem o teclado
+    #     if platform in ('android', 'ios'):
+    #         try:
+    #             from kivy.core.window import Window
+    #             Window.softinput_mode = "below_target" # Ou "pan" dependendo do seu design
+    #         except Exception:
+    #             pass
 
     def cancel_edit(self):
         """Restaura o valor original e bloqueia o campo."""
+        self._is_saving_or_canceling = True
         self.ids.field_input.text = self.original_value
         self._lock_field()
 
     def save_edit(self):
         """Dispara a gravação do novo valor através do callback cadastrado."""
+        if self._is_saving_or_canceling:
+            return
+        if self.ids.field_input.focus:
+            self.ids.field_input.focus = False
         if self.callback_save:
             self.callback_save(self.api_key, self.ids.field_input.text, self)
+
+    def on_input_focus(self, instance, value):
+        """Método chamado quando o TextInput ganha ou perde o foco."""
+        if not value and not self.ids.field_input.readonly and not self._is_saving_or_canceling:
+            Clock.schedule_once(lambda dt: self._check_auto_save(), 0.1)
+
+    def _check_auto_save(self):
+        """Verifica se deve salvar ou cancelar ao perder o foco."""
+        if not self.ids.field_input.readonly and not self._is_saving_or_canceling:
+            if self.ids.field_input.text != self.original_value:
+                self.save_edit()
+            else:
+                self.cancel_edit()
 
     def _lock_field(self):
         """Retorna o campo ao estado somente leitura."""

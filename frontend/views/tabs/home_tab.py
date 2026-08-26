@@ -125,21 +125,21 @@ KV_HOME_TAB = '''
                     title: "Casos confirmados"
                     value: "..."
                     size_hint_x: None 
-                    width: root.width * 0.7
+                    width: root.width * 0.5
 
                 StatCard:
                     id: card_suspeitas    
                     title: "Casos em suspeita"
                     value: "..."
                     size_hint_x: None
-                    width: root.width * 0.7
+                    width: root.width * 0.5
 
                 StatCard:
                     id: card_focus    
                     title: "Áreas de focos da dengue"
                     value: "..."
                     size_hint_x: None
-                    width: root.width * 0.7
+                    width: root.width * 0.5
         
         # espaço para o mapa
         ChartCard:

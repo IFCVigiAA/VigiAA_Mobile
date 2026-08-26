@@ -8,15 +8,8 @@ from kivy.storage.jsonstore import JsonStore
 from views.home_view import HomeStatistics  # Atualize a importação
 from kivy.core.window import Window
 
-Window.keyboard_anim_args = {'d': .2, 't': 'in_out_expo'}
-Window.softinput_mode = "below_target"
-
-class MainApp(MDApp):
-    def build(self):
-        sm = ScreenManager()
-        # Adicione com o novo nome
-        sm.add_widget(HomeStatistics(name="home_statistics"))
-        return sm
+# Window.keyboard_anim_args = {'d': .2, 't': 'in_out_expo'}
+# Window.softinput_mode = "below_target"
 
 # O store continua aqui em cima
 store = JsonStore('sessao_app.json')
