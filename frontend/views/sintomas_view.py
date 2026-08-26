@@ -106,7 +106,7 @@ KV_SINTOMAS = '''
                 adaptive_height: True
 
                 SintomaCard:
-                    image: "assets/images/termometro.png" 
+                    image: "assets/images/termometro.jpg" 
                     text: "Febre"
                 SintomaCard:
                     image: "assets/images/dores.jpeg"
