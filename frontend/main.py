@@ -6,6 +6,10 @@ from kivymd.app import MDApp
 from kivy.storage.jsonstore import JsonStore
 # No main.py ou gerenciador de telas:
 from views.home_view import HomeStatistics  # Atualize a importação
+from kivy.core.window import Window
+
+Window.keyboard_anim_args = {'d': .2, 't': 'in_out_expo'}
+Window.softinput_mode = "below_target"
 
 class MainApp(MDApp):
     def build(self):
@@ -94,7 +98,6 @@ try:
 
 except Exception as e:
     from kivy.uix.label import Label
-    from kivy.core.window import Window
     
     class ErrorApp(MDApp):
         def build(self):
