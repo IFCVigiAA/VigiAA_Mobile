@@ -1,22 +1,6 @@
 from django.urls import path
 from .import views
 from .views import (
-    # estatisticas_view,
-    # EstatisticasView,
-    # MyTokenObtainPairView, 
-    # UserRegistrationView, 
-    # UserDeleteView, 
-    # RequestPasswordResetEmail, 
-    # PasswordTokenCheckAPI,
-    # UserProfileView,
-    # ChangePasswordView,
-    # DengueFocusCreateView,
-    # DengueCaseCreateView,
-    # check_login_status,
-    # delete_account_view,
-    # google_callback_manual,
-    # profile_view,
-    # start_login,
     ChangePasswordView,
     DengueCaseCreateView,
     DengueFocusCreateView,

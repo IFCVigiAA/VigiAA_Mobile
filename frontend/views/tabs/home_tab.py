@@ -122,7 +122,7 @@ KV_HOME_TAB = '''
 
             StatCard:
                 id: card_focus    
-                title: "focus de dengue encontrados"
+                title: "Areas de focos da dengue"
                 value: "Carregando..."
         
         # espaço para o mapa
@@ -140,7 +140,7 @@ KV_HOME_TAB = '''
             image_src: "assets/images/grafico2.png"
 
         ChartCard:
-            title: "quantidade de focos e localidades encontradas"
+            title: "Quantidade de focos e localidades encontradas"
             image_src: "assets/images/graficofocus.png"
 '''
 
@@ -232,7 +232,7 @@ class HomeTabContent(ScrollView):
     resumo = result.get("resumo", {}) if isinstance(result, dict) else {}
     total_confirmados = resumo.get("total_casos_positivos", 0)
     total_suspeitas = resumo.get("total_casos_suspeitos", 0)
-    total_focus = resumo.get("total_casos_focus", 0)
+    total_focus = resumo.get("total_focos", 0)
 
     if "card_confirmados" in self.ids:
         self.ids.card_confirmados.value = str(total_confirmados)

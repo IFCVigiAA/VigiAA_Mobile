@@ -362,23 +362,6 @@ class PasswordResetWebConfirm(APIView):
                 
             return Response({'error': error_msg, 'uidb64': uidb64, 'token': token})
 
-# class UserProfileView(APIView):
-#     permission_classes = [IsAuthenticated] 
-
-#     def get(self, request):
-#         serializer = UserProfileSerializer(request.user)
-#         return Response(serializer.data)
-    
-#     def patch(self, request):
-#         user = request.user
-#         serializer = UserProfileSerializer(user, data=request.data, partial=True)
-        
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data)
-        
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
     # 2. Adicionar os parsers aqui:
@@ -457,28 +440,34 @@ class PositiveDengueCaseCreateView(APIView):
 
 @api_view(['GET'])
 def estatisticas_view(request):
-  # Captura o parâmetro ?ano= enviado pelo Kivy
-  ano = request.GET.get('ano')
+    ano = request.GET.get('ano')
 
-  casos_qs = DengueCase.objects.all()
-  positivos_qs = PositiveDengueCase.objects.all()
+    casos_qs = DengueCase.objects.all()
+    positivos_qs = PositiveDengueCase.objects.all()
+    focos_qs = DengueFocus.objects.all()
 
-  # Se o ano foi informado nos botões, filtra pela data de notificação
-  if ano:
-    casos_qs = casos_qs.filter(notification_date__year=ano)
-    positivos_qs = positivos_qs.filter(
-        dengue_case__notification_date__year=ano
-    )
+    # --- PRINTS DE DIAGNÓSTICO (Olhar no terminal do Django) ---
+    print(f"🔍 TOTAL DE FOCOS NO BANCO (SEM FILTRO): {focos_qs.count()}")
 
-  # Retorna estritamente o resumo esperado pelos cards do Kivy
-  data = {
-      'resumo': {
-          'total_casos_positivos': positivos_qs.count(),
-          'total_casos_suspeitos': casos_qs.count(),
-      }
-  }
+    if ano and ano != 'None' and str(ano).isdigit():
+        ano_int = int(ano)
+        casos_qs = casos_qs.filter(notification_date__year=ano_int)
+        positivos_qs = positivos_qs.filter(
+            dengue_case__notification_date__year=ano_int
+        )
+        focos_qs = focos_qs.filter(created_at__year=ano_int)
+        
+        print(f"🔍 TOTAL DE FOCOS APÓS FILTRAR O ANO {ano_int}: {focos_qs.count()}")
 
-  return Response(data, status=status.HTTP_200_OK)
+    data = {
+        'resumo': {
+            'total_casos_positivos': positivos_qs.count(),
+            'total_casos_suspeitos': casos_qs.count(),
+            'total_focos': focos_qs.count(),
+        }
+    }
+
+    return Response(data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])  # Login não exige token prévio
