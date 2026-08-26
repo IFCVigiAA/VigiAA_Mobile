@@ -128,7 +128,7 @@ KV_PROFILE_TAB = '''
         bold: True
         size_hint_x: None
         width: "80dp"
-        font_size: "14sp"
+        font_size: "13sp"
         pos_hint: {"center_y": .5}
         
     TextInput:
@@ -136,7 +136,7 @@ KV_PROFILE_TAB = '''
         text: root.text_value
         readonly: True
         size_hint_x: 1 
-        font_size: "15sp"
+        font_size: "13sp"
         foreground_color: (0, 0, 0, 1) if not self.readonly else (0.4, 0.4, 0.4, 1)
         background_color: 0, 0, 0, 0
         padding: [0, (self.height - self.line_height) / 2]

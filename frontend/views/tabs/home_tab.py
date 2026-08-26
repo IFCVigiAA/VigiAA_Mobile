@@ -24,7 +24,7 @@ KV_HOME_TAB = '''
     
     MDLabel:
         text: root.title
-        font_size: "14sp"
+        font_size: "12sp"
         bold: True
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
@@ -33,7 +33,7 @@ KV_HOME_TAB = '''
         
     MDLabel:
         text: root.value
-        font_size: "28sp"
+        font_size: "24sp"
         bold: True
         theme_text_color: "Custom"
         text_color: 0, 0, 0, 1
@@ -55,7 +55,7 @@ KV_HOME_TAB = '''
 
     MDLabel:
         text: root.title
-        font_size: "16sp"
+        font_size: "14sp"
         bold: True
         adaptive_height: True
         theme_text_color: "Custom"
@@ -68,7 +68,7 @@ KV_HOME_TAB = '''
 
 <YearButton>:
     text: root.year_text
-    font_size: "14sp"
+    font_size: "12sp"
     bold: True
     size_hint: None, None
     size: "80dp", "40dp"

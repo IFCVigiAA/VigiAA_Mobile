@@ -50,20 +50,20 @@ KV_NEW_TAB = '''
 
                     MDLabel:
                         text: "Cadastrar novo foco de dengue"
-                        font_size: "17sp"
+                        font_size: "18sp"
                         bold: True
                         adaptive_height: True
 
                     MDLabel:
                         text: "Forneça informações necessárias para o cadastro de um local com possíveis focos do mosquito"
                         theme_text_color: "Secondary"
-                        font_size: "13sp"
+                        font_size: "14sp"
                         adaptive_height: True
                         
                 # A BOLA AZUL PERFEITA (+)
                 MDIconButton:
                     icon: "plus"
-                    user_font_size: "24sp"
+                    user_font_size: "25sp"
                     theme_text_color: "Custom"
                     text_color: 1, 1, 1, 1
                     md_bg_color: 0.22, 0.75, 0.94, 1
@@ -101,14 +101,14 @@ KV_NEW_TAB = '''
 
                     MDLabel:
                         text: "Cadastrar novo paciente"
-                        font_size: "17sp"
+                        font_size: "18sp"
                         bold: True
                         adaptive_height: True
 
                     MDLabel:
                         text: "Forneça informações para o cadastro de um paciente."
                         theme_text_color: "Secondary"
-                        font_size: "13sp"
+                        font_size: "14sp"
                         adaptive_height: True
                         
                 MDIconButton:
