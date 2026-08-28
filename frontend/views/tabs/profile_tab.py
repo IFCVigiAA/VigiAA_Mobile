@@ -317,10 +317,18 @@ class ProfileField(MDBoxLayout):
         self._is_saving_or_canceling = False
 
     def start_edit(self):
-        # Ativa a trava para ignorar falsos positivos de foco
+        """Habilita a edição do campo de texto e força a exibição do teclado."""
+        # 1. ISSO EVITA QUE O TEXTO SUMA! (Recuperamos a linha que faltou)
+        self.original_value = self.ids.field_input.text
+        self._is_saving_or_canceling = False
+        
+        # 2. Ativa a trava para o foco não piscar
         self._is_transitioning = True
         
+        # 3. Libera o campo para edição
         self.ids.field_input.readonly = False
+        
+        # 4. Troca os botões
         self.ids.btn_edit.opacity = 0
         self.ids.btn_edit.disabled = True
         self.ids.btn_save.opacity = 1
@@ -328,13 +336,14 @@ class ProfileField(MDBoxLayout):
         self.ids.btn_cancel.opacity = 1
         self.ids.btn_cancel.disabled = False
 
-        # Agenda o foco e a liberação da trava
+        # 5. Delay essencial para o Kivy renderizar o readonly=False ANTES de chamar o teclado
         from kivy.clock import Clock
-        Clock.schedule_once(lambda dt: self._apply_focus(), 0.15)
+        Clock.schedule_once(self._apply_focus, 0.15)
 
-    def _apply_focus(self):
+    def _apply_focus(self, dt):
+        """Aplica o foco e chama o teclado nativamente após a renderização."""
         self.ids.field_input.focus = True
-        # Libera a trava após o foco estar garantido
+        # Libera a trava de segurança
         self._is_transitioning = False
 
     def cancel_edit(self):
@@ -354,13 +363,13 @@ class ProfileField(MDBoxLayout):
 
     def on_input_focus(self, instance, value):
         """Método chamado quando o TextInput ganha ou perde o foco."""
-        # TRAVA CIRÚRGICA: Ignora qualquer perda de foco acidental durante a abertura
+        # Se estiver abrindo a edição, ignora a perda de foco fantasma
         if getattr(self, '_is_transitioning', False):
             return
 
         if not value and not self.ids.field_input.readonly and not self._is_saving_or_canceling:
+            from kivy.clock import Clock
             Clock.schedule_once(lambda dt: self._check_auto_save(), 0.1)
-
 
     def _check_auto_save(self):
         """Verifica se deve salvar ou cancelar ao perder o foco."""
