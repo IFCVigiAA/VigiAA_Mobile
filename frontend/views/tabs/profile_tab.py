@@ -330,8 +330,9 @@ class ProfileField(MDBoxLayout):
         self.ids.btn_cancel.opacity = 1
         self.ids.btn_cancel.disabled = False
 
-        # 2. Ativa o foco diretamente de forma segura
-        self.ids.field_input.focus = True
+        # 2. Ativa o foco com o ATRASO CRÍTICO PARA MOBILE
+        # Substituímos a ativação direta por um Clock.schedule_once
+        Clock.schedule_once(lambda dt: setattr(self.ids.field_input, 'focus', True), 0.15)
 
     def cancel_edit(self):
         """Restaura o valor original e bloqueia o campo."""
