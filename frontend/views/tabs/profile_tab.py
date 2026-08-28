@@ -317,11 +317,9 @@ class ProfileField(MDBoxLayout):
         self._is_saving_or_canceling = False
 
     def start_edit(self):
-        """Habilita a edição do campo de texto e força a exibição do teclado."""
-        self.original_value = self.ids.field_input.text
-        self._is_saving_or_canceling = False
+        # Ativa a trava para ignorar falsos positivos de foco
+        self._is_transitioning = True
         
-        # 1. Libera a edição e atualiza a visibilidade dos botões de ação
         self.ids.field_input.readonly = False
         self.ids.btn_edit.opacity = 0
         self.ids.btn_edit.disabled = True
@@ -330,9 +328,14 @@ class ProfileField(MDBoxLayout):
         self.ids.btn_cancel.opacity = 1
         self.ids.btn_cancel.disabled = False
 
-        # 2. Ativa o foco com o ATRASO CRÍTICO PARA MOBILE
-        # Substituímos a ativação direta por um Clock.schedule_once
-        Clock.schedule_once(lambda dt: setattr(self.ids.field_input, 'focus', True), 0.15)
+        # Agenda o foco e a liberação da trava
+        from kivy.clock import Clock
+        Clock.schedule_once(lambda dt: self._apply_focus(), 0.15)
+
+    def _apply_focus(self):
+        self.ids.field_input.focus = True
+        # Libera a trava após o foco estar garantido
+        self._is_transitioning = False
 
     def cancel_edit(self):
         """Restaura o valor original e bloqueia o campo."""
@@ -351,8 +354,13 @@ class ProfileField(MDBoxLayout):
 
     def on_input_focus(self, instance, value):
         """Método chamado quando o TextInput ganha ou perde o foco."""
+        # TRAVA CIRÚRGICA: Ignora qualquer perda de foco acidental durante a abertura
+        if getattr(self, '_is_transitioning', False):
+            return
+
         if not value and not self.ids.field_input.readonly and not self._is_saving_or_canceling:
             Clock.schedule_once(lambda dt: self._check_auto_save(), 0.1)
+
 
     def _check_auto_save(self):
         """Verifica se deve salvar ou cancelar ao perder o foco."""
