@@ -42,23 +42,13 @@ class ProfileViewCheck(MDScreen):
     """
     profile_carregado = False
 
-    def on_tab_open(self):
-        """Método disparado quando a aba do perfil é aberta na interface."""
-        if not self.profile_carregado:
-            print("VIGIAA DEBUG: Primeiros dados do perfil solicitados.")
-            self.carregar_perfil_api()
-        else:
-            print("VIGIAA DEBUG: Perfil já em memória. Requisição à API evitada.")
-
     def carregar_perfil_api(self, force_reload=False):
-        """
-        Realiza a requisição GET à API Django para carregar as informações do usuário.
-        
-        :param force_reload: Força nova requisição mesmo se já estiver carregado em memória.
-        """
         if self.profile_carregado and not force_reload:
             return
+        # Envia a requisição para o background
+        threading.Thread(target=self._worker_carregar_perfil, daemon=True).start()
 
+    def _worker_carregar_perfil(self):
         app = MDApp.get_running_app()
         api_url = getattr(config, 'API_URL', getattr(app, 'api_base_url', ''))
         headers = {'Authorization': f'Bearer {app.user_token}'}
@@ -68,13 +58,17 @@ class ProfileViewCheck(MDScreen):
             response = requests.get(url, headers=headers, timeout=10, verify=False)
             if response.status_code == 200:
                 dados = response.json()
-                self.preencher_campos_ui(dados)
-                self.profile_carregado = True
-                print("VIGIAA DEBUG: Perfil carregado com sucesso.")
+                # Retorna para a thread principal apenas para atualizar a UI
+                Clock.schedule_once(lambda dt: self._aplicar_dados_ui(dados), 0)
             else:
                 print(f"VIGIAA DEBUG: Falha ao buscar perfil: Status {response.status_code}")
         except Exception as e:
             print(f"VIGIAA DEBUG: Erro de conexão ao buscar perfil: {e}")
+
+    def _aplicar_dados_ui(self, dados):
+        self.preencher_campos_ui(dados)
+        self.profile_carregado = True
+        print("VIGIAA DEBUG: Perfil carregado com sucesso.")
 
     def preencher_campos_ui(self, dados):
         """Preenche e atualiza a interface gráfica com os dados retornados do servidor."""
@@ -339,18 +333,6 @@ class ProfileField(MDBoxLayout):
         # 2. Ativa o foco diretamente de forma segura
         self.ids.field_input.focus = True
 
-    # def _focus_and_show_keyboard(self):
-    #     """Atribui o foco ao TextInput, invocando o teclado nativo do Android/iOS."""
-    #     self.ids.field_input.focus = True
-        
-    #     # Alternativa extra de segurança para plataformas móveis forçarem o teclado
-    #     if platform in ('android', 'ios'):
-    #         try:
-    #             from kivy.core.window import Window
-    #             Window.softinput_mode = "below_target" # Ou "pan" dependendo do seu design
-    #         except Exception:
-    #             pass
-
     def cancel_edit(self):
         """Restaura o valor original e bloqueia o campo."""
         self._is_saving_or_canceling = True
@@ -493,13 +475,12 @@ class ProfileTabContent(ScrollView):
             caminho_interno = self.garantir_arquivo_acessivel(path)
             
             if caminho_interno:
-                print(f"VIGIAA DEBUG: Foto copiada para uso interno: {caminho_interno}")
-                
                 Cache.remove('kv.image')
                 Cache.remove('kv.loader')
                 
+                # Deixe apenas o caminho real do arquivo
                 prefixo = "file://" if platform == "android" else ""
-                self.avatar_source = f"{prefixo}{caminho_interno}?t={int(time.time())}"
+                self.avatar_source = f"{prefixo}{caminho_interno}"
                 
                 # Dispara APENAS a requisição de upload em segundo plano
                 threading.Thread(target=self._worker_upload_avatar, args=(caminho_interno,), daemon=True).start()
@@ -547,7 +528,7 @@ class ProfileTabContent(ScrollView):
                 except Exception:
                     # Fallback com buffer Java nativo para versões legadas do Android
                     from jnius import jarray, c_byte
-                    buffer = jarray(c_byte)(1024 * 64)
+                    buffer = jarray('b')(1024 * 64) # 'b' representa byte no Java
                     while True:
                         bytes_read = input_stream.read(buffer)
                         if bytes_read == -1:
@@ -634,14 +615,6 @@ class ProfileTabContent(ScrollView):
             print(f"VIGIAA DEBUG: Erro no upload: {str(e)}")
             self.mostrar_aviso(f"Erro de conexão: {str(e)[:25]}")
 
-        # 🧹 LIMPEZA SEGURA: Apaga apenas este arquivo temporário específico após o término do upload
-        finally:
-            try:
-                if file_path and os.path.exists(file_path):
-                    os.remove(file_path)
-                    print(f"VIGIAA DEBUG: Arquivo temporário local removido: {file_path}")
-            except Exception as e:
-                print(f"VIGIAA DEBUG: Não foi possível remover o arquivo temporário: {e}")
 
     # --------------------------------------------------------------------------
     # REQUISIÇÕES E ATUALIZAÇÕES DOS DADOS DE TEXTO
