@@ -343,8 +343,17 @@ class ProfileField(MDBoxLayout):
     def _apply_focus(self, dt):
         """Aplica o foco e chama o teclado nativamente após a renderização."""
         self.ids.field_input.focus = True
+        
+        # FORÇA A EXIBIÇÃO DO TECLADO (Essencial para Android pós readonly)
+        from kivy.core.window import Window
+        Window.request_keyboard(self._keyboard_closed, self.ids.field_input)
+
         # Libera a trava de segurança
         self._is_transitioning = False
+
+    def _keyboard_closed(self):
+        """Método de callback exigido pelo request_keyboard (pode ficar vazio)"""
+        pass
 
     def cancel_edit(self):
         """Restaura o valor original e bloqueia o campo."""
