@@ -2,10 +2,18 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // Substitua pelo seu IP ou link do Ngrok
 const API_URL = "https://froglike-cataleya-quirkily.ngrok-free.dev"; 
+
+// Função simples para gerar um ID único sem precisar instalar bibliotecas extras
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -13,6 +21,7 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // --- LOGIN TRADICIONAL ---
   const handleLogin = async () => {
     if (!email || !password) {
       setErrorMsg("Preencha todos os campos");
@@ -23,7 +32,6 @@ export default function LoginScreen({ navigation }) {
     setErrorMsg('');
 
     try {
-      // Comunicação direta com o seu backend Django
       const response = await fetch(`${API_URL}/api/token/`, {
         method: 'POST',
         headers: {
@@ -36,8 +44,6 @@ export default function LoginScreen({ navigation }) {
       if (response.ok) {
         const data = await response.json();
         await AsyncStorage.setItem('session_token', data.access);
-        
-        // Redireciona para o app principal após o login com sucesso
         navigation.replace('MainApp');
       } else {
         setErrorMsg("Email ou senha incorretos.");
@@ -49,15 +55,72 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
+  // --- LOGIN COM GOOGLE (Nova Função) ---
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setErrorMsg('Aguardando navegador...');
+    
+    const loginId = generateUUID();
+    const authUrl = `${API_URL}/api/start-login/?login_id=${loginId}`;
+
+    try {
+      // 1. Abre o navegador nativo do celular no link do seu backend
+      await Linking.openURL(authUrl);
+
+      // 2. Começa a perguntar pro backend a cada 2 segundos se o login deu certo
+      let attempts = 0;
+      const maxAttempts = 30; // Máximo de 1 minuto esperando (30 tentativas x 2s)
+
+      const checkLoginInterval = setInterval(async () => {
+        attempts++;
+        
+        // Se passar de 1 minuto, desiste e cancela a busca
+        if (attempts >= maxAttempts) {
+          clearInterval(checkLoginInterval);
+          setErrorMsg("Tempo limite esgotado.");
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const res = await fetch(`${API_URL}/api/check-login/?login_id=${loginId}`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            
+            // Se o backend confirmar que o usuário logou lá no navegador
+            if (data.status === 'success' && data.access_token) {
+              clearInterval(checkLoginInterval); // Para de perguntar
+              await AsyncStorage.setItem('session_token', data.access_token); // Salva o token
+              setErrorMsg('Conectado! Redirecionando...');
+              
+              // Pequeno delay para o usuário ler a mensagem de sucesso antes de pular de tela
+              setTimeout(() => {
+                navigation.replace('MainApp');
+              }, 1000);
+            }
+          }
+        } catch (err) {
+          // Erros de rede enquanto testa a API são ignorados para tentar de novo no próximo segundo
+        }
+      }, 2000);
+
+    } catch (error) {
+      setErrorMsg("Erro ao abrir o Google");
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* O Degradê Nativo Substituindo o GradientRoundedLayout */}
       <LinearGradient
         colors={['#3AC0ED', '#72FC90']}
         style={styles.headerGradient}
       >
         <Image 
-          source={require('../../../assets/images/react-logo.png')} // Ajuste o caminho da sua logo
+          source={require('../../../assets/images/logo-sem-fundo.png')} 
           style={styles.logo} 
         />
         <Text style={styles.title}>VigiAA</Text>
@@ -105,7 +168,8 @@ export default function LoginScreen({ navigation }) {
           <View style={styles.dividerLine} />
         </View>
 
-        <TouchableOpacity style={styles.googleButton}>
+        {/* --- O BOTÃO AGORA CHAMA A FUNÇÃO --- */}
+        <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} disabled={loading}>
           <MaterialCommunityIcons name="google" size={20} color="#DB4437" />
           <Text style={styles.googleButtonText}>Continue com Google</Text>
         </TouchableOpacity>
