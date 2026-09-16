@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { WebView } from 'react-native-webview';
 
 const API_URL = "https://froglike-cataleya-quirkily.ngrok-free.dev";
 
@@ -14,7 +15,7 @@ export default function HomeTab() {
   }, [selectedYear]);
 
   const carregarDados = async (ano) => {
-    setStats({ confirmados: '...', suspeitas: '...' });
+    setStats({ confirmados: '...', suspeitas: '...', focos: '...' });
     try {
       const response = await fetch(`${API_URL}/api/estatisticas/?ano=${ano}`, {
         headers: {
@@ -29,13 +30,14 @@ export default function HomeTab() {
         
         setStats({
           confirmados: String(resumo.total_casos_positivos || 0),
-          suspeitas: String(resumo.total_casos_suspeitos || 0)
+          suspeitas: String(resumo.total_casos_suspeitos || 0),
+          focos: String(resumo.total_focos || 0)
         });
       } else {
-        setStats({ confirmados: 'Erro', suspeitas: 'Erro' });
+        setStats({ confirmados: 'Erro', suspeitas: 'Erro', focos: 'Erro' });
       }
     } catch (error) {
-      setStats({ confirmados: 'Erro', suspeitas: 'Erro' });
+      setStats({ confirmados: 'Erro', suspeitas: 'Erro', focos: 'Erro' });
     }
   };
 
@@ -68,6 +70,11 @@ export default function HomeTab() {
           <Text style={styles.cardTitle}>Suspeitas de dengue</Text>
           <Text style={styles.cardValue}>{stats.suspeitas}</Text>
         </View>
+        
+        <View style={styles.statCard}>
+          <Text style={styles.cardTitle}>Suspeitas de focos</Text>
+          <Text style={styles.cardValue}>{stats.suspeitas}</Text>
+        </View>
       </View>
 
       {/* Gráficos / Cards informativos */}
@@ -79,6 +86,21 @@ export default function HomeTab() {
       <View style={styles.chartCard}>
         <Text style={styles.chartTitle}>Proporção de focos por tipo</Text>
         <Image source={require('../../../assets/images/grafico2.png')} style={styles.chartImage} resizeMode="contain" />
+      </View>
+
+      <View style={styles.mapCard}> 
+        <Text style={styles.chartTitle}>Mapa com dados de Dengue e Aedes aegypti</Text>
+        
+        {/* Container que segura o mapa para garantir que ele não vaze das bordas */}
+        <View style={styles.mapWrapper}>
+          <WebView 
+            source={{ uri: 'https://vigiaa.geati.ifc.edu.br/map_src/index.html' }} 
+            style={styles.mapWebView}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+          />
+        </View>
       </View>
 
     </ScrollView>
@@ -128,6 +150,28 @@ const styles = StyleSheet.create({
     height: 280,
     justifyContent: 'space-between',
   },
-  chartTitle: { fontSize: 16, fontWeight: 'bold', color: '#000', marginBottom: 10 },
-  chartImage: { width: '100%', height: '85%' },
+  mapCard: {
+    backgroundColor: '#FFF',
+    padding: 15,
+    borderRadius: 10,
+    elevation: 1,
+    marginBottom: 15,
+  },
+  chartTitle: { fontSize: 16, fontWeight: 'bold', color: '#000', marginBottom: 10 
+  },
+  chartImage: { width: '100%', height: '85%' 
+  },
+  mapWrapper: {
+    width: '100%',
+    height: 350, // Altura ideal para o usuário conseguir interagir com o mapa
+    borderRadius: 12,
+    overflow: 'hidden', // Isso garante que as bordas do mapa fiquem arredondadas
+    marginTop: 15,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  mapWebView: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
 });

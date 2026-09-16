@@ -35,6 +35,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permita que o VigiAA acesse sua localização para mapear com precisão os focos de dengue."
+        }
       ]
     ]
   }

@@ -27,7 +27,7 @@ export default function ChangePasswordScreen({ navigation }) {
       const token = await AsyncStorage.getItem('session_token');
 
       const response = await fetch(`${API_URL}/api/change-password/`, {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,

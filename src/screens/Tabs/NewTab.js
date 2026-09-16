@@ -19,8 +19,8 @@ export default function NewTab({ navigation }) {
         />
         <View style={styles.cardContent}>
           <View style={styles.textContainer}>
-            <Text style={styles.cardTitle}>Cadastrar novo foco</Text>
-            <Text style={styles.cardDescription}>Forneça informações sobre focos do mosquito.</Text>
+            <Text style={styles.cardTitle}>Cadastrar novo foco de dengue</Text>
+            <Text style={styles.cardDescription}>Forneça informações necessárias para o cadastro de um local com possíveis focos do mosquito.</Text>
           </View>
           <View style={styles.plusButton}>
             <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
@@ -28,7 +28,7 @@ export default function NewTab({ navigation }) {
         </View>
       </TouchableOpacity>
 
-      {/* CARD 2: CASO SUSPEITO */}
+      {/* CARD 2: Paciente */}
       <TouchableOpacity 
         style={styles.card} 
         activeOpacity={0.9}
@@ -40,29 +40,8 @@ export default function NewTab({ navigation }) {
         />
         <View style={styles.cardContent}>
           <View style={styles.textContainer}>
-            <Text style={styles.cardTitle}>Cadastrar caso suspeito</Text>
-            <Text style={styles.cardDescription}>Forneça informações para o cadastro de um paciente suspeito.</Text>
-          </View>
-          <View style={styles.plusButton}>
-            <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
-          </View>
-        </View>
-      </TouchableOpacity>
-
-      {/* CARD 3: CASO POSITIVO */}
-      <TouchableOpacity 
-        style={styles.card} 
-        activeOpacity={0.9}
-        onPress={() => navigation.navigate('FormCasoPositivo')}
-      >
-        <Image 
-          source={require('../../../assets/images/agentes.jpeg')} 
-          style={styles.cardImage} 
-        />
-        <View style={styles.cardContent}>
-          <View style={styles.textContainer}>
-            <Text style={styles.cardTitle}>Cadastrar caso positivo</Text>
-            <Text style={styles.cardDescription}>Registre um diagnóstico confirmado de dengue.</Text>
+            <Text style={styles.cardTitle}>Cadastrar paciente</Text>
+            <Text style={styles.cardDescription}>Forneça informações necessárias para o cadastro de um paciente.</Text>
           </View>
           <View style={styles.plusButton}>
             <MaterialCommunityIcons name="plus" size={24} color="#FFF" />
