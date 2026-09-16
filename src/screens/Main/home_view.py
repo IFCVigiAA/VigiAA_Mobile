@@ -1,0 +1,312 @@
+import token
+
+from django.apps import config
+from kivymd.uix.screen import MDScreen
+from kivy.lang import Builder
+from kivy.clock import mainthread, Clock
+from kivy.graphics.texture import Texture
+from kivy.graphics import Rectangle, Color 
+from kivy.properties import ListProperty, VariableListProperty
+# Importações cruciais para o degradê
+from kivy.uix.boxlayout import BoxLayout 
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivy.metrics import dp
+ # graficosdadoskk
+import os
+import sys
+from kivy.properties import StringProperty
+import requests
+from kivy.clock import Clock
+from kivymd.uix.label import MDLabel
+from kivymd.uix.list import OneLineListItem
+# graficosgraficoskk
+
+# graficosdadoskk
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+print("ROOT:", ROOT_DIR)
+print("CONTEUDO:", os.listdir(ROOT_DIR))
+
+sys.path.insert(0, ROOT_DIR)
+
+BASE_DIR = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
+BACKEND_DIR = os.path.join(BASE_DIR, "backend")
+sys.path.insert(0, BASE_DIR)
+sys.path.insert(0, BACKEND_DIR)
+
+
+os.environ.setdefault(
+    "DJANGO_SETTINGS_MODULE",
+    "backend.projeto_principal.settings"
+)
+
+print(sys.path)
+
+import django
+django.setup()
+
+# from backend.api.models import PositiveDengueCase, DengueFocus, DengueCase
+
+ # ==============================================================================
+ # GRAFICOS DA HOME
+ # ==============================================================================
+
+
+class HomeStatistics(MDScreen):
+    def on_enter(self):
+        """Executado automaticamente quando a tela abre"""
+        self.carregar_estatisticas()
+
+    def carregar_estatisticas(self):
+        url = "https://froglike-cataleya-quirkily.ngrok-free.dev/api/estatisticas/"
+        
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                dados = response.json()
+                Clock.schedule_once(lambda dt: self.atualizar_interface(dados))
+            else:
+                print(f"Erro na API: {response.status_code}")
+        except Exception as e:
+            print(f"Erro de conexão: {e}")
+
+    def atualizar_interface(self, dados):
+        container = self.ids.container_lista 
+        container.clear_widgets() 
+        
+        resumo = dados.get("resumo", {})
+        total_positivos = resumo.get("total_casos_positivos", 0)
+        
+        self.ids.label_total.text = f"Casos Positivos: {total_positivos}"
+
+        casos = dados.get("detalhes_casos_positivos", [])
+        
+        if not casos:
+            container.add_widget(MDLabel(text="Nenhum registro encontrado.", halign="center"))
+            return
+
+        for caso in casos:
+            nome = caso.get("patient_name", "Sem nome")
+            cidade = caso.get("city", "Cidade não informada")
+            caso_id = caso.get("id")
+
+            item = OneLineListItem(
+                text=f"ID {caso_id}: {nome} - {cidade}"
+            )
+            container.add_widget(item)
+
+# Vacina preventiva para os ícones da Home (sininho, etc)
+from kivymd.uix.button import MDIconButton
+if not hasattr(MDIconButton, 'radius'):
+    MDIconButton.radius = VariableListProperty([dp(0), dp(0), dp(0), dp(0)])
+
+try:
+    from views.tabs.home_tab import HomeTabContent
+    from views.tabs.new_tab import NewTabContent
+    from views.tabs.explore_tab import ExploreTabContent
+    from views.tabs.profile_tab import ProfileTabContent
+except ImportError as e:
+    print(f"ERRO DE IMPORTAÇÃO NAS ABAS: {e}")
+
+class HorizontalGradientLayout(BoxLayout):
+    color_left = ListProperty([0.22, 0.75, 0.94, 1]) 
+    color_right = ListProperty([0.15, 0.91, 0.74, 1]) 
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas.before:
+            Color(1, 1, 1, 1) 
+            self.rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self.update_rect, size=self.update_rect)
+        self.create_gradient()
+
+    def create_gradient(self):
+        texture = Texture.create(size=(2, 1), colorfmt='rgba')
+        p1 = [int(c * 255) for c in self.color_left]
+        p2 = [int(c * 255) for c in self.color_right]
+        buf = bytes(p1 + p2)
+        texture.blit_buffer(buf, colorfmt='rgba', bufferfmt='ubyte')
+        self.rect.texture = texture
+
+    def update_rect(self, *args):
+        self.rect.pos = self.pos
+        self.rect.size = self.size
+
+# O KV agora fica no final para garantir que as classes acima já existam
+KV_HOME_VIEW = '''
+<HomeScreen>:
+    md_bg_color: 0.96, 0.96, 0.96, 1
+
+    MDBoxLayout:
+        orientation: "vertical"
+
+        HorizontalGradientLayout:
+            size_hint_y: None   
+            height: "80dp" 
+            padding: ["15dp", "0dp", "15dp", "0dp"]
+
+            MDBoxLayout:
+                orientation: "horizontal"
+                adaptive_height: True
+                pos_hint: {"center_y": .5}
+                md_bg_color: 0, 0, 0, 0 
+
+                Image:
+                    source: "assets/images/logo-sem-fundo.png"
+                    size_hint: None, None
+                    size: "40dp", "40dp"
+
+                MDLabel:
+                    text: "VigiAA"
+                    font_size: "22sp"
+                    bold: True
+                    theme_text_color: "Custom"
+                    text_color: 0, 0, 0, 1
+                    valign: "center"
+                    padding_x: "10dp"
+
+                MDIconButton:
+                    icon: "bell-outline"
+                    theme_text_color: "Custom"
+                    text_color: 0, 0, 0, 1
+
+        MDBottomNavigation:
+            id: bottom_nav
+            panel_color: 0.22, 0.75, 0.94, 1
+            selected_color_background: 0, 0, 0, 0
+            text_color_active: 0, 0, 0, 1  
+            text_color_normal: 0, 0, 0, 0.5 
+
+            MDBottomNavigationItem:
+                name: 'tab_home'
+                text: 'Início'
+                icon: 'home'
+                HomeTabContent:
+
+            MDBottomNavigationItem:
+                name: 'tab_new'
+                text: 'Novo'
+                icon: 'plus-circle-outline'
+                NewTabContent:
+
+            MDBottomNavigationItem:
+                name: 'tab_explore'
+                text: 'Explorar'
+                icon: 'compass'
+                ExploreTabContent:
+
+            MDBottomNavigationItem:
+                name: 'tab_profile'
+                text: 'Perfil'
+                icon: 'account'
+                on_tab_press: root.on_enter() # O método on_enter já faz a checagem com a flag
+                ProfileTabContent:
+                    id: profile_tab
+
+<HomeStatistics>:
+    name: "home_statistics"  # Nome da rota/screen se usar ScreenManager
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: "16dp"
+        spacing: "10dp"
+
+        MDLabel:
+            id: label_total
+            text: "Carregando..."
+            font_style: "H6"
+            size_hint_y: None
+            height: "40dp"
+
+        ScrollView:
+            MDList:
+                id: container_lista
+'''
+
+Builder.load_string(KV_HOME_VIEW)
+
+class HomeScreen(MDScreen):
+    def on_pre_enter(self, *args):
+        from kivymd.app import MDApp
+        from kivy.storage.jsonstore import JsonStore
+        import threading
+        
+        app = MDApp.get_running_app()
+        store = JsonStore('sessao_app.json')
+        
+        # 1. Puxa a chave
+        token_seguro = getattr(app, "vigiaa_token", None)
+        if not token_seguro and store.exists("session"):
+            token_seguro = store.get("session")["token"]
+            app.vigiaa_token = token_seguro 
+
+        if token_seguro:
+            # A NOVA REGRA: O Segurança só trabalha UMA VEZ por aplicativo aberto!
+            if getattr(app, 'seguranca_ja_verificou', False):
+                # Se já verificou hoje, deixa a detetive trabalhar em paz!
+                return 
+                
+            # Se ainda não verificou, marca que verificou e manda o segurança ir olhar
+            app.seguranca_ja_verificou = True
+            print("VIGIAA DEBUG: [HOME] Primeira entrada. Segurança indo checar o token...")
+            threading.Thread(target=self._seguranca_silencioso, args=(token_seguro,), daemon=True).start()
+        else:
+            print("VIGIAA DEBUG: [HOME FATAL] Cofre realmente vazio. Chutando pro login...")
+            self._chutar_para_login()
+
+    
+    def _seguranca_silencioso(self, token):
+        import requests
+        import config
+        from kivy.clock import Clock
+
+        try:
+            # Garante que o token enviado seja apenas a STRING e não um Dicionário
+            if isinstance(token, dict):
+             token = token.get('access') or token.get('access_token')
+
+            headers = {'Authorization': f'Bearer {token}'}
+            url = f'{config.API_URL}/api/profile/'
+
+            res = requests.get(url, headers=headers, timeout=5)
+
+            if res.status_code in [401, 403]:
+                # IMPRIMA ESTA LINHA NO SEU TERMINAL KIVY:
+                print(f'VIGIAA DEBUG - MOTIVO DO 401: {res.text}')
+
+                Clock.schedule_once(lambda dt: self._chutar_para_login(), 0)
+
+            elif res.status_code == 200:
+                print('VIGIAA DEBUG: Token validado com sucesso!')
+
+        except Exception as e:
+            print(f'VIGIAA DEBUG: Erro de conexão: {e}')
+
+    @mainthread
+    def _chutar_para_login(self, *args):
+        print("🚨🚨 ALARME: Expulsão detectada! Limpando rastros... 🚨🚨")
+        from kivymd.app import MDApp
+        from kivy.storage.jsonstore import JsonStore
+        from kivymd.toast import toast
+        
+        app = MDApp.get_running_app()
+        store = JsonStore('sessao_app.json')
+        
+        # 1. Resetar a barra de navegação para a primeira aba (Início)
+        # Isso garante que ao entrar de novo, o app não abra no Perfil.
+        self.ids.bottom_nav.switch_tab('tab_home')
+        
+        # 2. Reseta as memórias do cérebro do app
+        app.force_logout = True
+        app.vigiaa_token = None
+        app.seguranca_ja_verificou = False 
+        
+        if store.exists("session"):
+            store.delete("session")
+            
+        app.root.current = 'login'
+        toast("Sessão expirada. Faça login novamente.")
+
+    

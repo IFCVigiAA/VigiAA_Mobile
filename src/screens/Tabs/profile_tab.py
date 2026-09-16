@@ -1,0 +1,745 @@
+import certifi
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivy.uix.scrollview import ScrollView
+from kivy.lang import Builder
+from kivy.properties import StringProperty, BooleanProperty, ObjectProperty
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDFlatButton, MDIconButton
+from kivymd.uix.snackbar import MDSnackbar
+from kivymd.uix.label import MDLabel
+from kivymd.uix.card import MDCard
+from kivymd.uix.fitimage import FitImage
+from kivymd.app import MDApp
+from kivy.clock import mainthread, Clock
+from kivy.storage.jsonstore import JsonStore
+from kivy.metrics import dp
+import requests
+import threading
+import config
+import os
+from kivy.utils import platform
+import time  # <--- ADICIONE ESTE
+from kivy.utils import platform  # <--- ADICIONE ESTE
+from kivymd.uix.screen import MDScreen
+
+store = JsonStore('sessao_app.json')
+
+class ProfileViewCheck(MDScreen):
+    # 1. Flag para controlar se o perfil já foi carregado nesta sessão
+    profile_carregado = False
+
+    def on_tab_open(self):
+        """
+        Método chamado ao clicar/abrir a aba de Perfil.
+        Pode ser acionado no on_tab_switch do MDBottomNavigation ou MDTabs.
+        """
+        if not self.profile_carregado:
+            print("VIGIAA DEBUG: Primeiros dados do perfil solicitados.")
+            self.carregar_perfil_api()
+        else:
+            print("VIGIAA DEBUG: Perfil já em memória. Requisição à API evitada.")
+
+    def carregar_perfil_api(self, force_reload=False):
+        """Busca os dados do perfil no backend Django."""
+        if self.profile_carregado and not force_reload:
+            return
+
+        app = MDApp.get_running_app()
+        headers = {'Authorization': f'Token {app.user_token}'} # Ou seu padrão de autenticação
+        url = f"{app.api_base_url}/api/profile/"
+
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                dados = response.json()
+                self.preencher_campos_ui(dados)
+                
+                # Marca que os dados estão atualizados em memória
+                self.profile_carregado = True
+                print("VIGIAA DEBUG: Perfil carregado com sucesso.")
+            else:
+                print(f"VIGIAA DEBUG: Falha ao buscar perfil: Status {response.status_code}")
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Erro de conexão ao buscar perfil: {e}")
+
+    def preencher_campos_ui(self, dados):
+        """Atualiza a interface com os dados recebidos."""
+        self.ids.txt_nome.text = dados.get('first_name', '')
+        self.ids.txt_sobrenome.text = dados.get('last_name', '')
+        self.ids.txt_username.text = dados.get('username', '')
+        self.ids.txt_email.text = dados.get('email', '')
+        
+        if dados.get('foto_url'):
+            self.ids.avatar_user.source = f"{dados['foto_url']}?t={int(time.time())}"
+
+    def salvar_alteracoes_perfil(self, nome, sobrenome, email, username):
+        """
+        Chamado ao clicar no botão 'Salvar' das alterações do perfil.
+        Sincroniza com o Django e força a atualização do estado local.
+        """
+        app = MDApp.get_running_app()
+        headers = {'Authorization': f'Token {app.user_token}'}
+        url = f"{app.api_base_url}/api/profile/"
+
+        payload = {
+            'first_name': nome,
+            'last_name': sobrenome,
+            'email': email,
+            'username': username
+        }
+
+        try:
+            response = requests.patch(url, json=payload, headers=headers, timeout=10)
+            if response.status_code in [200, 201]:
+                print("VIGIAA DEBUG: Dados cadastrais atualizados no backend com sucesso.")
+                self.carregar_perfil_api(force_reload=True)
+            else:
+                print(f"VIGIAA DEBUG: Erro ao atualizar perfil: {response.text}")
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Exceção ao salvar perfil: {e}")
+
+    def atualizar_foto_perfil_sucesso(self):
+        """
+        Chamado assim que o upload da foto de perfil via API for concluído com sucesso.
+        """
+        print("VIGIAA DEBUG: Foto atualizada. Forçando recarregamento do perfil...")
+        self.carregar_perfil_api(force_reload=True)
+        
+KV_PROFILE_TAB = '''
+<ProfileField>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: "50dp"
+    size_hint_x: 1
+    # Margem direita ajustada para 10dp para alinhar o botão exatamente com o fim da linha cinza
+    padding: ["12dp", 0, "10dp", 0]
+    spacing: "10dp"
+    
+    canvas.before:
+        Color:
+            rgba: 0.9, 0.9, 0.9, 1
+        Line:
+            points: self.x + dp(10), self.y, self.width - dp(10), self.y
+            width: 1
+
+    MDLabel:
+        text: root.label_text
+        bold: True
+        size_hint_x: None
+        width: "80dp"
+        font_size: "14sp"
+        pos_hint: {"center_y": .5}
+        
+    TextInput:
+        id: field_input
+        text: root.text_value
+        readonly: True
+        size_hint_x: 1 
+        font_size: "15sp"
+        foreground_color: (0, 0, 0, 1) if not self.readonly else (0.4, 0.4, 0.4, 1)
+        background_color: 0, 0, 0, 0
+        padding: [0, (self.height - self.line_height) / 2]
+        multiline: False
+        pos_hint: {"center_y": .5}
+        cursor_color: 0.22, 0.75, 0.94, 1
+
+    MDBoxLayout:
+        size_hint: None, None
+        height: "36dp"
+        # Controle absoluto: 0dp se for email, 76dp para editar (2 botões + espaço) ou 36dp (só o lápis)
+        width: "0dp" if root.is_email else ("76dp" if btn_save.opacity > 0 else "36dp")
+        pos_hint: {"center_y": .5}
+        spacing: "4dp"
+        
+        MDIconButton:
+            id: btn_edit
+            icon: "pencil-outline"
+            icon_size: "20sp"
+            theme_text_color: "Custom"
+            text_color: 0.5, 0.5, 0.5, 1
+            opacity: 1 if not root.is_email and btn_save.opacity == 0 else 0
+            disabled: root.is_email or btn_save.opacity > 0
+            pos_hint: {"center_y": .5}
+            on_release: root.start_edit()
+            # Força o bloqueio do tamanho físico da área de toque
+            size_hint: None, None
+            size: ("36dp", "36dp") if self.opacity > 0 else ("0dp", "0dp")
+            
+        MDIconButton:
+            id: btn_save
+            icon: "check"
+            icon_size: "20sp"
+            theme_text_color: "Custom"
+            text_color: 0, 0.7, 0, 1
+            opacity: 0
+            disabled: True
+            pos_hint: {"center_y": .5}
+            on_release: root.save_edit()
+            size_hint: None, None
+            size: ("36dp", "36dp") if self.opacity > 0 else ("0dp", "0dp")
+            
+        MDIconButton:
+            id: btn_cancel
+            icon: "close"
+            icon_size: "20sp"
+            theme_text_color: "Custom"
+            text_color: 1, 0, 0, 1
+            opacity: 0
+            disabled: True
+            pos_hint: {"center_y": .5}
+            on_release: root.cancel_edit()
+            size_hint: None, None
+            size: ("36dp", "36dp") if self.opacity > 0 else ("0dp", "0dp")
+            
+<ActionRow@MDCard>:
+    size_hint_y: None
+    height: "56dp"
+    size_hint_x: 1
+    elevation: 0
+    md_bg_color: 1, 1, 1, 1
+    ripple_behavior: True
+    padding: ["12dp", "0dp", "12dp", "0dp"]
+    
+    text_label: ""
+    icon_name: "chevron-right"
+    text_color: 0, 0, 0, 1
+    
+    MDLabel:
+        text: root.text_label
+        bold: True
+        font_size: "16sp"
+        theme_text_color: "Custom"
+        text_color: root.text_color
+        halign: "left"
+        
+    MDIcon:
+        icon: root.icon_name
+        theme_text_color: "Custom"
+        text_color: root.text_color
+        pos_hint: {"center_y": .5}
+
+<ProfileTabContent>:
+    md_bg_color: 1, 1, 1, 1
+    MDBoxLayout:
+        orientation: "vertical"
+        size_hint_x: 1
+        padding: ["5dp", "20dp", "5dp", "20dp"]
+        spacing: "12dp"
+        adaptive_height: True
+
+        # --- ÁREA DA FOTO COM CÂMERA ---
+        AnchorLayout:
+            anchor_x: "center"
+            size_hint_y: None
+            height: "130dp"
+            
+            MDFloatLayout:
+                size_hint: None, None
+                size: "110dp", "110dp"
+                
+                MDCard:
+                    size_hint: None, None
+                    size: "110dp", "110dp"
+                    radius: [55,]
+                    md_bg_color: 0.9, 0.9, 0.9, 1
+                    elevation: 0
+                    pos_hint: {"center_x": .5, "center_y": .5}
+                    clip_to_bounds: True
+                    
+                    FitImage:
+                        id: avatar_image
+                        source: root.avatar_source
+                        radius: [55,]
+
+                MDIconButton:
+                    icon: "camera"
+                    md_bg_color: 0.22, 0.75, 0.94, 1
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, 1
+                    size_hint: None, None
+                    size: "36dp", "36dp"
+                    pos_hint: {"center_x": .85, "center_y": .15}
+                    on_release: root.open_gallery()
+
+        # DADOS DO USUÁRIO
+        MDBoxLayout:
+            id: fields_container
+            orientation: "vertical"
+            adaptive_height: True
+            size_hint_x: 1
+            spacing: "2dp"
+
+        # BOTÕES DE AÇÃO
+        MDBoxLayout:
+            orientation: "vertical"
+            adaptive_height: True
+            size_hint_x: 1
+            padding: ["10dp", "20dp", "10dp", "0dp"]
+            spacing: "5dp"
+
+            ActionRow:
+                id: btn_redefinir_senha
+                text_label: "Redefinir senha"
+                icon_name: "key-outline"
+                on_release: root.go_to_reset_password()
+
+            MDSeparator:
+                id: sep_redefinir_senha
+                height: "1dp"
+
+            ActionRow:
+                text_label: "Sair da conta"
+                icon_name: "logout"
+                on_release: root.logout()
+
+            MDSeparator:
+                height: "1dp"
+
+            ActionRow:
+                text_label: "Excluir conta"
+                icon_name: "delete-forever-outline"
+                text_color: 1, 0, 0, 1
+                on_release: root.open_delete_dialog()
+'''
+
+Builder.load_string(KV_PROFILE_TAB)
+
+class ActionRow(MDCard):
+    text_label = StringProperty("")
+    icon_name = StringProperty("chevron-right")
+    text_color = ObjectProperty([0, 0, 0, 1])
+
+class ProfileField(MDBoxLayout):
+    label_text = StringProperty("")
+    api_key = StringProperty("")
+    text_value = StringProperty("Carregando...")
+    is_email = BooleanProperty(False)
+    callback_save = ObjectProperty(None)
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.original_value = ""
+
+    def start_edit(self):
+        self.original_value = self.ids.field_input.text
+        self.ids.field_input.readonly = False
+        self.ids.field_input.focus = True
+        self.ids.btn_edit.opacity = 0
+        self.ids.btn_edit.disabled = True
+        self.ids.btn_save.opacity = 1
+        self.ids.btn_save.disabled = False
+        self.ids.btn_cancel.opacity = 1
+        self.ids.btn_cancel.disabled = False
+
+    def cancel_edit(self):
+        self.ids.field_input.text = self.original_value
+        self._lock_field()
+
+    def save_edit(self):
+        if self.callback_save:
+            self.callback_save(self.api_key, self.ids.field_input.text, self)
+
+    def _lock_field(self):
+        self.ids.field_input.readonly = True
+        self.ids.field_input.focus = False
+        self.ids.btn_save.opacity = 0
+        self.ids.btn_save.disabled = True
+        self.ids.btn_cancel.opacity = 0
+        self.ids.btn_cancel.disabled = True
+        if not self.is_email:
+            self.ids.btn_edit.opacity = 1
+            self.ids.btn_edit.disabled = False
+
+class ProfileTabContent(ScrollView):
+    avatar_source = StringProperty("https://cdn-icons-png.flaticon.com/512/149/149071.png")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.fields_refs = {}
+        self.dialog = None
+        Clock.schedule_once(self.setup_fields, 0)
+        Clock.schedule_once(lambda dt: self.refresh_data(), 0.5)
+
+    @mainthread
+    def refresh_data(self):
+        # Limpa o cache da imagem para forçar o Kivy a baixar a nova
+        from kivy.cache import Cache
+        Cache.remove('kv.loader')
+        Cache.remove('kv.image')
+        
+        for field in self.fields_refs.values():
+            field.ids.field_input.text = "Carregando..."
+        threading.Thread(target=self.load_user_data, daemon=True).start()
+
+    def setup_fields(self, dt):
+        self.ids.fields_container.clear_widgets()
+        config_campos = [
+            {"label": "Nome", "key": "first_name", "email": False},
+            {"label": "Sobrenome", "key": "last_name", "email": False},
+            {"label": "Usuário", "key": "username", "email": False},
+            {"label": "Email", "key": "email", "email": True},
+        ]
+        for c in config_campos:
+            field = ProfileField(label_text=c["label"], api_key=c["key"], is_email=c["email"], callback_save=self.salvar_na_api)
+            self.fields_refs[c["key"]] = field
+            self.ids.fields_container.add_widget(field)
+
+    def open_gallery(self):
+        try:
+            from plyer import filechooser
+            filechooser.open_file(
+                title="Escolha sua foto de perfil",
+                filters=[("Imagens", "*.png", "*.jpg", "*.jpeg")],
+                on_selection=self.process_selection
+            )
+        except:
+            self.mostrar_aviso("Erro ao abrir galeria.")
+
+    def process_selection(self, selection):
+        if selection:
+            path = selection[0]
+            # No Android, o path costuma vir como 'content://...'
+            threading.Thread(target=self._preparar_e_subir, args=(path,), daemon=True).start()
+
+    def _preparar_e_subir(self, path):
+        # 1. Faz a cópia segura
+        caminho_interno = self.copiar_para_pasta_app(path)
+        
+        if caminho_interno:
+            print(f"VIGIAA DEBUG: Caminho copiado com sucesso: {caminho_interno}")
+            
+            # Limpa cache de imagem local
+            from kivy.cache import Cache
+            Cache.remove('kv.image')
+            Cache.remove('kv.loader')
+            
+            # Atualiza a bolinha de foto instantaneamente na UI
+            @mainthread
+            def atualizar_ui(dt):
+                prefixo = "file://" if platform == "android" else ""
+                self.avatar_source = f"{prefixo}{caminho_interno}"
+            Clock.schedule_once(atualizar_ui, 0.1)
+
+            # Sobe pro servidor
+            threading.Thread(target=self._worker_upload_avatar, args=(caminho_interno,), daemon=True).start()
+        else:
+            self.mostrar_aviso("Falha ao carregar a imagem da galeria.")
+
+    def copiar_para_pasta_app(self, uri_origem):
+        """Usa o motor nativo do Kivy para ler a galeria e gerar um arquivo real"""
+        from kivymd.app import MDApp
+        from kivy.core.image import Image as CoreImage
+        import os
+        import time
+        import shutil
+        
+        app_folder = MDApp.get_running_app().user_data_dir
+        # Geramos um arquivo .png
+        dest_path = os.path.join(app_folder, f"perfil_{int(time.time())}.png")
+        
+        uri_str = str(uri_origem).replace("file://", "", 1)
+        
+        try:
+            print("VIGIAA DEBUG: [PERFIL] Lendo arquivo da galeria via Kivy CoreImage...")
+            # O Kivy decodifica o content:// sem erros de permissão
+            img = CoreImage(uri_str)
+            img.save(dest_path)
+            print("VIGIAA DEBUG: [PERFIL] Foto salva com sucesso na pasta segura!")
+            return dest_path
+        except Exception as e:
+            print(f"VIGIAA DEBUG ERROR: Motor Kivy falhou ({e}). Tentando backup shutil...")
+            try:
+                shutil.copy2(uri_str, dest_path)
+                return dest_path
+            except Exception as e2:
+                print(f"VIGIAA DEBUG ERROR: Backup shutil falhou: {e2}")
+                return None
+        
+    def garantir_arquivo_acessivel(self, original_path):
+        """Copia a imagem para a pasta do app para que o Python consiga ler"""
+        import shutil
+        from kivy.app import App
+        
+        try:
+            app_folder = App.get_running_app().user_data_dir
+            ext = original_path.split('.')[-1]
+            dest_path = os.path.join(app_folder, f"temp_profile_upload.{ext}")
+            
+            shutil.copy2(original_path, dest_path)
+            return dest_path
+        except Exception as e:
+            print(f"ERRO AO COPIAR ARQUIVO: {e}")
+            return original_path # tenta o original se falhar
+
+    def _worker_upload_avatar(self, file_path):
+        session = store.get("session") if store.exists("session") else None
+        # token = session["token"] if session else None
+        if not session:
+        #token
+            return
+        
+
+        token_data = session.get("token")
+
+        access_token = None
+        if isinstance(token_data, dict):
+            access_token = token_data.get("access")
+        elif isinstance(token_data, str):
+            access_token = token_data
+
+        if not access_token:
+            self.mostrar_aviso("Token de acesso não encontrado.")
+            return
+
+        
+        try:
+            import certifi
+            import os
+            import requests
+            
+            url = f"{config.API_URL}/api/profile/"
+            
+            if not file_path or not os.path.exists(file_path):
+                 self.mostrar_aviso("Erro interno ao ler arquivo gerado.")
+                 return
+
+            headers = {
+                "Authorization": f"Bearer {access_token.strip()}",
+                "ngrok-skip-browser-warning": "true",
+                "User-Agent": "KivyApp"
+            }
+
+            with open(file_path, 'rb') as f:
+                # IMPORTANTE: Mudei aqui para image/png para combinar com o arquivo exportado!
+                files = {'photo': ('avatar_vigiaa.png', f, 'image/png')}
+                
+                res = requests.patch(
+                    url, 
+                    headers=headers,  #{"Authorization": f"Bearer {token}"}, 
+                    files=files, 
+                    timeout=30,
+                    verify=False # SSL desligado temporariamente no Android
+                )
+                
+            if res.status_code == 200:
+                self.mostrar_aviso("Foto atualizada com sucesso!")
+                from kivy.clock import Clock
+                Clock.schedule_once(lambda dt: self.refresh_data(), 0.5)
+            else:
+                print(f"VIGIAA DEBUG: Erro no upload ({res.status_code}): {res.text}")
+                self.mostrar_aviso(f"Erro no servidor: {res.status_code}")
+                # self.mostrar_aviso(f"Erro no servidor: {res.status_code}")
+                
+        except Exception as e:
+            print(f"VIGIAA DEBUG: [PERFIL] Erro no upload: {str(e)}")
+            self.mostrar_aviso(f"Erro de conexão: {str(e)[:25]}")
+
+    def load_user_data(self):
+        if not store.exists("session"):
+            print("VIGIAA DEBUG: Nenhuma sessão encontrada.")
+            return
+
+        session = store.get("session")
+        token_data = session.get("token")
+        
+        # Extrai a string JWT de acesso de dentro da estrutura {'access': '...', 'refresh': '...'}
+        access_token = None
+        if isinstance(token_data, dict):
+            access_token = token_data.get("access")
+        elif isinstance(token_data, str):
+            access_token = token_data
+
+        if not access_token:
+            print("VIGIAA DEBUG: [ERRO] Token de acesso não encontrado na sessão.")
+            return
+
+        headers = {
+            "Authorization": f"Bearer {access_token.strip()}",
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "KivyApp"
+        }
+
+        try:
+            url = f"{config.API_URL}/api/profile/"
+            print(f"VIGIAA DEBUG: Enviando requisição de perfil para -> {url}")
+            
+            res = requests.get(url, headers=headers, timeout=10, verify=False)
+            
+            print(f"VIGIAA DEBUG: Resposta da API (Status {res.status_code})")
+            
+            if res.status_code == 200:
+                data = res.json()
+                print("VIGIAA DEBUG: Dados do perfil recebidos com sucesso!")
+                Clock.schedule_once(lambda dt: self.update_ui_fields(data), 0)
+            else:
+                print(f"VIGIAA DEBUG: Erro da API -> {res.text[:150]}")
+                
+        except Exception as e:
+            print(f"VIGIAA DEBUG: Exceção na requisição -> {e}")
+
+    @mainthread
+    def update_ui_fields(self, data):
+        import time # Import necessário para gerar o marcador de tempo
+        
+        # 1. Atualiza os campos de texto (Nome, Sobrenome, etc.)
+        for key, field in self.fields_refs.items():
+            if key in data:
+                field.ids.field_input.text = str(data.get(key, ""))
+        
+        # 2. Atualiza a foto de perfil com "Cache Buster"
+        if data.get("photo"):
+            foto_url = data.get("photo")
+            # Se a URL vier sem o domínio, anexe o config.API_URL
+            if not foto_url.startswith('http'):
+                foto_url = f"{config.API_URL}{foto_url}"
+        
+        # O Cache Buster (?t=...) é OBRIGATÓRIO para a foto atualizar ao voltar na tela
+            self.avatar_source = f"{foto_url}?t={int(time.time())}"
+
+        # 3. Esconde o botão de redefinir senha se for login social (Google/Facebook)
+        if data.get("tem_senha") is False:
+            self.ids.btn_redefinir_senha.opacity = 0
+            self.ids.btn_redefinir_senha.disabled = True
+            self.ids.btn_redefinir_senha.height = "0dp"
+            self.ids.sep_redefinir_senha.height = "0dp"
+
+    def salvar_na_api(self, api_key, novo_valor, field_instance):
+        threading.Thread(target=self._worker_save, args=(api_key, novo_valor, field_instance), daemon=True).start()
+
+    def _worker_save(self, api_key, novo_valor, field_instance):
+        session = store.get("session") if store.exists("session") else {}
+        token_data = session.get("token")
+        access_token = token_data.get("access") if isinstance(token_data, dict) else token_data
+
+        if not access_token:
+            Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
+            return
+
+        headers = {
+            "Authorization": f"Bearer {access_token.strip()}",
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "KivyApp"
+        }
+        try:
+            res = requests.patch(f"{config.API_URL}/api/profile/", json={api_key: novo_valor}, headers=headers, verify=False)
+            if res.status_code == 200:
+                self.mostrar_aviso(f"{field_instance.label_text} atualizado!")
+                Clock.schedule_once(lambda dt: field_instance._lock_field(), 0)
+            else:
+                Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
+        except:
+            Clock.schedule_once(lambda dt: field_instance.cancel_edit(), 0)
+
+    def logout(self):
+        app = MDApp.get_running_app()
+        if store.exists("session"): store.delete("session")
+        app.root.current = 'login'
+
+    def go_to_reset_password(self):
+        MDApp.get_running_app().root.current = 'change_password'
+
+    def open_delete_dialog(self):
+        self.dialog = MDDialog(
+            title="Excluir Conta",
+            text="Deseja desativar sua conta permanentemente?",
+            buttons=[
+                MDFlatButton(text="Cancelar", on_release=lambda x: self.dialog.dismiss()),
+                MDFlatButton(text="Confirmar", text_color=(1, 0, 0, 1), on_release=self.delete_account_action)
+            ],
+        )
+        self.dialog.open()
+
+    def delete_account_action(self, *args):
+        self.dialog.dismiss()
+        threading.Thread(target=self._worker_delete, daemon=True).start()
+
+    def _worker_delete(self):
+        session = store.get("session") if store.exists("session") else {}
+        token_data = session.get("token")
+        access_token = token_data.get("access") if isinstance(token_data, dict) else token_data
+
+        if not access_token:
+            return
+
+        headers = {
+            "Authorization": f"Bearer {access_token.strip()}",
+            "ngrok-skip-browser-warning": "true",
+            "User-Agent": "KivyApp"
+        }
+        try:
+            res = requests.delete(f"{config.API_URL}/api/delete-account/", headers=headers, verify=False)
+            if res.status_code == 200:
+                self.mostrar_aviso("Conta excluída.")
+                Clock.schedule_once(lambda dt: self.logout(), 0)
+        except: pass
+
+    @mainthread
+    def mostrar_aviso(self, texto):
+        MDSnackbar(MDLabel(text=texto, theme_text_color="Custom", text_color=(1,1,1,1))).open()
+
+import os
+import shutil
+import time
+from kivy.utils import platform
+from kivymd.app import MDApp
+
+
+def garantir_arquivo_acessivel(self, original_path):
+    """Copia a imagem para a pasta privada do app, lidando com URIs do Android e caminhos do Desktop."""
+    if not original_path:
+        return None
+
+    uri_str = str(original_path)
+    app_folder = MDApp.get_running_app().user_data_dir
+
+    # Define extensão do arquivo
+    ext = uri_str.split(".")[-1].lower() if "." in uri_str else "png"
+    if len(ext) > 4 or "/" in ext:
+        ext = "png"
+
+    dest_path = os.path.join(
+        app_folder, f"temp_profile_{int(time.time())}.{ext}"
+    )
+
+    # 1. Trata URIs 'content://' no Android usando Java ContentResolver
+    if platform == "android" and uri_str.startswith("content://"):
+        try:
+            from jnius import autoclass 
+
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            Uri = autoclass("android.net.Uri")
+
+            context = PythonActivity.mActivity
+            content_resolver = context.getContentResolver()
+            input_stream = content_resolver.openInputStream(Uri.parse(uri_str))
+
+            with open(dest_path, "wb") as output_file:
+                buffer = bytearray(1024 * 1024)  # 1MB
+                while True:
+                    bytes_read = input_stream.read(buffer)
+                    if bytes_read == -1:
+                        break
+                    output_file.write(buffer[:bytes_read])
+
+            input_stream.close()
+            print(
+                f"VIGIAA DEBUG: Foto copiada via ContentResolver -> {dest_path}"
+            )
+            return dest_path
+        except Exception as e:
+            print(f"VIGIAA DEBUG ERROR: ContentResolver falhou: {e}")
+            return None
+
+    # 2. Trata caminhos físicos padrão (Desktop ou prefixos 'file://')
+    try:
+        clean_path = uri_str.replace("file://", "")
+        shutil.copy2(clean_path, dest_path)
+        print(f"VIGIAA DEBUG: Foto copiada via shutil -> {dest_path}")
+        return dest_path
+    except Exception as e:
+        print(f"VIGIAA DEBUG ERROR: shutil falhou: {e}")
+        return (
+            original_path
+            if os.path.exists(original_path)
+            else None
+        )
