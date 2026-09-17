@@ -93,7 +93,11 @@ export default function LoginScreen({ navigation }) {
             // Se o backend confirmar que o usuário logou lá no navegador
             if (data.status === 'success' && data.access_token) {
               clearInterval(checkLoginInterval); // Para de perguntar
-              await AsyncStorage.setItem('session_token', data.access_token); // Salva o token
+              const tokenReal = typeof data.access_token === 'object' 
+                ? data.access_token.access 
+                : data.access_token;
+
+              await AsyncStorage.setItem('session_token', tokenReal);
               setErrorMsg('Conectado! Redirecionando...');
               
               // Pequeno delay para o usuário ler a mensagem de sucesso antes de pular de tela
@@ -130,7 +134,7 @@ export default function LoginScreen({ navigation }) {
           <MaterialCommunityIcons name="email-outline" size={20} color="#777" />
           <TextInput
             style={styles.input}
-            placeholder="email@domain.com"
+            placeholder="Usuário"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -142,7 +146,7 @@ export default function LoginScreen({ navigation }) {
           <MaterialCommunityIcons name="lock-outline" size={20} color="#777" />
           <TextInput
             style={styles.input}
-            placeholder="senha"
+            placeholder="Senha"
             value={password}
             onChangeText={setPassword}
             secureTextEntry

@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ExploreTab from '../screens/Tabs/ExploreTab';
 import HomeTab from '../screens/Tabs/HomeTab';
@@ -10,7 +11,7 @@ import ProfileTab from '../screens/Tabs/ProfileTab';
 
 const Tab = createBottomTabNavigator();
 
-// Componente do Cabeçalho Global (igual à sua imagem de referência)
+// Cabeçalho Global (mantido intacto)
 const CustomHeader = () => (
   <LinearGradient 
     colors={['#3AC0ED', '#72FC90']} 
@@ -19,7 +20,6 @@ const CustomHeader = () => (
     style={styles.header}
   >
     <View style={styles.headerLeft}>
-      {/* Ajuste o nome do arquivo da logo se necessário */}
       <Image source={require('../../assets/images/logo-sem-fundo.png')} style={styles.logo} />
       <Text style={styles.headerTitle}>VigiAA</Text>
     </View>
@@ -30,16 +30,21 @@ const CustomHeader = () => (
 );
 
 export default function TabNavigator() {
+  // 1. Pegamos a medida exata da barra de navegação do celular
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={{
-        headerShown: true,             // 1. Habilita o cabeçalho superior
-        header: () => <CustomHeader />, // 2. Injeta o nosso cabeçalho customizado
+        headerShown: true,
+        header: () => <CustomHeader />,
         tabBarStyle: { 
           backgroundColor: '#3AC0ED', 
-          height: Platform.OS === 'ios' ? 85 : 70,       // Mais alto para evitar a barra do sistema
-          paddingBottom: Platform.OS === 'ios' ? 25 : 15, // Empurra os ícones para cima
-          paddingTop: 5,
+          // 2. Altura base (60) + o tamanho da barra do sistema
+          height: 60 + insets.bottom, 
+          // 3. Empurra os ícones para cima exatamente o tamanho da barra
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 10, 
+          paddingTop: 10,
         },
         tabBarActiveTintColor: '#000',
         tabBarInactiveTintColor: 'rgba(0,0,0,0.5)',
@@ -84,7 +89,7 @@ export default function TabNavigator() {
 const styles = StyleSheet.create({
   header: {
     height: 100,
-    paddingTop: 45, // Espaço para a barra de status (bateria/relógio) do celular
+    paddingTop: 45, 
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
